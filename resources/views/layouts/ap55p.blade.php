@@ -22,7 +22,6 @@
 
     {{-- ✅ تحميل Tailwind + app.js عبر Vite فقط --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    {{-- <script src="https://cdn.tailwindcss.com"></script> --}}
 </head>
 
 <body class="app-surface bg-gray-900 text-gray-100 antialiased">
