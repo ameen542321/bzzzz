@@ -396,21 +396,31 @@ class InvoiceController extends Controller
 
     public function downloadPDF($storeOrInvoice, ?Invoice $invoice = null)
     {
+        $store = $storeOrInvoice instanceof Store ? $storeOrInvoice : null;
+
         if ($storeOrInvoice instanceof Invoice) {
             $invoice = $storeOrInvoice;
-        } elseif ($invoice instanceof Invoice) {
-            // owner route passes {store} then {invoice}
-        } else {
+        } elseif (!$invoice instanceof Invoice) {
             $invoice = Invoice::findOrFail($storeOrInvoice);
         }
 
+        $invoice->loadMissing(['sale.store']);
+        $authorized = false;
+
         if (Auth::guard('accountant')->check()) {
-            abort_unless(optional($invoice->sale)->store_id === optional(Auth::guard('accountant')->user())->store_id, 404);
+            $authorized = (int) optional($invoice->sale)->store_id === (int) optional(Auth::guard('accountant')->user())->store_id;
         }
 
-        if (Auth::guard('web')->check()) {
-            abort_unless(optional(optional($invoice->sale)->store)->user_id === Auth::guard('web')->id(), 404);
+        if (!$authorized && Auth::guard('web')->check()) {
+            $authorized = (int) optional(optional($invoice->sale)->store)->user_id === (int) Auth::guard('web')->id();
+
+            if ($authorized && $store) {
+                $authorized = (int) optional($invoice->sale)->store_id === (int) $store->id
+                    && (int) $store->user_id === (int) Auth::guard('web')->id();
+            }
         }
+
+        abort_unless($authorized, 403);
 
         $invoice->load(['sale.items.product', 'sale.store']);
 

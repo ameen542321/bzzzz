@@ -1,7 +1,7 @@
 @extends('layouts.auth')
 
 @section('content')
-<div class="max-w-md mx-auto mt-10">
+<div class="mx-auto">
 
     <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center">
@@ -15,7 +15,7 @@
         <p class="text-gray-500 text-xs mt-3 tracking-[0.2em] uppercase font-bold">Smart Management System</p>
     </div>
 
-    <div class="bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+    <div class="card-polished rounded-2xl p-8 relative overflow-hidden">
         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
 
         <h1 class="text-xl font-bold text-center mb-8 text-gray-200">الدخول إلى النظام</h1>

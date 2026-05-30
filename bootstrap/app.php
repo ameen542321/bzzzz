@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Web middleware group
         $middleware->group('web', [
 
+            // رؤوس حماية المتصفح لكل صفحات الويب
+            \App\Http\Middleware\SecurityHeaders::class,
+
             /* |--- ⭐ تشغيل الجدولة ---
             | تم تعطيل الحارس القديم لأنه يسبب بطء شديد في الموقع (انتحار الأداء)
             | \App\Http\Middleware\RunScheduler::class,
