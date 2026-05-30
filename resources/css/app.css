@@ -1,0 +1,47 @@
+@tailwind base;
+ @tailwind components;
+  @tailwind utilities;
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+
+body {
+    @apply bg-gray-900 text-gray-100;
+}
+/* body {
+    @apply bg-darkBg text-darkText;
+} */
+
+
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* خاص بلهمبرجر */
+/* #sidebar.w-16 .label {
+    display: none;
+} */
+/* Hide scrollbar for Chrome, Safari and Opera */
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.text-carled {
+    color: #00C4B4; /* تركوازي جميل */
+}
+
+.bg-carled {
+    background-color: #00C4B4;
+}

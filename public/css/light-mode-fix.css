@@ -1,0 +1,823 @@
+/* ====== ملف الوضع الفاتح الموحد - بدون تكرار ====== */
+
+/* ====== تعريف المتغيرات (مرة واحدة) ====== */
+:root {
+    --light-bg: #f1f5f9;
+    --light-card: #ffffff;
+    --light-text: #1e293b;
+    --light-text-soft: #334155;
+    --light-border: #e2e8f0;
+    --light-muted: #64748b;
+    --light-input-bg: #f8fafc;
+    --light-input-border: #cbd5e1;
+    --light-focus: #4f46e5;
+    --light-focus-alt: #ec4899;
+}
+
+/* ====== الأساسيات ====== */
+html:not(.dark) body {
+    background-color: var(--light-bg) !important;
+    color: var(--light-text) !important;
+}
+
+/* ====== شريط التمرير ====== */
+html:not(.dark) ::-webkit-scrollbar-track {
+    background: var(--light-bg) !important;
+}
+html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: var(--light-input-border) !important;
+}
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+}
+html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--light-input-border) !important;
+}
+
+/* ====== الحاويات والخلفيات (موحدة) ====== */
+html:not(.dark) .bg-gray-900,
+html:not(.dark) .bg-gray-800,
+html:not(.dark) .bg-gray-750,
+html:not(.dark) .bg-gray-950,
+html:not(.dark) .bg-slate-900,
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-slate-950,
+html:not(.dark) [class*="bg-gray-800/"],
+html:not(.dark) [class*="bg-gray-900/"],
+html:not(.dark) [class*="bg-slate-800/"],
+html:not(.dark) [class*="bg-slate-900/"],
+html:not(.dark) [class*="bg-white/"],
+html:not(.dark) .employee-card,
+html:not(.dark) .modal-content,
+html:not(.dark) #debtModal .bg-slate-900,
+html:not(.dark) #collectModal .bg-slate-900,
+html:not(.dark) #withdrawalModal .bg-slate-900,
+html:not(.dark) #creditSaleModal .bg-slate-900,
+html:not(.dark) #expenseModal .bg-slate-900,
+html:not(.dark) #editModal .bg-slate-900 {
+    background-color: var(--light-card) !important;
+    background-image: none !important;
+    border-color: var(--light-border) !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+}
+
+/* ====== النصوص والعناوين (موحدة) ====== */
+html:not(.dark) .text-white,
+html:not(.dark) [class*="text-gray-100"],
+html:not(.dark) [class*="text-gray-200"],
+html:not(.dark) [class*="text-gray-300"],
+html:not(.dark) [class*="text-slate-100"],
+html:not(.dark) [class*="text-slate-200"],
+html:not(.dark) [class*="text-slate-300"],
+html:not(.dark) h1, html:not(.dark) h2,
+html:not(.dark) h3, html:not(.dark) h4,
+html:not(.dark) #modalTitle,
+html:not(.dark) .group-hover\:text-white {
+    color: var(--light-text) !important;
+}
+
+/* النصوص الباهتة */
+html:not(.dark) [class*="text-gray-400"],
+html:not(.dark) [class*="text-gray-500"],
+html:not(.dark) [class*="text-gray-600"],
+html:not(.dark) [class*="text-slate-400"],
+html:not(.dark) [class*="text-slate-500"],
+html:not(.dark) #empNameDisplay,
+html:not(.dark) #collectEmpName {
+    color: var(--light-muted) !important;
+}
+
+/* نصوص الجداول والثانوية */
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300,
+html:not(.dark) .text-gray-600,
+html:not(.dark) .text-gray-700 {
+    color: var(--light-text-soft) !important;
+}
+
+/* ====== الحدود والفواصل (موحدة) ====== */
+html:not(.dark) .border,
+html:not(.dark) [class*="border-gray-"],
+html:not(.dark) [class*="border-slate-"],
+html:not(.dark) [class*="divide-"],
+html:not(.dark) table,
+html:not(.dark) th,
+html:not(.dark) td,
+html:not(.dark) tr {
+    border-color: var(--light-border) !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+}
+
+html:not(.dark) .border-pink-800 { border-color: #f9a8d4 !important; }
+html:not(.dark) .border-blue-800 { border-color: #93c5fd !important; }
+html:not(.dark) .border-slate-800 { border-color: var(--light-border) !important; }
+
+/* ====== الحقول والمدخلات (موحدة) ====== */
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea,
+html:not(.dark) .bg-slate-950,
+html:not(.dark) .bg-gray-700\/50 {
+    background-color: var(--light-input-bg) !important;
+    color: var(--light-text) !important;
+    border-color: var(--light-input-border) !important;
+    border-width: 1px !important;
+    box-shadow: none !important;
+}
+
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+    background-color: var(--light-card) !important;
+    border-color: var(--light-focus) !important;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08) !important;
+    outline: none !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+    color: #94a3b8 !important;
+}
+
+html:not(.dark) select option {
+    background-color: var(--light-card) !important;
+    color: var(--light-text) !important;
+}
+
+html:not(.dark) #employeeSearch {
+    background-color: var(--light-card) !important;
+}
+
+/* ====== العناصر الدائرية والأفاتار ====== */
+html:not(.dark) .bg-slate-800:not(a):not(button),
+html:not(.dark) .bg-slate-900\/50 {
+    background-color: #f1f5f9 !important;
+    border-color: var(--light-border) !important;
+    color: #475569 !important;
+}
+
+html:not(.dark) .bg-blue-900\/40,
+html:not(.dark) .bg-slate-800.text-blue-400 {
+    background-color: #eff6ff !important;
+    border-color: #dbeafe !important;
+    color: #2563eb !important;
+}
+
+html:not(.dark) .bg-blue-900\/20,
+html:not(.dark) .bg-blue-600\/20 {
+    background-color: #eff6ff !important;
+    color: #2563eb !important;
+}
+
+/* ====== أزرار الرجوع (موحدة) ====== */
+html:not(.dark) a.bg-gray-800,
+html:not(.dark) a.bg-slate-800,
+html:not(.dark) .bg-gray-700:not(.from-purple-600):not(.bg-blue-600),
+html:not(.dark) .bg-slate-800.text-slate-200 {
+    background-color: #f1f5f9 !important;
+    color: var(--light-text) !important;
+    border: 1px solid var(--light-input-border) !important;
+}
+
+html:not(.dark) a.bg-gray-800:hover,
+html:not(.dark) a.bg-slate-800:hover,
+html:not(.dark) .bg-gray-700:hover,
+html:not(.dark) .bg-slate-800.text-slate-200:hover {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) a.bg-gray-800 svg,
+html:not(.dark) a.bg-slate-800 svg,
+html:not(.dark) .bg-gray-700 svg {
+    stroke: var(--light-text) !important;
+    color: var(--light-text) !important;
+}
+
+/* ====== الأزرار الملونة (موحدة) ====== */
+html:not(.dark) .bg-blue-600,
+html:not(.dark) .from-blue-600,
+html:not(.dark) .from-indigo-600,
+html:not(.dark) .from-purple-600 {
+    background-color: #2563eb !important;
+    background-image: none !important;
+    color: #ffffff !important;
+}
+
+html:not(.dark) .from-purple-600 {
+    background-color: #7c3aed !important;
+}
+
+/* ====== التنبيهات والحالات (موحدة) ====== */
+/* أخضر */
+html:not(.dark) [class*="bg-green-900/"],
+html:not(.dark) [class*="bg-green-600/"] {
+    background-color: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+    color: #166534 !important;
+}
+html:not(.dark) [class*="text-green-"] {
+    color: #15803d !important;
+}
+
+/* أحمر */
+html:not(.dark) [class*="bg-red-900/"],
+html:not(.dark) [class*="bg-red-600/"] {
+    background-color: #fef2f2 !important;
+    border-color: #fecaca !important;
+    color: #991b1b !important;
+}
+html:not(.dark) [class*="text-red-"] {
+    color: #b91c1c !important;
+}
+
+/* أصفر */
+html:not(.dark) [class*="bg-yellow-900/"],
+html:not(.dark) [class*="from-yellow-900/"] {
+    background-color: #fffbeb !important;
+    border-color: #fef3c7 !important;
+    color: #92400e !important;
+}
+html:not(.dark) [class*="text-yellow-"] {
+    color: #a16207 !important;
+}
+
+/* أزرق */
+html:not(.dark) [class*="bg-blue-900/"],
+html:not(.dark) [class*="bg-blue-600/"],
+html:not(.dark) [class*="from-blue-900/"] {
+    background-color: #eff6ff !important;
+    border-color: #bfdbfe !important;
+    color: #1e40af !important;
+}
+html:not(.dark) [class*="text-blue-"] {
+    color: #1d4ed8 !important;
+}
+
+/* بنفسجي */
+html:not(.dark) [class*="bg-purple-600/"],
+html:not(.dark) [class*="from-purple-900/"] {
+    background-color: #faf5ff !important;
+    border-color: #e9d5ff !important;
+    color: #6b21a8 !important;
+}
+
+/* ====== الجداول ====== */
+html:not(.dark) .bg-gray-900 {
+    background-color: #f1f5f9 !important; /* رأس الجدول */
+}
+
+/* ====== المودالات والخلفيات الضبابية ====== */
+html:not(.dark) .bg-slate-950\/90,
+html:not(.dark) .fixed.inset-0.bg-slate-950\/90,
+html:not(.dark) #withdrawalModal > div:last-child,
+html:not(.dark) #expenseModal,
+html:not(.dark) #editModal {
+    background-color: rgba(15, 23, 42, 0.2) !important;
+    backdrop-filter: blur(2px) !important;
+}
+
+html:not(.dark) .sticky.top-0,
+html:not(.dark) #creditSaleModal .sticky.top-0,
+html:not(.dark) #withdrawalModal .sticky.top-0 {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(8px) !important;
+    border-bottom: 1px solid var(--light-border) !important;
+}
+
+/* ====== القوائم المنسدلة ====== */
+html:not(.dark) .absolute.z-50.bg-gray-800 {
+    background-color: var(--light-card) !important;
+    border: 1px solid var(--light-border) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ====== سلة المنتجات وسجل العمليات ====== */
+html:not(.dark) .bg-gray-800\/40,
+html:not(.dark) #debtsList .bg-slate-800\/40,
+html:not(.dark) .bg-slate-800\/40.p-2.rounded-lg.italic {
+    background-color: var(--light-input-bg) !important;
+    border-color: var(--light-border) !important;
+    color: var(--light-muted) !important;
+}
+
+html:not(.dark) .bg-slate-800.mr-2 {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .group:hover.border-r-2 {
+    border-color: var(--light-focus) !important;
+}
+
+/* ====== التدرجات اللونية ====== */
+html:not(.dark) [class*="bg-gradient-"]:not(.from-blue-600):not(.from-indigo-600):not(.from-purple-600) {
+    background-image: none !important;
+    background-color: var(--light-input-bg) !important;
+    border: 1px solid var(--light-border) !important;
+}
+
+/* ====== الظلال ====== */
+html:not(.dark) [class*="shadow-"] {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ====== الأيقونات ====== */
+html:not(.dark) svg:not([class*="text-white"]) {
+    stroke: currentColor;
+    color: var(--light-text-soft) !important;
+}
+
+/* ====== صناديق الإحصائيات ====== */
+html:not(.dark) [class*="from-"]:is(.from-blue-900\/30, .from-green-900\/30, .from-purple-900\/30, .from-red-900\/30, .from-yellow-900\/30) {
+    --tw-gradient-from: rgba(0, 0, 0, 0.02) !important;
+    --tw-gradient-to: rgba(0, 0, 0, 0.03) !important;
+    border-color: var(--light-border) !important;
+}
+
+/* ====== عناصر خاصة ====== */
+html:not(.dark) .bg-gradient-to-r.from-yellow-900\/30 {
+    background: #fefce8 !important;
+    color: #a16207 !important;
+    border-color: #fef3c7 !important;
+}
+/* ====== ✅ إضافات الصفحات الناقصة - نسخة CSS عادية ====== */
+
+/* 🏬 صفحة المتاجر */
+html:not(.dark) .bg-gradient-to-r.from-gray-900\/50,
+html:not(.dark) .bg-gradient-to-br.from-gray-900\/50,
+html:not(.dark) .bg-gray-900\/50 {
+    background-color: var(--light-card) !important;
+    background-image: none !important;
+    border: 1px solid var(--light-border) !important;
+}
+
+html:not(.dark) .bg-gradient-to-r.from-yellow-900\/10 {
+    background-color: #fffbeb !important;
+    background-image: none !important;
+    border: 1px solid #fef3c7 !important;
+}
+
+html:not(.dark) .text-yellow-300 {
+    color: #92400e !important;
+}
+
+html:not(.dark) .bg-blue-500\/10 { background-color: #eff6ff !important; }
+html:not(.dark) .bg-green-500\/10 { background-color: #f0fdf4 !important; }
+html:not(.dark) .bg-yellow-500\/10 { background-color: #fffbeb !important; }
+html:not(.dark) .bg-purple-500\/10 { background-color: #faf5ff !important; }
+html:not(.dark) .bg-red-500\/10 { background-color: #fef2f2 !important; }
+
+html:not(.dark) .bg-gradient-to-r.from-gray-900\/30 {
+    background-color: #f8fafc !important;
+    background-image: none !important;
+    border: 1px solid var(--light-border) !important;
+}
+
+html:not(.dark) button:disabled.bg-gray-800\/50,
+html:not(.dark) button:disabled.bg-slate-800\/50 {
+    background-color: #f1f5f9 !important;
+    color: #94a3b8 !important;
+    border: 1px solid #e2e8f0 !important;
+    cursor: not-allowed !important;
+}
+
+html:not(.dark) .group-hover\:opacity-100.bg-gray-900:not(body) {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+html:not(.dark) .border-b-gray-900 {
+    border-bottom-color: #1e293b !important;
+}
+
+/* 📊 صفحة التقارير */
+html:not(.dark) .bg-gray-800\/60 {
+    background-color: #ffffff !important;
+    border: 1px solid var(--light-border) !important;
+}
+
+html:not(.dark) .bg-gray-800\/30 {
+    background-color: #f8fafc !important;
+    border-top: 1px solid var(--light-border) !important;
+}
+
+/* 👥 صفحة الموظفين */
+html:not(.dark) .hover\:bg-gray-800:hover {
+    background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) .bg-green-900\/30 {
+    background-color: #f0fdf4 !important;
+    color: #166534 !important;
+    border-color: #bbf7d0 !important;
+}
+
+html:not(.dark) .bg-red-900\/30 {
+    background-color: #fef2f2 !important;
+    color: #991b1b !important;
+    border-color: #fecaca !important;
+}
+
+/* 📦 صفحة المنتجات */
+html:not(.dark) .bg-green-800 {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+}
+
+html:not(.dark) .bg-red-800 {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+}
+
+html:not(.dark) .bg-yellow-800 {
+    background-color: #fef9c3 !important;
+    color: #854d0e !important;
+}
+
+html:not(.dark) .bg-gray-800\/70 {
+    background-color: #f1f5f9 !important;
+    border: 1px solid var(--light-border) !important;
+}
+
+/* 🛒 صفحة الفواتير */
+html:not(.dark) .bg-green-900 {
+    background-color: #f0fdf4 !important;
+    color: #166534 !important;
+}
+
+html:not(.dark) .bg-yellow-900 {
+    background-color: #fffbeb !important;
+    color: #92400e !important;
+}
+
+html:not(.dark) .bg-red-900 {
+    background-color: #fef2f2 !important;
+    color: #991b1b !important;
+}
+
+html:not(.dark) .bg-gray-900 {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+}
+
+html:not(.dark) .bg-gray-900\/80 {
+    background-color: #f8fafc !important;
+    border-top: 2px solid var(--light-border) !important;
+}
+
+/* ⚙️ صفحة الإعدادات */
+html:not(.dark) .bg-gray-800\/20 {
+    background-color: #ffffff !important;
+    border-bottom: 2px solid transparent !important;
+}
+
+html:not(.dark) .bg-gray-800\/20.border-blue-500 {
+    background-color: #eff6ff !important;
+    border-bottom: 2px solid #2563eb !important;
+}
+
+html:not(.dark) .divide-gray-700 {
+    border-color: var(--light-border) !important;
+}
+
+/* 🔔 صفحة الإشعارات */
+html:not(.dark) .bg-blue-900\/10 {
+    background-color: #eff6ff !important;
+    border-right: 3px solid #2563eb !important;
+}
+
+html:not(.dark) .bg-blue-600\/10 { background-color: #eff6ff !important; }
+html:not(.dark) .bg-green-600\/10 { background-color: #f0fdf4 !important; }
+html:not(.dark) .bg-red-600\/10 { background-color: #fef2f2 !important; }
+html:not(.dark) .bg-yellow-600\/10 { background-color: #fffbeb !important; }
+
+/* 📱 عناصر مشتركة */
+html:not(.dark) .bg-gray-800\/70.text-white {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+}
+
+html:not(.dark) .hover\:bg-gray-700:hover {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .bg-gray-800\/60.animate-pulse {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .bg-gray-800\/90 {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+html:not(.dark) .bg-yellow-800\/50 {
+    background-color: #fef9c3 !important;
+    color: #854d0e !important;
+}
+
+/* 🎯 كلاسات إضافية */
+html:not(.dark) [class*="bg-black/"] {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+html:not(.dark) [class*="hover:bg-gray-"]:hover,
+html:not(.dark) [class*="hover:bg-slate-"]:hover {
+    background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) [class*="ring-gray-"] {
+    --tw-ring-color: #e2e8f0 !important;
+}
+
+html:not(.dark) [class*="divide-gray-"] > * + * {
+    border-color: var(--light-border) !important;
+}
+/* ====== تكملة تنظيف صفحة المتاجر (الوضع الفاتح) ====== */
+html:not(.dark) {
+
+    /* 1. الحاويات الكبيرة والخلفيات المتدرجة (Stats & Empty State) */
+    .bg-gradient-to-r.from-gray-900\/50.to-gray-900\/30,
+    .bg-gradient-to-br.from-gray-900\/50.to-gray-900\/30,
+    .bg-gradient-to-r.from-gray-900\/30.to-gray-900\/10,
+    .bg-gray-900\/50 {
+        background-color: var(--light-card) !important;
+        background-image: none !important;
+        border-color: var(--light-border) !important;
+    }
+
+    /* 2. بطاقات الإحصائيات الصغيرة (Grid Items) */
+    .grid .bg-gray-900\/50 {
+        background-color: #f8fafc !important; /* لون رمادي خفيف جداً للتمييز */
+        border-color: var(--light-border) !important;
+    }
+
+    /* 3. تنبيهات التحذير (Warning Alert) */
+    .bg-gradient-to-r.from-yellow-900\/10.to-yellow-900\/5 {
+        background-color: #fffbeb !important;
+        background-image: none !important;
+        border-color: #fef3c7 !important;
+    }
+
+    .text-yellow-300 {
+        color: #92400e !important; /* نص أصفر داكن ليكون مقروءاً */
+    }
+
+    /* 4. معالجة التلميح (Tooltip) عند امتلاء الخطة */
+    .bg-gray-900.text-gray-300.rounded-lg.shadow-xl {
+        background-color: #1e293b !important; /* نتركه داكناً كـ Tooltip كلاسيكي أو اجعله أبيض إذا فضلت */
+        border-color: #0f172a !important;
+    }
+
+    .border-b-gray-900 {
+        border-bottom-color: #1e293b !important;
+    }
+
+    /* 5. أيقونات الإحصائيات (Icons Backgrounds) */
+    .bg-blue-500\/10 { background-color: #eff6ff !important; }
+    .bg-green-500\/10 { background-color: #f0fdf4 !important; }
+    .bg-yellow-500\/10 { background-color: #fffbeb !important; }
+    .bg-purple-500\/10 { background-color: #faf5ff !important; }
+
+    /* 6. الفواصل والأزرار المعطلة */
+    .border-gray-800, .border-gray-700 {
+        border-color: var(--light-border) !important;
+    }
+
+    .bg-gray-800\/50.text-gray-500.cursor-not-allowed {
+        background-color: #f1f5f9 !important;
+        border-color: #e2e8f0 !important;
+        color: #94a3b8 !important;
+    }
+
+    /* 7. التوجيه السريع في الأسفل (Inline Flex Container) */
+    .inline-flex.bg-gradient-to-r.from-gray-900\/50 {
+        background-color: #f8fafc !important;
+        border-color: var(--light-border) !important;
+    }
+
+    /* 8. نصوص الوصف والرمادي */
+    .text-gray-400, .text-gray-500 {
+        color: var(--light-muted) !important;
+    }
+
+    /* 9. أيقونة التاج ومعلومات الخطة */
+    .bg-gradient-to-br.from-blue-500\/10.to-blue-600\/10 {
+        background-color: #eff6ff !important;
+        background-image: none !important;
+        border: 1px solid #dbeafe !important;
+    }
+}
+/* ====== تعديل بطاقة المتجر (Store Card) ذات الألوان الصريحة ====== */
+html:not(.dark) {
+
+    /* تحويل خلفية البطاقة والحدود الصريحة */
+    .bg-\[\#1b1d21\] {
+        background-color: var(--light-card) !important;
+    }
+
+    .border-\[\#2a2d31\],
+    .hover\:border-\[\#3a3d41\]:hover {
+        border-color: var(--light-border) !important;
+    }
+
+    /* الفاصل السفلي داخل البطاقة */
+    .border-t.border-\[\#2a2d31\] {
+        border-top-color: var(--light-border) !important;
+    }
+
+    /* تعديل نصوص البيانات الداخلية (السجل، الضريبة، إلخ) */
+    .text-gray-300 {
+        color: var(--light-text) !important;
+    }
+
+    .text-gray-500 {
+        color: var(--light-muted) !important;
+    }
+
+    /* معالجة أيقونات الألوان الباهتة داخل البطاقة */
+    .text-blue-400\/80 { color: #2563eb !important; }
+    .text-emerald-400\/80 { color: #059669 !important; }
+
+}
+/* ====== 📊 تنظيف صفحة تقرير الاستهلاك الداخلي (الوضع الفاتح) ====== */
+html:not(.dark) {
+
+    /* 1. الشريط العلوي وحاوية الفلترة */
+    .bg-white.dark\:bg-gray-800.border-gray-200.dark\:border-gray-700 {
+        background-color: var(--light-card) !important;
+        border-color: var(--light-border) !important;
+    }
+
+    /* 2. حقول الإدخال والقوائم المنسدلة */
+    .bg-gray-50.dark\:bg-gray-700.border-gray-300.dark\:border-gray-600 {
+        background-color: var(--light-input-bg) !important;
+        border-color: var(--light-input-border) !important;
+        color: var(--light-text) !important;
+    }
+
+    /* 3. البطاقات الإحصائية (إزالة التدرجات الداكنة) */
+    [class*="dark:from-blue-900/20"],
+    [class*="dark:from-green-900/20"],
+    [class*="dark:from-purple-900/20"] {
+        background-image: none !important;
+        background-color: #f8fafc !important; /* لون فاتح محايد */
+        border-color: var(--light-border) !important;
+    }
+
+    /* 4. بطاقة المنتج (Store Product Card) - التدرج من الأبيض إلى الرمادي */
+    .bg-gradient-to-br.from-white.to-gray-50.dark\:from-gray-800.dark\:to-gray-900 {
+        background-image: none !important;
+        background-color: var(--light-card) !important;
+        border-color: var(--light-border) !important;
+    }
+
+    /* 5. القسم الداخلي للكمية داخل بطاقة المنتج */
+    .bg-gray-50.dark\:bg-gray-900 {
+        background-color: #f1f5f9 !important; /* رمادي فاتح جداً للتمييز */
+        border: 1px solid var(--light-border) !important;
+    }
+
+    /* 6. شريط التقدم (Progress Bar Track) */
+    .bg-gray-200.dark\:bg-gray-700.rounded-full.h-2 {
+        background-color: #e2e8f0 !important;
+    }
+
+    /* 7. شاشة التحميل (Loading Overlay) */
+    .fixed.inset-0.bg-black\/50 {
+        background-color: rgba(0, 0, 0, 0.1) !important; /* تخفيف سواد الخلفية عند التحميل */
+        backdrop-filter: blur(4px) !important;
+    }
+
+    .fixed.inset-0.bg-black\/50 .bg-white.dark\:bg-gray-800 {
+        background-color: var(--light-card) !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* 8. النصوص */
+    .text-gray-800.dark\:text-white {
+        color: var(--light-text) !important;
+    }
+
+    .text-gray-600.dark\:text-gray-400,
+    .text-gray-500.dark\:text-gray-400 {
+        color: var(--light-muted) !important;
+    }
+
+    /* 9. زر "عرض المزيد" وزر "رجوع" */
+    .bg-gray-100.dark\:bg-gray-700,
+    .bg-gray-100.dark\:bg-gray-800 {
+        background-color: #f1f5f9 !important;
+        border: 1px solid var(--light-input-border) !important;
+        color: var(--light-text) !important;
+    }
+}
+/* ====== ✅ إصلاح المودل في صفحة تقرير الاستهلاك الداخلي ====== */
+html:not(.dark) .fixed.inset-0.z-\[60\],
+html:not(.dark) .fixed.inset-0.z-\[9999\] {
+    /* خلفية المودل الشفافة */
+    background-color: rgba(15, 23, 42, 0.2) !important;
+    backdrop-filter: blur(2px) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] .bg-white.dark\:bg-gray-800,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .bg-white.dark\:bg-gray-800 {
+    background-color: var(--light-card) !important;
+    border-color: var(--light-border) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* عنوان المودل */
+html:not(.dark) .fixed.inset-0.z-\[60\] .border-b,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .border-b {
+    border-bottom-color: var(--light-border) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-gray-900.dark\:text-white,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .text-gray-900.dark\:text-white {
+    color: var(--light-text) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-blue-600.dark\:text-blue-400 {
+    color: var(--light-focus) !important;
+}
+
+/* الجدول داخل المودل */
+html:not(.dark) .fixed.inset-0.z-\[60\] table,
+html:not(.dark) .fixed.inset-0.z-\[9999\] table {
+    border-color: var(--light-border) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] th,
+html:not(.dark) .fixed.inset-0.z-\[9999\] th {
+    background-color: #f1f5f9 !important;
+    color: var(--light-text) !important;
+    border-bottom: 2px solid var(--light-border) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] td,
+html:not(.dark) .fixed.inset-0.z-\[9999\] td {
+    color: var(--light-text-soft) !important;
+    border-bottom-color: var(--light-border) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] tr:hover,
+html:not(.dark) .fixed.inset-0.z-\[9999\] tr:hover {
+    background-color: #f8fafc !important;
+}
+
+/* الأرقام في الجدول */
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-blue-700,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .text-blue-700 {
+    color: var(--light-focus) !important;
+}
+
+/* الملاحظات */
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-gray-400.italic,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .text-gray-400.italic {
+    color: var(--light-muted) !important;
+}
+
+/* قسم الإغلاق في أسفل المودل */
+html:not(.dark) .fixed.inset-0.z-\[60\] .bg-gray-50.dark\:bg-gray-700,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .bg-gray-50.dark\:bg-gray-700 {
+    background-color: #f1f5f9 !important;
+    border-top: 1px solid var(--light-border) !important;
+}
+
+/* زر الإغلاق */
+html:not(.dark) .fixed.inset-0.z-\[60\] .bg-gray-200.dark\:bg-gray-600,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .bg-gray-200.dark\:bg-gray-600 {
+    background-color: var(--light-card) !important;
+    border: 1px solid var(--light-input-border) !important;
+    color: var(--light-text) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] .bg-gray-200.dark\:bg-gray-600:hover,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .bg-gray-200.dark\:bg-gray-600:hover {
+    background-color: #e2e8f0 !important;
+}
+
+/* زر X للإغلاق */
+html:not(.dark) .fixed.inset-0.z-\[60\] button.text-gray-400,
+html:not(.dark) .fixed.inset-0.z-\[9999\] button.text-gray-400 {
+    color: var(--light-muted) !important;
+}
+
+html:not(.dark) .fixed.inset-0.z-\[60\] button.text-gray-400:hover,
+html:not(.dark) .fixed.inset-0.z-\[9999\] button.text-gray-400:hover {
+    color: var(--light-text) !important;
+}
+
+/* رسالة "لا توجد عمليات" */
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-gray-500.dark\:text-gray-400,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .text-gray-500.dark\:text-gray-400 {
+    color: var(--light-muted) !important;
+}
+
+/* حالة التحميل داخل المودل */
+html:not(.dark) .fixed.inset-0.z-\[60\] .text-center.text-gray-400,
+html:not(.dark) .fixed.inset-0.z-\[9999\] .text-center.text-gray-400 {
+    color: var(--light-muted) !important;
+}

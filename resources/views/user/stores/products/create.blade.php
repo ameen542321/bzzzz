@@ -1,0 +1,251 @@
+@extends('dashboard.app')
+
+@section('title', 'إضافة منتج – متجر ' . $store->name)
+
+@section('content')
+
+<div class="max-w-4xl mx-auto py-10">
+    {{-- عرض الأخطاء إذا وجدت --}}
+    @if ($errors->any())
+        <div class="mb-6 p-4 bg-red-900/50 border border-red-500 text-red-200 rounded-lg text-sm">
+            <ul class="list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="flex items-center justify-between mb-8">
+        <a href="{{ route('user.stores.products.index', $store->id) }}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition shadow-sm">
+            <i class="fa-solid fa-arrow-right text-sm"></i>
+            <span class="text-sm font-medium">رجوع إلى المنتجات</span>
+        </a>
+        <h1 class="text-2xl font-bold text-white">إضافة منتج جديد</h1>
+        <div class="w-32"></div>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 p-8 rounded-xl shadow-2xl">
+        <form action="{{ route('user.stores.products.store', $store->id) }}" method="POST" enctype="multipart/form-data" id="productForm">
+            @csrf
+
+            @php
+                $mainCategories = $categories->where('is_main_category', 1);
+                $normalCategories = $categories->where('is_main_category', 0);
+            @endphp
+
+            {{-- القسم --}}
+            <div class="mb-6">
+                <label class="block text-gray-300 mb-2">القسم</label>
+                <select name="category_id" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-600">
+                    @foreach($mainCategories as $category)
+                        <option value="{{ $category->id }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }} (نشاط)</option>
+                    @endforeach
+                    @foreach($normalCategories as $category)
+                        <option value="{{ $category->id }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- نوع المنتج --}}
+            <div class="mb-6">
+                <label class="block text-gray-300 mb-2">نوع المنتج</label>
+                <select name="product_type" id="product_type" onchange="toggleFractionSection()"
+                        class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 font-bold text-blue-400 outline-none focus:ring-2 focus:ring-blue-600">
+                    <option value="standard" @selected(old('product_type') == 'standard')>📦 منتج عادي (بالوحدة)</option>
+                    <option value="fractional" @selected(old('product_type') == 'fractional')>✂️ منتج قابل للتجزئة (رول/قص)</option>
+                </select>
+            </div>
+
+            {{-- نظام الأطقم (للعادي فقط) --}}
+            <div id="splittable_options_div" class="mb-6 p-5 bg-purple-900/10 border border-purple-500/30 rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-purple-500/20 rounded-lg text-purple-400"><i class="fa-solid fa-boxes-stacked"></i></div>
+                        <div>
+                            <h3 class="text-white font-bold text-sm">نظام البيع كطقم / حبة</h3>
+                            <p class="text-[10px] text-gray-400">تفعيل خيار بيع أجزاء من هذا المنتج بشكل منفرد.</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="is_splittable" id="is_splittable" value="1" @checked(old('is_splittable')) onchange="toggleSplittableFields()" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                    </label>
+                </div>
+                <div id="splittable_fields" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5 border-t border-purple-500/20 pt-5" style="display: none;">
+                    <div class="md:col-span-2">
+                        <label class="block text-purple-400 mb-2 text-xs font-bold">الوضع الافتراضي في البيع السريع</label>
+                        <select name="quick_sale_default_unit" class="w-full bg-gray-800 border border-purple-500/40 text-white rounded-lg px-4 py-2">
+                            <option value="unit" @selected(old('quick_sale_default_unit', 'unit') === 'unit')>طقم (افتراضي)</option>
+                            <option value="piece" @selected(old('quick_sale_default_unit') === 'piece')>حبة</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-purple-400 mb-2 text-xs font-bold">عدد الحبات في الطقم</label>
+                        <input type="number" name="items_per_unit" id="items_per_unit" value="{{ old('items_per_unit', 4) }}" class="w-full bg-gray-800 border border-purple-500/40 text-white rounded-lg px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-purple-400 mb-2 text-xs font-bold">سعر الحبة المنفردة</label>
+                        <input type="number" step="0.01" name="piece_price" id="piece_price" value="{{ old('piece_price') }}" class="w-full bg-gray-800 border border-purple-500/40 text-white rounded-lg px-4 py-2">
+                    </div>
+                </div>
+            </div>
+
+            {{-- حقول الأمتار والرولات --}}
+            <div id="roll_length_div" class="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg" style="display: none;">
+                <label class="block text-blue-400 mb-2 font-bold italic"><i class="fa-solid fa-ruler-combined ml-1"></i> طول الرول (بالأمتار)</label>
+                <input type="number" step="0.01" name="roll_length" id="roll_length" value="{{ old('roll_length', 30) }}" class="w-full bg-gray-800 border border-blue-500/50 text-white rounded-lg px-4 py-2">
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-gray-300 mb-2">اسم المنتج</label>
+                <input type="text" name="name" value="{{ old('name') }}" required class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-gray-300 mb-2">سعر البيع</label>
+                    <input type="number" step="0.01" name="price" value="{{ old('price') }}" required class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-2">سعر التكلفة</label>
+                    <input type="number" step="0.01" name="cost_price" value="{{ old('cost_price') }}" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div id="standard_quantity_div">
+                    <label class="block text-gray-300 mb-2">الكمية الابتدائية (وحدات)</label>
+                    <input type="number" step="0.01" name="quantity" id="quantity" value="{{ old('quantity') }}" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                </div>
+                <div id="fractional_quantity_div" style="display: none;">
+                    <label class="block text-blue-400 mb-2 font-bold">الكمية (عدد الرولات)</label>
+                    <input type="number" step="0.01" name="num_rolls" id="num_rolls" value="{{ old('num_rolls') }}" class="w-full bg-gray-800 border border-blue-500/50 text-white rounded-lg px-4 py-2">
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-2">حد المخزون (التنبيه)</label>
+                    <input type="number" step="0.01" name="min_stock" value="{{ old('min_stock', 1) }}" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                </div>
+            </div>
+
+            <div id="waste_percentage_div" class="mb-6" style="display: none;">
+                <label class="block text-blue-400 mb-2 font-bold italic">نسبة الهالك %</label>
+                <input type="number" step="0.01" name="waste_percentage" value="{{ old('waste_percentage', 0) }}" class="w-full bg-gray-800 border border-blue-900 text-white rounded-lg px-4 py-2">
+            </div>
+
+            {{-- خيارات التجزئة --}}
+            <div id="fractions_section" style="display: none;" class="mb-8 p-6 bg-gray-800/50 border border-blue-900/30 rounded-xl">
+                <div class="flex items-center justify-between mb-4 border-b border-gray-700 pb-2">
+                    <h3 class="text-blue-400 font-bold flex items-center gap-2"><i class="fa-solid fa-scissors text-sm"></i> خيارات التجزئة</h3>
+                    <button type="button" onclick="addFractionRow()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg">+ إضافة خيار</button>
+                </div>
+                <div id="fractions_container"></div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-gray-300 mb-2">الوصف</label>
+                <textarea name="description" rows="3" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">{{ old('description') }}</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label class="block text-gray-300 mb-2 text-sm">الحالة</label>
+                    <select name="status" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                        <option value="active" @selected(old('status') == 'active')>مفعل</option>
+                        <option value="inactive" @selected(old('status') == 'inactive')>غير مفعل</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-2 text-sm">صورة المنتج</label>
+                    <input type="file" name="image" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                </div>
+            </div>
+
+            {{-- خيار البقاء في الصفحة (تم استعادته) --}}
+            <div class="mb-8 flex items-center gap-3 bg-gray-800/30 p-4 rounded-lg border border-gray-700">
+                <input type="checkbox" name="stay_here" id="stay_here" value="1" @checked(old('stay_here')) class="w-5 h-5 rounded border-gray-700 bg-gray-800 text-blue-600 focus:ring-blue-500">
+                <label for="stay_here" class="text-gray-300 text-sm font-medium cursor-pointer">البقاء في هذه الصفحة بعد الإضافة لإنشاء منتج آخر</label>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg transition shadow-lg active:scale-95">
+                <i class="fa-solid fa-save ml-2"></i> حفظ المنتج
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    let fractionIndex = 0;
+
+    function toggleFractionSection() {
+        const type = document.getElementById('product_type').value;
+        const splittableDiv = document.getElementById('splittable_options_div');
+        const rollDiv = document.getElementById('roll_length_div');
+        const fractionSec = document.getElementById('fractions_section');
+        const wasteDiv = document.getElementById('waste_percentage_div');
+        const stdQty = document.getElementById('standard_quantity_div');
+        const fracQty = document.getElementById('fractional_quantity_div');
+
+        if (type === 'fractional') {
+            splittableDiv.style.display = 'none';
+            rollDiv.style.display = 'block';
+            fractionSec.style.display = 'block';
+            wasteDiv.style.display = 'block';
+            stdQty.style.display = 'none';
+            fracQty.style.display = 'block';
+            
+            // إضافة سطر تلقائي إذا كان فارغاً
+            if (document.getElementById('fractions_container').children.length === 0) addFractionRow();
+        } else {
+            splittableDiv.style.display = 'block';
+            rollDiv.style.display = 'none';
+            fractionSec.style.display = 'none';
+            wasteDiv.style.display = 'none';
+            stdQty.style.display = 'block';
+            fracQty.style.display = 'none';
+            toggleSplittableFields();
+        }
+    }
+
+    function toggleSplittableFields() {
+        const isSplittable = document.getElementById('is_splittable').checked;
+        const fields = document.getElementById('splittable_fields');
+        fields.style.display = isSplittable ? 'grid' : 'none';
+    }
+
+    function addFractionRow() {
+        const container = document.getElementById('fractions_container');
+        const row = document.createElement('div');
+        row.id = `row_${fractionIndex}`;
+        row.className = "flex flex-col md:flex-row gap-3 mb-4 p-4 bg-gray-900/80 rounded-lg border border-gray-700 relative";
+        row.innerHTML = `
+            <div class="flex-1">
+                <input type="text" name="fractions[${fractionIndex}][option_label]" placeholder="اسم الخيار" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
+            </div>
+            <div class="w-full md:w-32">
+                <input type="number" step="0.01" name="fractions[${fractionIndex}][deduction_value]" placeholder="الخصم" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
+            </div>
+            <div class="w-full md:w-32">
+                <input type="number" step="0.01" name="fractions[${fractionIndex}][price]" placeholder="السعر" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button>
+        `;
+        container.appendChild(row);
+        fractionIndex++;
+    }
+
+    function disableNumberWheelInputs() {
+        document.querySelectorAll('input[type="number"]').forEach((input) => {
+            input.addEventListener('wheel', function(event) {
+                event.preventDefault();
+            }, { passive: false });
+        });
+    }
+
+    window.onload = function() {
+        toggleFractionSection();
+        disableNumberWheelInputs();
+    };
+</script>
+@endsection

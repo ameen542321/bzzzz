@@ -1,0 +1,27 @@
+/* ====== الخط العربي ====== */
+body {
+    font-family: 'Cairo', sans-serif;
+}
+
+/* ====== منع الرمش ====== */
+[x-cloak] {
+    display: none !important;
+}
+
+/* ====== الوضع المظلم - شريط التمرير ====== */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0f172a;  /* داكن - للمود الداكن */
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;  /* داكن - للمود الداكن */
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;  /* داكن - للمود الداكن */
+}
+
+/* ====== أي إعدادات أخرى خاصة بالوضع المظلم ====== */
+/* ضع هنا كل الكلاسات الخاصة بالـ Dark Mode فقط */
