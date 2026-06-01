@@ -553,6 +553,7 @@
     }
 
     // استرجاع الثيم المحفوظ
+    // ملاحظة: هذا السكربت مكرر مع تهيئة الثيم المبكرة في layout، وأُبقي هنا كدعم احتياطي لناف بار المالك.
     document.addEventListener('alpine:init', () => {
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark') {
