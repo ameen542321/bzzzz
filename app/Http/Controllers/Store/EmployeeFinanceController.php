@@ -11,6 +11,7 @@ use App\Models\Withdrawal;
 use App\Models\EmployeeLog;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use App\Http\Controllers\Controller;
 use App\Services\EmployeeLogService;
 
@@ -52,13 +53,14 @@ class EmployeeFinanceController extends Controller
     ]);
 
     $description = trim($request->description) ?: null;
+    $operationDate = Carbon::parse($request->date);
 
-    // منع التكرار
+    // منع التكرار لنفس تاريخ العملية المدخل
     $exists = Withdrawal::where('store_id', $person->store_id)
         ->where('person_id', $person->id)
         ->where('amount', $request->amount)
         ->where('description', $description)
-        ->whereDate('created_at', today())
+        ->whereDate('date', $operationDate->toDateString())
         ->exists();
 
     if ($exists) {
@@ -74,9 +76,10 @@ class EmployeeFinanceController extends Controller
         'person_type' => Employee::class,
         'amount'      => $request->amount,
         'description' => $description,
-        'date'        => $request->date,
+        'date'        => $operationDate->toDateString(),
         'status'      => 'pending',
-        'month'       => now()->format('Y-m'),
+        'month'       => $operationDate->format('Y-m'),
+        'created_at'  => $operationDate->copy()->setTimeFrom(now()),
         'added_by'    => $accountant->id,
     ]);
 
