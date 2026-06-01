@@ -116,6 +116,7 @@
         openUser: false,
         openNotif: false,
         openStoreMenu: false,
+        isDark: false,
 
         init() {
             // إغلاق جميع القوائم عند التحميل
@@ -123,6 +124,13 @@
             this.openMenu = false;
             this.openUser = false;
             this.openNotif = false;
+            this.isDark = document.documentElement.classList.contains('dark');
+        },
+
+        toggleTheme() {
+            this.isDark = !this.isDark;
+            document.documentElement.classList.toggle('dark', this.isDark);
+            localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
         },
 
         toggleStoreMenu() {
@@ -249,10 +257,13 @@
             <div class="flex items-center gap-4 md:gap-6">
                 {{-- زر تبديل النمط --}}
                 <button
-                    @click="document.documentElement.classList.toggle('dark'); localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light')"
+                    type="button"
+                    aria-label="تبديل النمط"
+                    :aria-pressed="isDark.toString()"
+                    @click="toggleTheme()"
                     class="p-2 text-gray-400 hover:text-white transition rounded-full hover:bg-gray-800">
-                    <i class="fa-solid fa-sun dark:hidden"></i>
-                    <i class="fa-solid fa-moon hidden dark:block"></i>
+                    <i x-show="!isDark" x-cloak class="fa-solid fa-sun" aria-hidden="true"></i>
+                    <i x-show="isDark" x-cloak class="fa-solid fa-moon" aria-hidden="true"></i>
                 </button>
 
                 {{-- الإشعارات --}}
