@@ -138,7 +138,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
         <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي الربح الشهري حسب كل متجر">
-            <x-stat-card title="صافي الربح الشهري (بعد الخصومات)"
+            <x-stat-card title="صافي الربح الشهري"
                 value="{{ number_format($profitMonth) }}"
                 color="{{ $profitMonth >= 0 ? 'emerald' : 'red' }}" />
         </button>
@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
         sales_today: { title: 'مبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
+        profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'مطابق للتقرير الشهري: المحصل - (تكلفة المنتجات المباعة + الاستهلاك الداخلي + مشتريات المالك للاستهلاك + المصروفات). الرواتب للتوضيح فقط.' },
         sales_month: { title: 'مبيعات الشهر', value: '{{ number_format($salesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         salaries_month: { title: 'صافي الرواتب (شهري)', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'بعد خصم سحوبات العمال. إجمالي الرواتب: {{ number_format($monthlySalaries ?? 0, 2) }} ر.س - السحوبات: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
