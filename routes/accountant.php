@@ -20,11 +20,28 @@ use App\Http\Controllers\Accountant\ProductSearchController;
 */
 
 // رابط عرض التقرير العام
-Route::get('/view-report/{filename}', function ($filename) {
-    $path = storage_path('app/public/reports/' . $filename);
-    if (!file_exists($path)) abort(404, 'الملف غير موجود');
-    return response()->file($path);
-})->name('pdf.report.view');
+Route::get('/view-report/{filename}', function (string $filename) {
+    abort_unless(
+        $filename === basename($filename) && preg_match('/\A[A-Za-z0-9._-]+\.pdf\z/', $filename),
+        404,
+        'الملف غير موجود'
+    );
+
+    $reportsDirectory = realpath(storage_path('app/public/reports'));
+    $reportPath = realpath(storage_path('app/public/reports/' . $filename));
+
+    abort_unless(
+        $reportsDirectory && $reportPath && str_starts_with($reportPath, $reportsDirectory . DIRECTORY_SEPARATOR),
+        404,
+        'الملف غير موجود'
+    );
+
+    return response()->file($reportPath, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        'X-Content-Type-Options' => 'nosniff',
+    ]);
+})->where('filename', '[A-Za-z0-9._-]+\.pdf')->name('pdf.report.view');
 
 // صفحة الإيقاف
 Route::get('/suspended', fn() => view('accountant.suspended'))

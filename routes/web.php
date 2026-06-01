@@ -212,17 +212,25 @@ Route::post('/device-token', [DeviceTokenController::class, 'store'])
 
 
 
-   Route::get('/reports/{filename}', function ($filename) {
-    $path = public_path('reports/' . $filename);
+Route::get('/reports/{filename}', function (string $filename) {
+    abort_unless(
+        $filename === basename($filename) && preg_match('/\AReport_\d+_\d+\.pdf\z/', $filename),
+        404
+    );
 
-    if (!file_exists($path)) {
-        abort(404);
-    }
+    $reportsDirectory = realpath(public_path('reports'));
+    $reportPath = realpath(public_path('reports/' . $filename));
 
-    return response()->file($path, [
+    abort_unless(
+        $reportsDirectory && $reportPath && str_starts_with($reportPath, $reportsDirectory . DIRECTORY_SEPARATOR),
+        404
+    );
+
+    return response()->file($reportPath, [
         'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'inline; filename="' . $filename . '"'
+        'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        'X-Content-Type-Options' => 'nosniff',
     ]);
-})->name('public.report.view');
+})->where('filename', 'Report_[0-9]+_[0-9]+\.pdf')->name('public.report.view');
 
 
