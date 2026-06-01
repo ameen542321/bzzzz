@@ -267,15 +267,51 @@ class StoreController extends Controller
             })
             ->count();
 
-        $totalProfit = Sale::where('store_id', $store->id)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
+            $monthlySoldProductsCost = (float) DB::table('sale_items')
+                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+                ->where('sales.store_id', $store->id)
+                ->whereYear('sales.created_at', $now->year)
+                ->whereMonth('sales.created_at', $now->month)
+                ->whereIn('sales.sale_type', $includedSaleTypes)
+                ->where(function ($query) {
+                    $query->whereNull('sales.description')
+                        ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+                })
+                ->sum(DB::raw('COALESCE(sale_items.total_cost, 0)'));
+        } else {
+            $monthlySoldProductsCost = (float) Sale::where('store_id', $store->id)
+                ->whereYear('created_at', $now->year)
+                ->whereMonth('created_at', $now->month)
+                ->whereIn('sale_type', $includedSaleTypes)
+                ->where(function ($query) {
+                    $query->whereNull('description')
+                        ->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->sum('products_total');
+        }
+
+        $monthlyAccountantConsumptionForProfit = (float) Sale::where('store_id', $store->id)
             ->whereYear('created_at', $now->year)
             ->whereMonth('created_at', $now->month)
+            ->where('sale_type', 'internal_use')
             ->where(function ($query) {
                 $query->whereNull('description')
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as total_profit')
-            ->value('total_profit');
+            ->sum('total');
+
+        $monthlyOwnerPurchasesForProfit = (float) Purchase::where('store_id', $store->id)
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->sum('cost');
+
+        $monthlyExpensesForProfit = (float) \App\Models\Expense::where('store_id', $store->id)
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->sum('amount');
+
+        $totalProfit = (float) $monthSales - ($monthlySoldProductsCost + $monthlyAccountantConsumptionForProfit + $monthlyOwnerPurchasesForProfit + $monthlyExpensesForProfit);
 
         // إحصائيات الموارد البشرية والأقسام
         $accountantsCount = Accountant::where('store_id', $store->id)->count();
@@ -442,18 +478,49 @@ class StoreController extends Controller
         $todayExpenses = \App\Models\Expense::where('store_id', $store->id)->whereDate('created_at', today())->sum('amount');
 
         // ===== 4. إحصائيات الربحية =====
-        $monthlyProfit = Sale::where('store_id', $store->id)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
+            $monthlySoldProductsCost = (float) DB::table('sale_items')
+                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+                ->where('sales.store_id', $store->id)
+                ->whereMonth('sales.created_at', $now->month)
+                ->whereYear('sales.created_at', $now->year)
+                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->where(function ($query) {
+                    $query->whereNull('sales.description')
+                        ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+                })
+                ->sum(DB::raw('COALESCE(sale_items.total_cost, 0)'));
+        } else {
+            $monthlySoldProductsCost = (float) Sale::where('store_id', $store->id)
+                ->whereMonth('created_at', $now->month)
+                ->whereYear('created_at', $now->year)
+                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->where(function ($query) {
+                    $query->whereNull('description')
+                        ->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->sum('products_total');
+        }
+
+        $monthlyAccountantConsumption = (float) Sale::where('store_id', $store->id)
             ->whereMonth('created_at', $now->month)
             ->whereYear('created_at', $now->year)
+            ->where('sale_type', 'internal_use')
             ->where(function ($query) {
                 $query->whereNull('description')
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as monthly_profit')
-            ->value('monthly_profit');
-        $monthlyOperatingExpenses = $monthlyExpenses;
-        $totalMonthlyCosts = $totalMonthlySalaries + $monthlyOperatingExpenses;
-        $monthlyNetProfit = $monthlyProfit - $totalMonthlyCosts;
+            ->sum('total');
+
+        $monthlyOwnerPurchases = (float) Purchase::where('store_id', $store->id)
+            ->whereMonth('created_at', $now->month)
+            ->whereYear('created_at', $now->year)
+            ->sum('cost');
+
+        $monthlyProfit = $monthlySales - $monthlySoldProductsCost;
+        $monthlyOperatingExpenses = $monthlyExpenses + $monthlyAccountantConsumption + $monthlyOwnerPurchases;
+        $totalMonthlyCosts = $monthlySoldProductsCost + $monthlyOperatingExpenses;
+        $monthlyNetProfit = $monthlySales - $totalMonthlyCosts;
 
         $profitMargin = ($monthlySales > 0) ? ($monthlyNetProfit / $monthlySales) * 100 : 0;
         $dailyAverageProfit = ($now->day > 0) ? ($monthlyNetProfit / $now->day) : $monthlyNetProfit;
