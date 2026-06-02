@@ -76,19 +76,7 @@ class DailySalesController extends Controller
         $this->applyPeriodFilter($query, $shiftWindows);
 
         // فلترة البحث (رقم العملية / اسم المنتج / اسم العنصر المخصص / وصف العملية)
-        if ($request->filled('search')) {
-            $search = trim((string) $request->search);
-
-            $query->where(function ($q) use ($search) {
-                if (is_numeric($search)) {
-                    $q->orWhere('sales.id', (int) $search);
-                }
-
-                $q->orWhere('products.name', 'like', "%{$search}%")
-                    ->orWhere('sale_items.custom_name', 'like', "%{$search}%")
-                    ->orWhere('sales.description', 'like', "%{$search}%");
-            });
-        }
+        $this->applySearchFilter($query, $request);
 
         // تنفيذ الاستعلام
         $results = $query->orderBy('sales.created_at', 'desc')->get();
@@ -110,19 +98,7 @@ class DailySalesController extends Controller
             $query = $buildSalesQuery();
             $this->applyPeriodFilter($query, $shiftWindows);
 
-            if ($request->filled('search')) {
-                $search = trim((string) $request->search);
-
-                $query->where(function ($q) use ($search) {
-                    if (is_numeric($search)) {
-                        $q->orWhere('sales.id', (int) $search);
-                    }
-
-                    $q->orWhere('products.name', 'like', "%{$search}%")
-                        ->orWhere('sale_items.custom_name', 'like', "%{$search}%")
-                        ->orWhere('sales.description', 'like', "%{$search}%");
-                });
-            }
+            $this->applySearchFilter($query, $request);
 
             $results = $query->orderBy('sales.created_at', 'desc')->get();
         }
@@ -322,6 +298,25 @@ class DailySalesController extends Controller
                 'query' => $request->query(),
             ]
         );
+    }
+
+    private function applySearchFilter($query, Request $request): void
+    {
+        if (!$request->filled('search')) {
+            return;
+        }
+
+        $search = trim((string) $request->search);
+
+        $query->where(function ($q) use ($search) {
+            if (is_numeric($search)) {
+                $q->orWhere('sales.id', (int) $search);
+            }
+
+            $q->orWhere('products.name', 'like', "%{$search}%")
+                ->orWhere('sale_items.custom_name', 'like', "%{$search}%")
+                ->orWhere('sales.description', 'like', "%{$search}%");
+        });
     }
 
     private function getCreditCollectionOperations(int $storeId, $shiftWindows, array $visibleSaleIds = [])
