@@ -989,7 +989,12 @@ class DashboardController extends Controller
     // تعديل رابط الواتساب: تجهيز الرابط العام للتقرير قبل إضافته إلى نص الرسالة.
     private function buildPublicReportUrl(string $fileName): string
     {
-        $reportUrl = route('public.report.view', ['filename' => $fileName], true);
+        // إذا كنت تعمل على localhost فلن يستطيع واتساب/جوال المالك فتح الرابط؛ ضع رابط ngrok أو الدومين العام هنا.
+        $publicBaseUrl = rtrim((string) config('services.whatsapp.report_public_url'), '/');
+        $reportPath = route('public.report.view', ['filename' => $fileName], false);
+        $reportUrl = $publicBaseUrl !== ''
+            ? $publicBaseUrl . $reportPath
+            : route('public.report.view', ['filename' => $fileName], true);
 
         // WhatsApp لا يحوّل النص إلى رابط قابل للنقر إذا لم يبدأ الرابط ببروتوكول واضح.
         if (!preg_match('/^https?:\/\//i', $reportUrl)) {
