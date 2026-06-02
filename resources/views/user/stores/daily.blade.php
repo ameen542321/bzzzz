@@ -420,7 +420,17 @@
                                             @if(!$isCollectionOperation)
                                             <div class="mt-3 pt-3 border-t border-gray-700 flex justify-end">
                                                 <button type="button"
-                                                        onclick="event.stopPropagation(); openEditSaleModal({{ $sale->id }});"
+                                                        onclick="event.stopPropagation(); openEditSaleModal(this);"
+                                                        data-sale-id="{{ $sale->id }}"
+                                                        data-action-url="{{ route('user.stores.daily.update', [$store->id, $sale->id]) }}"
+                                                        data-sale-type="{{ $sale->sale_type }}"
+                                                        data-paid-amount="{{ (float) ($sale->paid_amount ?? 0) }}"
+                                                        data-remaining-amount="{{ (float) ($sale->remaining_amount ?? 0) }}"
+                                                        data-employee-id="{{ $sale->employee_id }}"
+                                                        data-cash-amount="{{ (float) ($sale->cash_amount ?? 0) }}"
+                                                        data-card-amount="{{ (float) ($sale->card_amount ?? 0) }}"
+                                                        data-labor-total="{{ (float) ($sale->labor_total ?? 0) }}"
+                                                        data-description="{{ e($sale->description ?? '') }}"
                                                         class="text-xs bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 px-3 py-1.5 rounded-lg hover:bg-indigo-600/30 transition">
                                                     <i class="fas fa-pen ml-1"></i> تعديل العملية
                                                 </button>
@@ -444,110 +454,6 @@
                             </div>
                         </div>
 
-                        {{-- نافذة تعديل العملية --}}
-                        <div id="edit-sale-modal-{{ $sale->id }}" class="hidden fixed inset-0 z-50 bg-black/70 p-4" onclick="closeEditSaleModal({{ $sale->id }})">
-                            <div class="max-w-lg mx-auto mt-16 max-h-[85vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl p-5" onclick="event.stopPropagation()">
-                                <h3 class="text-white font-bold text-lg mb-4">تعديل العملية #{{ $sale->id }}</h3>
-
-                                <form method="POST" action="{{ route('user.stores.daily.update', [$store->id, $sale->id]) }}" class="space-y-4">
-                                    @csrf
-                                    @method('PUT')
-
-                                    @if(session('edit_sale_modal') == $sale->id && $errors->any())
-                                    <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-                                        <ul class="space-y-1 list-disc pr-4">
-                                            @foreach($errors->all() as $error)
-                                                <li>{{ $error }}</li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                    @endif
-
-                                    <div>
-                                        <label class="text-sm text-gray-300 block mb-1">نوع البيع</label>
-                                        <select id="sale-type-{{ $sale->id }}" name="sale_type" onchange="updateEditSaleFields({{ $sale->id }})" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                            <option value="cash" @selected($sale->sale_type === 'cash')>نقداً</option>
-                                            <option value="card" @selected($sale->sale_type === 'card')>بطاقة</option>
-                                            <option value="credit" @selected($sale->sale_type === 'credit')>آجل</option>
-                                            <option value="mixed" @selected($sale->sale_type === 'mixed')>ميكس</option>
-                                        </select>
-                                    </div>
-
-                                    <div id="paid-amount-wrapper-{{ $sale->id }}"
-                                         data-original-sale-type="{{ $sale->sale_type }}"
-                                         data-original-paid-amount="{{ (float) ($sale->paid_amount ?? 0) }}"
-                                         data-original-remaining-amount="{{ (float) ($sale->remaining_amount ?? 0) }}"
-                                         class="{{ $sale->sale_type === 'credit' ? 'hidden' : '' }}">
-                                        <label id="paid-amount-label-{{ $sale->id }}" class="text-sm text-gray-300 block mb-1">المبلغ المدفوع</label>
-                                        <input id="paid-amount-input-{{ $sale->id }}" type="number" step="0.01" min="0" name="paid_amount" value="{{ old('paid_amount', $sale->paid_amount) }}"
-                                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                        <p id="paid-amount-help-{{ $sale->id }}" class="text-xs text-gray-500 mt-1">في حالة (نقد/بطاقة) سيتم ضبط المدفوع تلقائياً على إجمالي الفاتورة. في الميكس أدخل الكاش/الشبكة، وفي الآجل الكامل ستكون المديونية هي كامل العملية.</p>
-                                        <div id="credit-conversion-warning-{{ $sale->id }}" class="hidden mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">
-                                            تنبيه: هذه العملية كانت آجلًا وتم تحصيل جزء منها مسبقًا؛ لذلك تم وضع <span class="font-bold">القيمة المتبقية</span> داخل خانة المبلغ المدفوع لإكمال التحويل.
-                                        </div>
-                                    </div>
-
-                                    <div id="debt-wrapper-{{ $sale->id }}" class="{{ in_array($sale->sale_type, ['credit', 'mixed'], true) ? '' : 'hidden' }}">
-                                        <label class="text-sm text-gray-300 block mb-1">قيمة المديونية</label>
-                                        <input type="number" step="0.01" min="0" name="debt_amount" value="{{ old('debt_amount', $sale->remaining_amount ?? 0) }}"
-                                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                        <p class="text-xs text-gray-500 mt-1">للآجل الكامل يجب أن تساوي كامل العملية. وللآجل الجزئي في الميكس يجب أن يكون (كاش + شبكة + مديونية) = قيمة العملية.</p>
-                                    </div>
-
-                                    <div id="employee-wrapper-{{ $sale->id }}" class="{{ in_array($sale->sale_type, ['credit', 'mixed'], true) ? '' : 'hidden' }}">
-                                        <label class="text-sm text-gray-300 block mb-1">الموظف المرتبط بالآجل</label>
-                                        <select name="employee_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                            <option value="">بدون موظف</option>
-                                            @foreach(($employees ?? collect()) as $employee)
-                                                <option value="{{ $employee->id }}" @selected(old('employee_id', $sale->employee_id) == $employee->id)>{{ $employee->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <p class="text-xs text-gray-500 mt-1">اختياره إلزامي عند وجود مديونية كاملة أو جزئية.</p>
-                                    </div>
-
-                                    <div id="mixed-wrapper-{{ $sale->id }}" class="{{ $sale->sale_type === 'mixed' ? '' : 'hidden' }}">
-                                    <div id="mixed-conversion-warning-{{ $sale->id }}"
-                                         data-original-sale-type="{{ $sale->sale_type }}"
-                                         data-original-paid-amount="{{ (float) ($sale->paid_amount ?? 0) }}"
-                                         data-original-remaining-amount="{{ (float) ($sale->remaining_amount ?? 0) }}"
-                                         class="hidden mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs text-cyan-200">
-                                        عند التحويل إلى ميكس من آجل محصّل جزئيًا، أدخل القيم يدويًا بحيث يكون:
-                                        <span class="font-bold">كاش + شبكة + مديونية = المتبقي من العملية</span>.
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="text-sm text-gray-300 block mb-1">كاش (لـ ميكس)</label>
-                                            <input id="cash-amount-input-{{ $sale->id }}" type="number" step="0.01" min="0" name="cash_amount" value="{{ old('cash_amount', $sale->cash_amount) }}"
-                                                   class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                        </div>
-                                        <div>
-                                            <label class="text-sm text-gray-300 block mb-1">شبكة (لـ ميكس)</label>
-                                            <input id="card-amount-input-{{ $sale->id }}" type="number" step="0.01" min="0" name="card_amount" value="{{ old('card_amount', $sale->card_amount) }}"
-                                                   class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                        </div>
-                                    </div>
-                                    </div>
-
-                                    <div>
-                                        <label class="text-sm text-gray-300 block mb-1">شغل اليد</label>
-                                        <input type="number" step="0.01" min="0" name="labor_total" value="{{ old('labor_total', $sale->labor_total) }}"
-                                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
-                                    </div>
-
-                                    <div>
-                                        <label class="text-sm text-gray-300 block mb-1">الوصف</label>
-                                        <textarea name="description" rows="3"
-                                                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">{{ old('description', $sale->description) }}</textarea>
-                                    </div>
-
-                                    <div class="flex gap-2 justify-end">
-                                        <button type="button" onclick="closeEditSaleModal({{ $sale->id }})" class="px-4 py-2 bg-gray-700 text-white rounded-lg">إلغاء</button>
-                                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">حفظ التعديل</button>
-                                    </div>
-                                </form>
-
-                            </div>
-                        </div>
                         @endforeach
                     </div>
                 </div>
@@ -562,6 +468,115 @@
                 عرض مبيعات اليوم
             </a>
             @endif
+        </div>
+        @endif
+
+        {{-- نافذة تعديل العملية - مودال واحد مشترك لكل العمليات المعروضة --}}
+        @if(($stats['count'] ?? 0) > 0)
+        <div id="edit-sale-modal" class="hidden fixed inset-0 z-50 bg-black/70 p-4">
+            <div class="max-w-lg mx-auto mt-16 max-h-[85vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl p-5" onclick="event.stopPropagation()">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h3 id="edit-sale-title" class="text-white font-bold text-lg">تعديل العملية</h3>
+                    <button type="button"
+                            onclick="closeEditSaleModal()"
+                            aria-label="إغلاق نافذة تعديل العملية"
+                            class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:bg-gray-700 transition flex items-center justify-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <form id="edit-sale-form" method="POST" action="#" class="space-y-4">
+                    @csrf
+                    @method('PUT')
+
+                    @if(session('edit_sale_modal') && $errors->any())
+                    <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                        <ul class="space-y-1 list-disc pr-4">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+
+                    <div>
+                        <label class="text-sm text-gray-300 block mb-1">نوع البيع</label>
+                        <select id="edit-sale-type" name="sale_type" onchange="updateEditSaleFields()" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            <option value="cash">نقداً</option>
+                            <option value="card">بطاقة</option>
+                            <option value="credit">آجل</option>
+                            <option value="mixed">ميكس</option>
+                        </select>
+                    </div>
+
+                    <div id="edit-paid-amount-wrapper"
+                         data-original-sale-type=""
+                         data-original-paid-amount="0"
+                         data-original-remaining-amount="0">
+                        <label id="edit-paid-amount-label" class="text-sm text-gray-300 block mb-1">المبلغ المدفوع</label>
+                        <input id="edit-paid-amount-input" type="number" step="0.01" min="0" name="paid_amount"
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                        <p id="edit-paid-amount-help" class="text-xs text-gray-500 mt-1">في حالة (نقد/بطاقة) سيتم ضبط المدفوع تلقائياً على إجمالي الفاتورة. في الميكس أدخل الكاش/الشبكة، وفي الآجل الكامل ستكون المديونية هي كامل العملية.</p>
+                        <div id="edit-credit-conversion-warning" class="hidden mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">
+                            تنبيه: هذه العملية كانت آجلًا وتم تحصيل جزء منها مسبقًا؛ لذلك تم وضع <span class="font-bold">القيمة المتبقية</span> داخل خانة المبلغ المدفوع لإكمال التحويل.
+                        </div>
+                    </div>
+
+                    <div id="edit-debt-wrapper" class="hidden">
+                        <label class="text-sm text-gray-300 block mb-1">قيمة المديونية</label>
+                        <input id="edit-debt-amount-input" type="number" step="0.01" min="0" name="debt_amount"
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                        <p class="text-xs text-gray-500 mt-1">للآجل الكامل يجب أن تساوي كامل العملية. وللآجل الجزئي في الميكس يجب أن يكون (كاش + شبكة + مديونية) = قيمة العملية.</p>
+                    </div>
+
+                    <div id="edit-employee-wrapper" class="hidden">
+                        <label class="text-sm text-gray-300 block mb-1">الموظف المرتبط بالآجل</label>
+                        <select id="edit-employee-id" name="employee_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            <option value="">بدون موظف</option>
+                            @foreach(($employees ?? collect()) as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">اختياره إلزامي عند وجود مديونية كاملة أو جزئية.</p>
+                    </div>
+
+                    <div id="edit-mixed-wrapper" class="hidden">
+                        <div id="edit-mixed-conversion-warning" class="hidden mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-2 text-xs text-cyan-200">
+                            عند التحويل إلى ميكس من آجل محصّل جزئيًا، أدخل القيم يدويًا بحيث يكون:
+                            <span class="font-bold">كاش + شبكة + مديونية = المتبقي من العملية</span>.
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-sm text-gray-300 block mb-1">كاش (لـ ميكس)</label>
+                                <input id="edit-cash-amount-input" type="number" step="0.01" min="0" name="cash_amount"
+                                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-300 block mb-1">شبكة (لـ ميكس)</label>
+                                <input id="edit-card-amount-input" type="number" step="0.01" min="0" name="card_amount"
+                                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-sm text-gray-300 block mb-1">شغل اليد</label>
+                        <input id="edit-labor-total-input" type="number" step="0.01" min="0" name="labor_total"
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                    </div>
+
+                    <div>
+                        <label class="text-sm text-gray-300 block mb-1">الوصف</label>
+                        <textarea id="edit-description-input" name="description" rows="3"
+                                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"></textarea>
+                    </div>
+
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" onclick="closeEditSaleModal()" class="px-4 py-2 bg-gray-700 text-white rounded-lg">إلغاء</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">حفظ التعديل</button>
+                    </div>
+                </form>
+            </div>
         </div>
         @endif
 
@@ -617,19 +632,19 @@ function toggleDetails(saleId) {
     }
 }
 
-function updateEditSaleFields(saleId) {
-    const saleType = document.getElementById(`sale-type-${saleId}`)?.value;
-    const paidWrapper = document.getElementById(`paid-amount-wrapper-${saleId}`);
-    const debtWrapper = document.getElementById(`debt-wrapper-${saleId}`);
-    const employeeWrapper = document.getElementById(`employee-wrapper-${saleId}`);
-    const mixedWrapper = document.getElementById(`mixed-wrapper-${saleId}`);
-    const paidInput = document.getElementById(`paid-amount-input-${saleId}`);
-    const paidLabel = document.getElementById(`paid-amount-label-${saleId}`);
-    const paidHelp = document.getElementById(`paid-amount-help-${saleId}`);
-    const conversionWarning = document.getElementById(`credit-conversion-warning-${saleId}`);
-    const mixedConversionWarning = document.getElementById(`mixed-conversion-warning-${saleId}`);
-    const cashInput = document.getElementById(`cash-amount-input-${saleId}`);
-    const cardInput = document.getElementById(`card-amount-input-${saleId}`);
+function updateEditSaleFields() {
+    const saleType = document.getElementById('edit-sale-type')?.value;
+    const paidWrapper = document.getElementById('edit-paid-amount-wrapper');
+    const debtWrapper = document.getElementById('edit-debt-wrapper');
+    const employeeWrapper = document.getElementById('edit-employee-wrapper');
+    const mixedWrapper = document.getElementById('edit-mixed-wrapper');
+    const paidInput = document.getElementById('edit-paid-amount-input');
+    const paidLabel = document.getElementById('edit-paid-amount-label');
+    const paidHelp = document.getElementById('edit-paid-amount-help');
+    const conversionWarning = document.getElementById('edit-credit-conversion-warning');
+    const mixedConversionWarning = document.getElementById('edit-mixed-conversion-warning');
+    const cashInput = document.getElementById('edit-cash-amount-input');
+    const cardInput = document.getElementById('edit-card-amount-input');
 
     if (!saleType) return;
 
@@ -674,23 +689,74 @@ function updateEditSaleFields(saleId) {
     }
 }
 
-function openEditSaleModal(saleId) {
-    const modal = document.getElementById(`edit-sale-modal-${saleId}`);
-    if (modal) {
-        modal.classList.remove('hidden');
-        updateEditSaleFields(saleId);
+function openEditSaleModal(trigger, overrideValues = {}) {
+    const button = typeof trigger === 'string'
+        ? document.querySelector(`[data-sale-id="${trigger}"]`)
+        : trigger;
+    const modal = document.getElementById('edit-sale-modal');
+    const form = document.getElementById('edit-sale-form');
+
+    if (!button || !modal || !form) return;
+
+    Object.keys(overrideValues).forEach((key) => {
+        if (overrideValues[key] === undefined || overrideValues[key] === null) {
+            delete overrideValues[key];
+        }
+    });
+
+    const values = {
+        saleType: button.dataset.saleType || 'cash',
+        paidAmount: button.dataset.paidAmount || '0',
+        remainingAmount: button.dataset.remainingAmount || '0',
+        employeeId: button.dataset.employeeId || '',
+        cashAmount: button.dataset.cashAmount || '0',
+        cardAmount: button.dataset.cardAmount || '0',
+        laborTotal: button.dataset.laborTotal || '0',
+        description: button.dataset.description || '',
+        ...overrideValues,
+    };
+
+    form.action = button.dataset.actionUrl || '#';
+    document.getElementById('edit-sale-title').textContent = `تعديل العملية #${button.dataset.saleId}`;
+
+    const paidWrapper = document.getElementById('edit-paid-amount-wrapper');
+    if (paidWrapper) {
+        paidWrapper.dataset.originalSaleType = button.dataset.saleType || '';
+        paidWrapper.dataset.originalPaidAmount = button.dataset.paidAmount || '0';
+        paidWrapper.dataset.originalRemainingAmount = button.dataset.remainingAmount || '0';
     }
+
+    document.getElementById('edit-sale-type').value = values.saleType;
+    document.getElementById('edit-paid-amount-input').value = values.paidAmount;
+    document.getElementById('edit-debt-amount-input').value = values.debtAmount ?? values.remainingAmount;
+    document.getElementById('edit-employee-id').value = values.employeeId;
+    document.getElementById('edit-cash-amount-input').value = values.cashAmount;
+    document.getElementById('edit-card-amount-input').value = values.cardAmount;
+    document.getElementById('edit-labor-total-input').value = values.laborTotal;
+    document.getElementById('edit-description-input').value = values.description;
+
+    modal.classList.remove('hidden');
+    updateEditSaleFields();
 }
 
-function closeEditSaleModal(saleId) {
-    const modal = document.getElementById(`edit-sale-modal-${saleId}`);
+function closeEditSaleModal() {
+    const modal = document.getElementById('edit-sale-modal');
     if (modal) modal.classList.add('hidden');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const failedModalId = @json(session('edit_sale_modal'));
     if (failedModalId) {
-        openEditSaleModal(failedModalId);
+        openEditSaleModal(String(failedModalId), {
+            saleType: @json(old('sale_type')) || undefined,
+            paidAmount: @json(old('paid_amount')) || undefined,
+            debtAmount: @json(old('debt_amount')) || undefined,
+            employeeId: @json(old('employee_id')) || '',
+            cashAmount: @json(old('cash_amount')) || undefined,
+            cardAmount: @json(old('card_amount')) || undefined,
+            laborTotal: @json(old('labor_total')) || undefined,
+            description: @json(old('description')) || '',
+        });
     }
 });
 </script>
