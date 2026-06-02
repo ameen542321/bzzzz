@@ -12,6 +12,7 @@ use App\Models\DailyBalance;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DailySalesController extends Controller
 {
@@ -299,7 +300,28 @@ class DailySalesController extends Controller
             'shift_count' => $shiftSummaries->count(),
         ];
 
+        $sales = $this->paginateSalesCollection($sales, $request);
+
         return view('user.stores.daily', compact('store', 'sales', 'stats', 'startTime', 'endTime', 'selectedShift', 'shiftSummaries', 'employees'));
+    }
+
+    private function paginateSalesCollection($sales, Request $request): LengthAwarePaginator
+    {
+        $perPage = 25;
+        $total = $sales->count();
+        $lastPage = max((int) ceil($total / $perPage), 1);
+        $page = min(max((int) $request->query('page', 1), 1), $lastPage);
+
+        return new LengthAwarePaginator(
+            $sales->slice(($page - 1) * $perPage, $perPage)->values(),
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
     }
 
     private function getCreditCollectionOperations(int $storeId, $shiftWindows, array $visibleSaleIds = [])

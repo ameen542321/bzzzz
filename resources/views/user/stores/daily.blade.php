@@ -191,11 +191,12 @@
 
     {{-- ===== بطاقات العمليات (مقسمة حسب الشفت) ===== --}}
     @php
-        $groupedSales = $sales->groupBy('shift_key');
+        $displaySales = $sales instanceof \Illuminate\Contracts\Pagination\Paginator ? $sales->getCollection() : $sales;
+        $groupedSales = $displaySales->groupBy('shift_key');
     @endphp
 
     <div class="space-y-6">
-        @if($sales->count() > 0)
+        @if(($stats['count'] ?? $displaySales->count()) > 0)
             @foreach(($shiftSummaries ?? collect()) as $shift)
                 @php
                     $shiftSales = $groupedSales->get($shift['key'], collect());
@@ -563,27 +564,36 @@
             @endif
         </div>
         @endif
+
+        @if($sales instanceof \Illuminate\Contracts\Pagination\Paginator && $sales->hasPages())
+            <div class="mt-6 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+                <div class="mb-3 text-xs text-gray-400">
+                    عرض {{ number_format($sales->firstItem() ?? 0) }} - {{ number_format($sales->lastItem() ?? 0) }} من أصل {{ number_format($sales->total()) }} عملية ضمن الفترة المحددة.
+                </div>
+                {{ $sales->links() }}
+            </div>
+        @endif
     </div>
 
     {{-- ===== ملخص الصفحة ===== --}}
-    @if($sales->count() > 0)
+    @if(($stats['count'] ?? 0) > 0)
     <div class="mt-6 p-4 bg-gray-800/50 rounded-xl border border-gray-700">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
                 <p class="text-gray-400 text-xs">عدد العمليات</p>
-                <p class="text-white font-bold">{{ $sales->count() }}</p>
+                <p class="text-white font-bold">{{ number_format($stats['count'] ?? 0) }}</p>
             </div>
             <div>
                 <p class="text-gray-400 text-xs">إجمالي المستلم</p>
-                <p class="text-green-400 font-bold">{{ number_format($sales->sum('paid_amount'), 2) }} ر.س</p>
+                <p class="text-green-400 font-bold">{{ number_format($stats['collected_total'] ?? 0, 2) }} ر.س</p>
             </div>
             <div>
                 <p class="text-gray-400 text-xs">إجمالي التكلفة</p>
-                <p class="text-yellow-400 font-bold">{{ number_format($sales->sum('total_cost'), 2) }} ر.س</p>
+                <p class="text-yellow-400 font-bold">{{ number_format($stats['total_cost'] ?? 0, 2) }} ر.س</p>
             </div>
             <div>
                 <p class="text-gray-400 text-xs">الربح المحتسب</p>
-                <p class="text-blue-400 font-bold">{{ number_format($sales->sum('recognized_profit'), 2) }} ر.س</p>
+                <p class="text-blue-400 font-bold">{{ number_format($stats['total_profit'] ?? 0, 2) }} ر.س</p>
             </div>
         </div>
     </div>
