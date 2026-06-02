@@ -12,8 +12,8 @@ class StockMovement extends Model
         'user_id',
         'type',
         'quantity',
-        'meters',
-        'roll_length_at_movement',
+        'meters',   // 🔥 جديد: القيمة بالأمتار (مثل 3.00)
+    'roll_length_at_movement', // 🔥 جديد
         'note',
     ];
 
@@ -27,39 +27,6 @@ class StockMovement extends Model
         'previous_balance',
         'current_balance',
     ];
-
-    protected static function booted(): void
-    {
-        static::creating(function (StockMovement $movement): void {
-            if (!is_null($movement->meters) && !is_null($movement->roll_length_at_movement)) {
-                return;
-            }
-
-            $product = $movement->relationLoaded('product')
-                ? $movement->product
-                : Product::query()->select('id', 'quantity')->find($movement->product_id);
-
-            if (!$product) {
-                return;
-            }
-
-            // إصلاح سجل الحركة من مكان واحد: عند إنشاء حركة مباشرة بعد تحديث المخزون
-            // نحسب الرصيد قبل/بعد تلقائياً حتى تظهر صفحة إدارة المخزون بأرقام صحيحة.
-            $afterQuantity = (float) $product->getRawOriginal('quantity');
-            $movementQuantity = abs((float) $movement->quantity);
-
-            if ($movement->type === 'increase') {
-                $beforeQuantity = $afterQuantity - $movementQuantity;
-            } elseif ($movement->type === 'decrease') {
-                $beforeQuantity = $afterQuantity + $movementQuantity;
-            } else {
-                return;
-            }
-
-            $movement->meters ??= $afterQuantity;
-            $movement->roll_length_at_movement ??= $beforeQuantity;
-        });
-    }
 
     public function store()
     {
