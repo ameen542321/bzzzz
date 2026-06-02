@@ -473,8 +473,8 @@
 
         {{-- نافذة تعديل العملية - مودال واحد مشترك لكل العمليات المعروضة --}}
         @if(($stats['count'] ?? 0) > 0)
-        <div id="edit-sale-modal" class="hidden fixed inset-0 z-50 bg-black/70 p-4">
-            <div class="max-w-lg mx-auto mt-16 max-h-[85vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl p-5" onclick="event.stopPropagation()">
+        <div id="edit-sale-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 overscroll-contain">
+            <div class="max-w-lg mx-auto mt-16 max-h-[85vh] overflow-y-auto overscroll-contain bg-gray-900 border border-gray-700 rounded-xl p-5" onclick="event.stopPropagation()">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h3 id="edit-sale-title" class="text-white font-bold text-lg">تعديل العملية</h3>
                     <button type="button"
@@ -736,12 +736,14 @@ function openEditSaleModal(trigger, overrideValues = {}) {
     document.getElementById('edit-description-input').value = values.description;
 
     modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
     updateEditSaleFields();
 }
 
 function closeEditSaleModal() {
     const modal = document.getElementById('edit-sale-modal');
     if (modal) modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
