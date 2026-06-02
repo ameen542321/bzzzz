@@ -974,8 +974,7 @@ class DashboardController extends Controller
             $fileName = null;
         }
 
-        // تعديل رابط الواتساب: بناء رابط PDF عام ومطلق حتى يظهر كرابط قابل للنقر داخل واتساب.
-        $reportUrl = $fileName ? $this->buildPublicReportUrl($fileName) : 'غير متوفر';
+        $reportUrl = $fileName ? url('reports/' . $fileName) : 'غير متوفر';
         $message = $this->buildWhatsAppMessage($store, $accountant, $reportData, $reportUrl);
 
         $encodedMessage = rawurlencode($message);
@@ -984,24 +983,6 @@ class DashboardController extends Controller
         Cache::put($cacheKey, $todayMessages + 1, now()->addDay());
 
         return $waUrl;
-    }
-
-    // تعديل رابط الواتساب: تجهيز الرابط العام للتقرير قبل إضافته إلى نص الرسالة.
-    private function buildPublicReportUrl(string $fileName): string
-    {
-        // إذا كنت تعمل على localhost فلن يستطيع واتساب/جوال المالك فتح الرابط؛ ضع رابط ngrok أو الدومين العام هنا.
-        $publicBaseUrl = rtrim((string) config('services.whatsapp.report_public_url'), '/');
-        $reportPath = route('public.report.view', ['filename' => $fileName], false);
-        $reportUrl = $publicBaseUrl !== ''
-            ? $publicBaseUrl . $reportPath
-            : route('public.report.view', ['filename' => $fileName], true);
-
-        // WhatsApp لا يحوّل النص إلى رابط قابل للنقر إذا لم يبدأ الرابط ببروتوكول واضح.
-        if (!preg_match('/^https?:\/\//i', $reportUrl)) {
-            $reportUrl = 'https://' . ltrim($reportUrl, '/');
-        }
-
-        return str_replace(' ', '%20', $reportUrl);
     }
 
     private function buildWhatsAppMessage($store, $accountant, $reportData, $reportUrl)
@@ -1060,14 +1041,8 @@ class DashboardController extends Controller
         $message .= "\n📝 *ملاحظات:*\n" . $reportData['notes'] . "\n";
     }
 
-    // تعديل رسالة الواتساب: وضع رابط PDF في سطر مستقل ليسهل على واتساب تحويله إلى رابط.
-    if ($reportUrl !== 'غير متوفر') {
-        $message .= "\n📄 *تقرير PDF:*\n";
-        $message .= "رابط التحميل المباشر:\n";
-        $message .= $reportUrl . "\n";
-    } else {
-        $message .= "\n📄 *تقرير PDF:* غير متوفر حالياً\n";
-    }
+    $message .= "\n📄 *تقرير PDF:*\n";
+    $message .= $reportUrl;
 
     return $message;
 }

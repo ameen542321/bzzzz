@@ -39,8 +39,5 @@ return [
     'api_key' => env('ONESIGNAL_API_KEY'),
 ],
 
-    'whatsapp' => [
-        'report_public_url' => env('WHATSAPP_REPORT_PUBLIC_URL'),
-    ],
 
 ];

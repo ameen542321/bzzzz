@@ -965,19 +965,14 @@ class DailySalesController extends Controller
                     continue;
                 }
 
-                $product = $item->product->refresh();
-                $beforeQuantity = (float) $product->getRawOriginal('quantity');
-                $product->increment('quantity', $restoreQty);
-                $afterQuantity = $beforeQuantity + $restoreQty;
+                $item->product->increment('quantity', $restoreQty);
 
-                $product->stockMovements()->create([
+                $item->product->stockMovements()->create([
                     'store_id' => $store->id,
                     'user_id' => auth()->id(),
-                    'product_id' => $product->id,
+                    'product_id' => $item->product->id,
                     'type' => 'increase',
                     'quantity' => $restoreQty,
-                    'meters' => $afterQuantity,
-                    'roll_length_at_movement' => $beforeQuantity,
                     'note' => 'استرجاع مخزون بعد حذف عملية مبيعات #' . $sale->id,
                 ]);
             }

@@ -203,13 +203,8 @@
                     @forelse($movements as $move)
                         @php
                             $moveQty = $isFractional ? ($move->quantity / $product->roll_length) : $move->quantity;
-                            $hasBalanceSnapshot = !is_null($move->roll_length_at_movement) && !is_null($move->meters);
-                            $beforeQty = $hasBalanceSnapshot
-                                ? ($isFractional ? ($move->previous_balance / $product->roll_length) : $move->previous_balance)
-                                : null;
-                            $afterQty = $hasBalanceSnapshot
-                                ? ($isFractional ? ($move->current_balance / $product->roll_length) : $move->current_balance)
-                                : null;
+                            $beforeQty = $isFractional ? ($move->previous_balance / $product->roll_length) : $move->previous_balance;
+                            $afterQty = $isFractional ? ($move->current_balance / $product->roll_length) : $move->current_balance;
                         @endphp
                         <tr class="hover:bg-gray-800/20 transition-colors">
                             <td class="py-4 px-6">
@@ -228,22 +223,14 @@
                                 </span>
                             </td>
                             <td class="py-4 px-6">
-                                @if($hasBalanceSnapshot)
-                                    <span class="font-mono text-gray-300">
-                                        {{ number_format($beforeQty, 2) }}
-                                    </span>
-                                @else
-                                    <span class="text-gray-600 text-xs">غير متوفر</span>
-                                @endif
+                                <span class="font-mono text-gray-300">
+                                    {{ number_format($beforeQty, 2) }}
+                                </span>
                             </td>
                             <td class="py-4 px-6">
-                                @if($hasBalanceSnapshot)
-                                    <span class="font-mono text-blue-400 font-bold">
-                                        {{ number_format($afterQty, 2) }}
-                                    </span>
-                                @else
-                                    <span class="text-gray-600 text-xs">غير متوفر</span>
-                                @endif
+                                <span class="font-mono text-blue-400 font-bold">
+                                    {{ number_format($afterQty, 2) }}
+                                </span>
                             </td>
                             <td class="py-4 px-6 text-gray-400">
                                 <div class="flex items-center gap-2">
