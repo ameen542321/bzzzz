@@ -974,6 +974,7 @@ class DashboardController extends Controller
             $fileName = null;
         }
 
+        // تعديل رابط الواتساب: بناء رابط PDF عام ومطلق حتى يظهر كرابط قابل للنقر داخل واتساب.
         $reportUrl = $fileName ? $this->buildPublicReportUrl($fileName) : 'غير متوفر';
         $message = $this->buildWhatsAppMessage($store, $accountant, $reportData, $reportUrl);
 
@@ -985,6 +986,7 @@ class DashboardController extends Controller
         return $waUrl;
     }
 
+    // تعديل رابط الواتساب: تجهيز الرابط العام للتقرير قبل إضافته إلى نص الرسالة.
     private function buildPublicReportUrl(string $fileName): string
     {
         $reportUrl = route('public.report.view', ['filename' => $fileName], true);
@@ -1053,6 +1055,7 @@ class DashboardController extends Controller
         $message .= "\n📝 *ملاحظات:*\n" . $reportData['notes'] . "\n";
     }
 
+    // تعديل رسالة الواتساب: وضع رابط PDF في سطر مستقل ليسهل على واتساب تحويله إلى رابط.
     if ($reportUrl !== 'غير متوفر') {
         $message .= "\n📄 *تقرير PDF:*\n";
         $message .= "رابط التحميل المباشر:\n";
