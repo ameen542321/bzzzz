@@ -342,14 +342,21 @@ class QuickSaleController extends Controller
         foreach ($itemsWithDeductions as $itemData) {
             $saleItem = $sale->items()->create($itemData['row_data']);
 
-            $itemData['product']->decrement('quantity', $itemData['quantity_to_subtract']);
+            $product = $itemData['product']->refresh();
+            $movementQuantity = (float) $itemData['quantity_to_subtract'];
+            $beforeQuantity = (float) $product->getRawOriginal('quantity');
 
-            $itemData['product']->stockMovements()->create([
+            $product->decrement('quantity', $movementQuantity);
+            $afterQuantity = $beforeQuantity - $movementQuantity;
+
+            $product->stockMovements()->create([
                 'store_id'   => $storeId,
                 'user_id'    => $userId,
-                'product_id' => $itemData['product']->id,
+                'product_id' => $product->id,
                 'type'       => 'decrease',
-                'quantity'   => $itemData['quantity_to_subtract'],
+                'quantity'   => $movementQuantity,
+                'meters'     => $afterQuantity,
+                'roll_length_at_movement' => $beforeQuantity,
                 'note'       => $itemData['note'] . " (مبيعات POS #{$sale->id})",
             ]);
 
