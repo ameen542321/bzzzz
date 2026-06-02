@@ -195,7 +195,6 @@
                         <th class="py-4 px-6 font-medium">الكمية ({{ $unitLabel }})</th>
                         <th class="py-4 px-6 font-medium">الرصيد قبل</th>
                         <th class="py-4 px-6 font-medium">الرصيد بعد</th>
-                        <th class="py-4 px-6 font-medium">المستخدم</th>
                         <th class="py-4 px-6 font-medium">التاريخ والوقت</th>
                     </tr>
                 </thead>
@@ -232,14 +231,6 @@
                                     {{ number_format($afterQty, 2) }}
                                 </span>
                             </td>
-                            <td class="py-4 px-6 text-gray-400">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-[10px] text-blue-400 border border-gray-700">
-                                        <i class="fa-solid fa-user"></i>
-                                    </div>
-                                    {{ $move->user->name ?? 'نظام' }}
-                                </div>
-                            </td>
                             <td class="py-4 px-6 text-[11px] text-gray-500 font-mono">
                                 {{ $move->created_at->format('Y-m-d') }}<br>
                                 {{ $move->created_at->format('H:i A') }}
@@ -247,7 +238,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-16 text-center">
+                            <td colspan="5" class="py-16 text-center">
                                 <i class="fa-solid fa-inbox text-gray-800 text-5xl mb-4 block"></i>
                                 <p class="text-gray-600 italic">لا توجد حركات مخزنية مسجلة حتى الآن</p>
                             </td>
