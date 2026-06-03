@@ -215,6 +215,8 @@
     }
 
     function addFractionRow() {
+        // في منتجات الرول، حقل deduction_value يعني عدد الأمتار المستهلكة للخيار.
+        // مثال: زجاج أمامي = 1.5 يعني خصم 1.5 متر من مخزون الرول وليس 1.5 رول.
         const container = document.getElementById('fractions_container');
         const row = document.createElement('div');
         row.id = `row_${fractionIndex}`;

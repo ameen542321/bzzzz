@@ -146,7 +146,9 @@ class QuickSaleController extends Controller
                 } elseif ($fractionId && $fractionId !== '0') {
                     $fraction = $product->fractions()->find($fractionId);
                     if ($fraction) {
-                        // خيارات التجزئة في الواجهة تُدخل كاستهلاك فعلي بالمتر، وليست كنسبة من طول الرول.
+                        // مهم: قيمة deduction_value في خيارات الرول تمثل الأمتار الفعلية المستهلكة.
+                        // مثال: خيار "زجاج أمامي" بقيمة 1.5 مع رول طوله 30م يخصم 1.5م فقط،
+                        // وليس 1.5 × 30م. لذلك نمرر unitType = meter حتى لا تُعامل القيمة كنسبة من الرول.
                         $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'meter');
                     }
                 } else {

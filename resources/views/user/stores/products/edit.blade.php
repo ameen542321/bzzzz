@@ -155,6 +155,7 @@
                     <h3 class="text-blue-400 font-bold">خيارات التجزئة الحالية</h3>
                     <button type="button" onclick="addFractionRow()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded">+ إضافة خيار جديد</button>
                 </div>
+                {{-- قيمة deduction_value هنا محفوظة كاستهلاك فعلي بالمتر لكل خيار رول، وليست نسبة من طول الرول. --}}
                 <div id="fractions_container">
                     @php
                         $data = old('fractions') ?? $product->fractions()->get()->toArray();
@@ -226,6 +227,7 @@
     }
 
     function addFractionRow() {
+        // عند إضافة خيار جديد للرول، قيمة الاستهلاك تُدخل بالمتر حتى يخصم البيع نفس الرقم من المخزون.
         const container = document.getElementById('fractions_container');
         const div = document.createElement('div');
         div.className = "flex gap-2 mb-2";
