@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use App\Services\NotificationService;
+use App\Support\ProductProfitCostCalculator;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
@@ -176,8 +177,26 @@ class QuickSaleController extends Controller
             }
 
             $productsTotal += (float) $item['total'];
-            $costPerBaseUnit = (float) ($product->cost_price ?? 0);
-            $itemCostTotal = $costPerBaseUnit * $quantityToDecrement;
+
+            $costUnitType = 'unit';
+            $costQuantity = $quantityToDecrement;
+            $costConsumedMeters = null;
+
+            if ($product->product_type === 'fractional') {
+                // cost_price للرول يمثل تكلفة الرول الكامل، بينما quantityToDecrement هنا أمتار مستهلكة.
+                // لذلك تمرير custom_consumption يجعل الحاسبة تقسم الاستهلاك على roll_length وتحسب تكلفة الجزء المستخدم فقط.
+                $costUnitType = 'meter';
+                $costConsumedMeters = $quantityToDecrement;
+            } elseif ($product->is_splittable && $saleUnit === 'piece') {
+                $costUnitType = 'piece';
+                $costQuantity = (float) $item['quantity'];
+            }
+
+            $itemCostTotal = ProductProfitCostCalculator::calculateItemCost($product, [
+                'quantity' => $costQuantity,
+                'unit_type' => $costUnitType,
+                'custom_consumption' => $costConsumedMeters,
+            ]);
             $totalProfit += ($item['total'] - $itemCostTotal);
 
             $itemsWithDeductions[] = [
@@ -192,6 +211,7 @@ class QuickSaleController extends Controller
                     'custom_consumption'  => $quantityToDecrement,
                     'custom_meters'       => $customMeters,
                     'roll_length_at_sale' => $product->roll_length,
+                    'unit_type'           => $costUnitType,
                     'quantity'            => $item['quantity'],
                     'price'               => $item['price'],
                     'total'               => $item['total'],

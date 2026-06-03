@@ -9,6 +9,7 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
+use App\Support\ProductProfitCostCalculator;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -1032,7 +1033,20 @@ class DailySalesController extends Controller
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
             // تكلفة المنتج
-            $itemCost = $item->cost_price * $stockQuantity;
+            if (($item->product_type ?? null) === 'fractional') {
+                // cost_price للرول هو تكلفة الرول الكامل؛ في التقارير يجب احتساب تكلفة الأمتار المستهلكة فقط.
+                $itemCost = ProductProfitCostCalculator::calculateItemCost([
+                    'cost_price' => $item->cost_price,
+                    'product_type' => $item->product_type,
+                    'roll_length' => $item->roll_length,
+                ], [
+                    'quantity' => $item->quantity,
+                    'custom_consumption' => $stockQuantity,
+                    'unit_type' => 'meter',
+                ]);
+            } else {
+                $itemCost = $item->cost_price * $stockQuantity;
+            }
 
             // ربح المنتج
             $itemProfit = $itemTotal - $itemCost;
