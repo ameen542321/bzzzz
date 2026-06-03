@@ -56,6 +56,8 @@ class DailySalesController extends Controller
                 'sale_items.quantity as item_quantity',
                 'sale_items.price as item_price',
                 'sale_items.total as item_total',
+                'sale_items.cost_price as item_cost_price',
+                'sale_items.total_cost as item_total_cost',
                 'sale_items.is_custom',
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
@@ -153,6 +155,8 @@ class DailySalesController extends Controller
                     'quantity' => $row->item_quantity,
                     'price' => $row->item_price,
                     'total' => $row->item_total,
+                    'cost_price_at_sale' => $row->item_cost_price,
+                    'total_cost_at_sale' => $row->item_total_cost,
                     'is_custom' => $row->is_custom,
                     'custom_name' => $row->custom_name,
                     'custom_consumption' => $row->custom_consumption,
@@ -507,6 +511,8 @@ class DailySalesController extends Controller
                 'sale_items.quantity as item_quantity',
                 'sale_items.price as item_price',
                 'sale_items.total as item_total',
+                'sale_items.cost_price as item_cost_price',
+                'sale_items.total_cost as item_total_cost',
                 'sale_items.is_custom',
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
@@ -542,6 +548,8 @@ class DailySalesController extends Controller
                 'quantity' => $row->item_quantity,
                 'price' => $row->item_price,
                 'total' => $row->item_total,
+                'cost_price_at_sale' => $row->item_cost_price,
+                'total_cost_at_sale' => $row->item_total_cost,
                 'is_custom' => $row->is_custom,
                 'custom_name' => $row->custom_name,
                 'custom_consumption' => $row->custom_consumption,
@@ -1033,7 +1041,10 @@ class DailySalesController extends Controller
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
             // تكلفة المنتج
-            if (($item->product_type ?? null) === 'fractional') {
+            if ($item->total_cost_at_sale !== null) {
+                // عند توفر تكلفة وقت البيع نستخدمها حتى لا تتغير أرباح العمليات القديمة عند تغيير تكلفة المنتج لاحقاً.
+                $itemCost = (float) $item->total_cost_at_sale;
+            } elseif (($item->product_type ?? null) === 'fractional') {
                 // cost_price للرول هو تكلفة الرول الكامل؛ في التقارير يجب احتساب تكلفة الأمتار المستهلكة فقط.
                 $itemCost = ProductProfitCostCalculator::calculateItemCost([
                     'cost_price' => $item->cost_price,

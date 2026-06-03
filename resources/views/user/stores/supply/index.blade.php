@@ -982,6 +982,7 @@ function updateSupplyModalUI() {
     const quantityUnitBadge = document.getElementById('quantityUnitBadge');
     const priceLabelText = document.getElementById('priceLabelText');
     const currentPriceLabel = document.getElementById('currentPriceLabel');
+    const currentPriceValue = document.getElementById('currentPriceValue');
     const helperMeaning = document.getElementById('helperMeaning');
     const priceFieldHint = document.getElementById('priceFieldHint');
 
@@ -989,6 +990,8 @@ function updateSupplyModalUI() {
 
     const productKind = form.dataset.productKind || 'normal';
     const rollLength = parseFloat(form.dataset.rollLength || '0') || 0;
+    const currentRollCost = parseFloat(form.dataset.currentRollCost || '0') || 0;
+    const currentMeterCost = parseFloat(form.dataset.currentMeterCost || '0') || 0;
     const itemsPerUnit = parseFloat(form.dataset.itemsPerUnit || '0') || 0;
     const quantity = parseFloat(quantityInput.value) || 0;
     const price = parseFloat(priceInput.value) || 0;
@@ -1005,15 +1008,15 @@ function updateSupplyModalUI() {
         if (unitType === 'meter') {
             quantityLabel = 'الأمتار الموردة';
             quantityBadge = 'متر';
-            normalizedQuantity = rollLength > 0 ? (quantity / rollLength) : quantity;
-            helperText = 'تم تحويل الأمتار إلى ما يعادلها من الرولات لحساب قيمة التوريد وفق سعر تكلفة الرول.';
+            helperText = 'السعر المدخل هنا هو سعر المتر، وسيتم تحويله داخلياً إلى سعر الرول الكامل لحساب الربح لاحقاً.';
+            priceHintText = 'عند اختيار متر: أدخل سعر تكلفة المتر. سيُحفظ سعر الرول = سعر المتر × طول الرول.';
+            priceLabel = 'سعر تكلفة المتر';
         } else {
             quantityLabel = 'عدد الرولات الموردة';
             quantityBadge = 'رول';
-            helperText = 'القيمة محسوبة على أساس سعر تكلفة الرول.';
+            helperText = 'القيمة محسوبة على أساس عدد الرولات × سعر تكلفة الرول.';
+            priceLabel = 'سعر تكلفة الرول';
         }
-
-        priceLabel = 'سعر تكلفة الرول';
     } else if (productKind === 'splittable') {
         if (unitType === 'piece') {
             quantityLabel = 'عدد الحبات الموردة';
@@ -1035,6 +1038,10 @@ function updateSupplyModalUI() {
     if (priceLabelText) priceLabelText.textContent = priceLabel;
     if (currentPriceLabel) {
         currentPriceLabel.textContent = priceLabel.replace('سعر ', '') + ' الحالية:';
+    }
+    if (currentPriceValue) {
+        const currentPrice = productKind === 'fractional' && unitType === 'meter' ? currentMeterCost : currentRollCost;
+        currentPriceValue.textContent = currentPrice.toFixed(2) + ' ر.س';
     }
     if (helperMeaning) helperMeaning.textContent = helperText;
     if (priceFieldHint) priceFieldHint.textContent = priceHintText;

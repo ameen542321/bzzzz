@@ -2,6 +2,8 @@
       class="space-y-6 text-right animate-modalIn"
       data-product-kind="{{ $product->product_type === 'fractional' ? 'fractional' : ($product->is_splittable ? 'splittable' : 'normal') }}"
       data-roll-length="{{ (float) ($product->roll_length ?? 0) }}"
+      data-current-roll-cost="{{ number_format((float) ($product->cost_price ?? 0), 2, '.', '') }}"
+      data-current-meter-cost="{{ (float) ($product->roll_length ?? 0) > 0 ? number_format(((float) ($product->cost_price ?? 0) / (float) $product->roll_length), 2, '.', '') : '0.00' }}"
       data-items-per-unit="{{ (int) ($product->items_per_unit ?? 0) }}">
     @csrf
 
@@ -189,7 +191,7 @@
                                 تكلفة الحبة الحالية:
                             @endif
                         </span>
-                        <span class="text-gray-300 font-bold">{{ number_format($product->cost_price, 2) }} ر.س</span>
+                        <span id="currentPriceValue" class="text-gray-300 font-bold">{{ number_format($product->cost_price, 2) }} ر.س</span>
                     </div>
                     @if($product->product_type === 'fractional' && (float) $product->roll_length > 0)
                         <div class="flex justify-between items-center text-xs mt-2 text-gray-500">
