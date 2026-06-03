@@ -20,7 +20,8 @@ class QuickSaleDeductionCalculator
             }
 
             if ($fractionDeductionValue !== null) {
-                return $product->calculateFinalDeduction($fractionDeductionValue, 'default');
+                // خيارات التجزئة الجاهزة تُخزن كاستهلاك فعلي بالمتر.
+                return $product->calculateFinalDeduction($fractionDeductionValue, 'meter');
             }
 
             // نبقي هذا الفرع على السلوك الحالي للمشروع كما هو،

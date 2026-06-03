@@ -163,7 +163,7 @@
                         @php $item = (array) $item; @endphp
                         <div class="flex gap-2 mb-2" id="row_{{ $index }}">
                             <input type="text" name="fractions[{{ $index }}][option_label]" value="{{ $item['option_label'] ?? '' }}" placeholder="الاسم" class="flex-1 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
-                            <input type="number" step="0.01" name="fractions[{{ $index }}][deduction_value]" value="{{ $item['deduction_value'] ?? '' }}" placeholder="الخصم" class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
+                            <input type="number" step="0.01" name="fractions[{{ $index }}][deduction_value]" value="{{ $item['deduction_value'] ?? '' }}" placeholder="الاستهلاك بالمتر" class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
                             <input type="number" step="0.01" name="fractions[{{ $index }}][price]" value="{{ $item['price'] ?? '' }}" placeholder="السعر" class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
                             <button type="button" onclick="this.parentElement.remove()" class="text-red-500 px-2 font-bold">×</button>
                         </div>
@@ -231,7 +231,7 @@
         div.className = "flex gap-2 mb-2";
         div.innerHTML = `
             <input type="text" name="fractions[${fractionIndex}][option_label]" placeholder="الاسم" required class="flex-1 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
-            <input type="number" step="0.01" name="fractions[${fractionIndex}][deduction_value]" placeholder="الخصم" required class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
+            <input type="number" step="0.01" name="fractions[${fractionIndex}][deduction_value]" placeholder="الاستهلاك بالمتر" required class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
             <input type="number" step="0.01" name="fractions[${fractionIndex}][price]" placeholder="السعر" required class="w-24 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm">
             <button type="button" onclick="this.parentElement.remove()" class="text-red-500 px-2">×</button>
         `;

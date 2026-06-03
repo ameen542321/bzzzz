@@ -224,7 +224,7 @@
                 <input type="text" name="fractions[${fractionIndex}][option_label]" placeholder="اسم الخيار" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
             </div>
             <div class="w-full md:w-32">
-                <input type="number" step="0.01" name="fractions[${fractionIndex}][deduction_value]" placeholder="الخصم" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
+                <input type="number" step="0.01" name="fractions[${fractionIndex}][deduction_value]" placeholder="الاستهلاك بالمتر" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">
             </div>
             <div class="w-full md:w-32">
                 <input type="number" step="0.01" name="fractions[${fractionIndex}][price]" placeholder="السعر" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded px-3 py-2">

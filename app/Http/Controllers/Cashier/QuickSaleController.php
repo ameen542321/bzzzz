@@ -146,7 +146,8 @@ class QuickSaleController extends Controller
                 } elseif ($fractionId && $fractionId !== '0') {
                     $fraction = $product->fractions()->find($fractionId);
                     if ($fraction) {
-                        $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'default');
+                        // خيارات التجزئة في الواجهة تُدخل كاستهلاك فعلي بالمتر، وليست كنسبة من طول الرول.
+                        $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'meter');
                     }
                 } else {
                     $quantityToDecrement = (float) $item['quantity'];
