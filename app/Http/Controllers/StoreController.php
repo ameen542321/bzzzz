@@ -1173,44 +1173,23 @@ class StoreController extends Controller
     }
 
     /**
-     * يحسب تكلفة المنتجات المباعة مع دعم العمليات القديمة قبل إضافة sale_items.total_cost.
+     * يحسب تكلفة المنتجات المباعة من سجل البيع نفسه حتى لا نخلط بين عمليات قديمة
+     * قبل حقول sale_items.total_cost وعمليات جديدة بعدها.
      */
     private function calculateSoldProductsCostForPeriod(int $storeId, $start, $end, array $saleTypes): float
     {
-        $salesFallbackQuery = Sale::where('store_id', $storeId)
+        return (float) Sale::where('store_id', $storeId)
             ->whereBetween('created_at', [$start, $end])
             ->whereIn('sale_type', $saleTypes)
             ->where(function ($query) {
                 $query->whereNull('description')
                     ->orWhere('description', '!=', 'manual_invoice_entry');
-            });
-
-        if (! \Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
-            return (float) $salesFallbackQuery
-                ->selectRaw('COALESCE(SUM(products_total), 0) as products_cost')
-                ->value('products_cost');
-        }
-
-        $salesCosts = DB::table('sales')
-            ->leftJoin('sale_items', 'sales.id', '=', 'sale_items.sale_id')
-            ->where('sales.store_id', $storeId)
-            ->whereBetween('sales.created_at', [$start, $end])
-            ->whereIn('sales.sale_type', $saleTypes)
-            ->where(function ($query) {
-                $query->whereNull('sales.description')
-                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
             })
-            ->groupBy('sales.id', 'sales.products_total')
-            ->selectRaw('sales.id')
-            ->selectRaw('COALESCE(SUM(sale_items.total_cost), 0) as item_total_cost')
-            ->selectRaw('COUNT(sale_items.id) as items_count')
-            ->selectRaw('SUM(CASE WHEN sale_items.total_cost IS NULL THEN 0 ELSE 1 END) as costed_items_count')
-            ->selectRaw('COALESCE(sales.products_total, 0) as legacy_products_cost');
-
-        return (float) DB::query()
-            ->fromSub($salesCosts, 'sales_costs')
-            ->selectRaw('COALESCE(SUM(CASE WHEN items_count > 0 AND items_count = costed_items_count THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
-            ->value('total_cost');
+            // products_total/labor_total/profit محفوظة على نفس عملية البيع، لذلك هذه المعادلة
+            // تخدم المبيعات القديمة والجديدة بدون الاعتماد على sale_items.total_cost غير الموجود
+            // أو غير المعبأ في العمليات التي تمت قبل تعديل الرولات.
+            ->selectRaw('COALESCE(SUM((COALESCE(products_total, 0) + COALESCE(labor_total, 0)) - COALESCE(profit, 0)), 0) as products_cost')
+            ->value('products_cost');
     }
 
     /**
