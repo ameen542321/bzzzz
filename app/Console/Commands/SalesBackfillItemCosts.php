@@ -49,11 +49,15 @@ class SalesBackfillItemCosts extends Command
 
         $query = SaleItem::query()
             ->with(['sale:id,store_id,created_at,sale_type,description', 'product'])
-            ->whereHas('sale', function ($saleQuery) use ($storeId, $start, $end) {
-                // هذا الأمر أداة تعبئة بيانات، لذلك لا نستبعد أي نوع عملية أو وصف.
-                // إذا ظهر سطر بيع داخل الشهر والمتجر وأعمدته فارغة، يجب أن يدخل في المعاينة.
-                $saleQuery->where('store_id', $storeId)
-                    ->whereBetween('created_at', [$start, $end]);
+            ->whereHas('sale', function ($saleQuery) use ($storeId) {
+                $saleQuery->where('store_id', $storeId);
+            })
+            ->where(function ($dateQuery) use ($start, $end) {
+                // المحاسب قد يسجل عملية بتاريخ عمل 31-05 أثناء يوم 01-06؛ لذلك نفحص تاريخ البيع وتاريخ سطر البيع معاً.
+                $dateQuery->whereBetween('created_at', [$start, $end])
+                    ->orWhereHas('sale', function ($saleQuery) use ($start, $end) {
+                        $saleQuery->whereBetween('created_at', [$start, $end]);
+                    });
             })
             ->where(function ($query) {
                 $query->whereNull('cost_price')

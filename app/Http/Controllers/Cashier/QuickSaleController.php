@@ -381,6 +381,11 @@ class QuickSaleController extends Controller
         // تنفيذ الخصم الفعلي وتسجيل الحركة
         foreach ($itemsWithDeductions as $itemData) {
             $saleItem = $sale->items()->create($itemData['row_data']);
+            // عند تثبيت تاريخ عملية سابق، يجب أن يحمل سطر البيع نفس التاريخ حتى لا يظهر في شهر مختلف.
+            $saleItem->forceFill([
+                'created_at' => $operationTimestamp,
+                'updated_at' => $operationTimestamp,
+            ])->save();
 
             $itemData['product']->decrement('quantity', $itemData['quantity_to_subtract']);
 
