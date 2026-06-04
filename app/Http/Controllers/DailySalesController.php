@@ -1041,13 +1041,17 @@ class DailySalesController extends Controller
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
             // تكلفة المنتج
-            if ($item->total_cost_at_sale !== null) {
+            $costPrice = (float) (((float) ($item->cost_price_at_sale ?? 0) > 0)
+                ? $item->cost_price_at_sale
+                : ($item->cost_price ?? 0));
+
+            if ((float) ($item->total_cost_at_sale ?? 0) > 0) {
                 // عند توفر تكلفة وقت البيع نستخدمها حتى لا تتغير أرباح العمليات القديمة عند تغيير تكلفة المنتج لاحقاً.
                 $itemCost = (float) $item->total_cost_at_sale;
             } elseif (($item->product_type ?? null) === 'fractional') {
-                // cost_price للرول هو تكلفة الرول الكامل؛ في التقارير يجب احتساب تكلفة الأمتار المستهلكة فقط.
+                // إذا كانت تكلفة السطر فارغة نحسب الرول من تكلفة وقت البيع إن وجدت، وإلا من تكلفة المنتج الحالية.
                 $itemCost = ProductProfitCostCalculator::calculateItemCost([
-                    'cost_price' => $item->cost_price,
+                    'cost_price' => $costPrice,
                     'product_type' => $item->product_type,
                     'roll_length' => $item->roll_length,
                 ], [
@@ -1056,7 +1060,8 @@ class DailySalesController extends Controller
                     'unit_type' => 'meter',
                 ]);
             } else {
-                $itemCost = $item->cost_price * $stockQuantity;
+                // العمليات القديمة قبل أعمدة التكلفة تُحسب بالطريقة السابقة: تكلفة الوحدة × الكمية.
+                $itemCost = $costPrice * $stockQuantity;
             }
 
             // ربح المنتج
