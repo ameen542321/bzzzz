@@ -1193,7 +1193,6 @@ class StoreController extends Controller
 
         $salesCosts = DB::table('sales')
             ->leftJoin('sale_items', 'sales.id', '=', 'sale_items.sale_id')
-            ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
             ->where('sales.store_id', $storeId)
             ->whereBetween('sales.created_at', [$start, $end])
             ->whereIn('sales.sale_type', $saleTypes)
@@ -1203,19 +1202,15 @@ class StoreController extends Controller
             })
             ->groupBy('sales.id', 'sales.products_total')
             ->selectRaw('sales.id')
-            ->selectRaw("COALESCE(SUM(CASE
-                WHEN COALESCE(sale_items.total_cost, 0) > 0 THEN sale_items.total_cost
-                WHEN products.product_type = 'fractional' AND COALESCE(products.roll_length, 0) > 0
-                    THEN (COALESCE(NULLIF(sale_items.cost_price, 0), products.cost_price, 0) / products.roll_length) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)
-                ELSE COALESCE(NULLIF(sale_items.cost_price, 0), products.cost_price, 0) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)
-            END), 0) as item_total_cost")
+            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(sale_items.total_cost, 0) > 0 THEN sale_items.total_cost ELSE 0 END), 0) as item_total_cost')
             ->selectRaw('COUNT(sale_items.id) as items_count')
+            ->selectRaw('SUM(CASE WHEN COALESCE(sale_items.total_cost, 0) > 0 THEN 1 ELSE 0 END) as costed_items_count')
             ->selectRaw('COALESCE(sales.products_total, 0) as legacy_products_cost');
 
         return (float) DB::query()
             ->fromSub($salesCosts, 'sales_costs')
-            // إذا وجدت أسطر بيع نحسبها بنفس منطق صفحة المبيعات اليومية، وإلا نرجع لقيمة العملية القديمة.
-            ->selectRaw('COALESCE(SUM(CASE WHEN items_count > 0 THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
+            // إذا كانت كل أسطر العملية تحمل total_cost نستخدم النظام الجديد، وإلا نرجع لقيمة العملية القديمة.
+            ->selectRaw('COALESCE(SUM(CASE WHEN items_count > 0 AND items_count = costed_items_count THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
             ->value('total_cost');
     }
 
