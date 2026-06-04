@@ -1203,12 +1203,13 @@ class StoreController extends Controller
             ->groupBy('sales.id', 'sales.products_total')
             ->selectRaw('sales.id')
             ->selectRaw('COALESCE(SUM(sale_items.total_cost), 0) as item_total_cost')
+            ->selectRaw('COUNT(sale_items.id) as items_count')
             ->selectRaw('SUM(CASE WHEN sale_items.total_cost IS NULL THEN 0 ELSE 1 END) as costed_items_count')
             ->selectRaw('COALESCE(sales.products_total, 0) as legacy_products_cost');
 
         return (float) DB::query()
             ->fromSub($salesCosts, 'sales_costs')
-            ->selectRaw('COALESCE(SUM(CASE WHEN costed_items_count > 0 THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
+            ->selectRaw('COALESCE(SUM(CASE WHEN items_count > 0 AND items_count = costed_items_count THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
             ->value('total_cost');
     }
 
