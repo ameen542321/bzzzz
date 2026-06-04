@@ -50,13 +50,10 @@ class SalesBackfillItemCosts extends Command
         $query = SaleItem::query()
             ->with(['sale:id,store_id,created_at,sale_type,description', 'product'])
             ->whereHas('sale', function ($saleQuery) use ($storeId, $start, $end) {
+                // هذا الأمر أداة تعبئة بيانات، لذلك لا نستبعد أي نوع عملية أو وصف.
+                // إذا ظهر سطر بيع داخل الشهر والمتجر وأعمدته فارغة، يجب أن يدخل في المعاينة.
                 $saleQuery->where('store_id', $storeId)
-                    ->whereBetween('created_at', [$start, $end])
-                    ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
-                    ->where(function ($query) {
-                        $query->whereNull('description')
-                            ->orWhere('description', '!=', 'manual_invoice_entry');
-                    });
+                    ->whereBetween('created_at', [$start, $end]);
             })
             ->where(function ($query) {
                 $query->whereNull('cost_price')
