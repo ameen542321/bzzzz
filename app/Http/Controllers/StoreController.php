@@ -1187,7 +1187,7 @@ class StoreController extends Controller
 
         if (! \Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
             return (float) $salesFallbackQuery
-                ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
+                ->selectRaw('COALESCE(SUM(products_total), 0) as products_cost')
                 ->value('products_cost');
         }
 
@@ -1200,11 +1200,11 @@ class StoreController extends Controller
                 $query->whereNull('sales.description')
                     ->orWhere('sales.description', '!=', 'manual_invoice_entry');
             })
-            ->groupBy('sales.id', 'sales.products_total', 'sales.labor_total', 'sales.profit')
+            ->groupBy('sales.id', 'sales.products_total')
             ->selectRaw('sales.id')
             ->selectRaw('COALESCE(SUM(sale_items.total_cost), 0) as item_total_cost')
             ->selectRaw('SUM(CASE WHEN sale_items.total_cost IS NULL THEN 0 ELSE 1 END) as costed_items_count')
-            ->selectRaw('COALESCE(sales.products_total, 0) + COALESCE(sales.labor_total, 0) - COALESCE(sales.profit, 0) as legacy_products_cost');
+            ->selectRaw('COALESCE(sales.products_total, 0) as legacy_products_cost');
 
         return (float) DB::query()
             ->fromSub($salesCosts, 'sales_costs')
