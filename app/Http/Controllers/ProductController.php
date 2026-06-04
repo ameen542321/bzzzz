@@ -599,8 +599,8 @@ class ProductController extends Controller
             // الحقول الجديدة
             'product_type'     => 'required|in:standard,fractional',
             'waste_percentage' => 'nullable|numeric|min:0|max:100',
-            'num_rolls'        => 'required_if:product_type,fractional|nullable|numeric|min:0',
-            'roll_length'      => 'required_if:product_type,fractional|nullable|numeric|gt:0',
+            'num_rolls'        => 'exclude_unless:product_type,fractional|required|numeric|min:0',
+            'roll_length'      => 'exclude_unless:product_type,fractional|required|numeric|gt:0',
 
             // حقول الأطقم
             'is_splittable'    => 'nullable|boolean',
@@ -723,7 +723,7 @@ class ProductController extends Controller
             'image'            => 'nullable|image|max:2048',
             'product_type'     => 'required|in:standard,fractional',
             'waste_percentage' => 'nullable|numeric|min:0|max:100',
-            'roll_length'      => 'required_if:product_type,fractional|nullable|numeric|gt:0',
+            'roll_length'      => 'exclude_unless:product_type,fractional|required|numeric|gt:0',
 
             'is_splittable'    => 'nullable|boolean',
             'items_per_unit'   => 'required_if:is_splittable,1|nullable|integer|min:1',
