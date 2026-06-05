@@ -699,15 +699,32 @@ class DashboardController extends Controller
             })
             ->with(['employee', 'accountant', 'items.product'])
             ->get()->map(function($s) {
-                 $productsList = [];
-        foreach ($s->items as $item) {
-            $productsList[] = [
-                'name' => $item->product->name ?? 'منتج',
-                'quantity' => $item->quantity,
-                'price' => $item->price,
-                'total' => $item->total
-            ];
-        }
+                $productsList = [];
+                $productsCost = 0.0;
+                $productsSalesValue = 0.0;
+
+                foreach ($s->items as $item) {
+                    $product = $item->product;
+                    $stockQuantity = $this->saleItemStockQuantityForReport($item, $product);
+                    $lineTotal = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
+                    $costPrice = (float) ($product->cost_price ?? 0);
+                    $lineCost = $costPrice * $stockQuantity;
+
+                    $productsSalesValue += $lineTotal;
+                    $productsCost += $lineCost;
+
+                    $productsList[] = [
+                        'name' => $product->name ?? 'منتج',
+                        'quantity' => $item->quantity,
+                        'price' => $item->price,
+                        'total' => $lineTotal,
+                        'stock_quantity' => $stockQuantity,
+                        'cost_price' => $costPrice,
+                        'cost_total' => $lineCost,
+                        'profit' => $lineTotal - $lineCost,
+                    ];
+                }
+
                 return [
                     'id' => $s->id,
                     'time' => $s->created_at->format('h:i A'),
@@ -716,12 +733,14 @@ class DashboardController extends Controller
                     'total' => $s->final_total,
                     'labor_total' => $s->labor_total,
                     'labor_desc' => $s->description,
-                    'cost' => $s->products_total - $s->profit,
-                    'profit' => $s->profit,
+                    // تكلفة المنتجات في التقرير تعتمد على عناصر البيع نفسها لا على ربح مخزن قديم،
+                    // حتى تظهر تكلفة الرول/الحبة/الكمية المعدلة بشكل صحيح عند إغلاق الشفت.
+                    'cost' => $productsCost,
+                    'profit' => ($productsSalesValue + (float) ($s->labor_total ?? 0)) - $productsCost,
                     'employee' => $s->employee->name ?? '---',
                     'accountant' => $s->accountant->name ?? '---',
-                      'products' => $productsList, // إضافة المنتجات
-            'products_count' => count($productsList) // عدد المنتجات
+                    'products' => $productsList,
+                    'products_count' => count($productsList)
                 ];
             });
 
@@ -865,54 +884,73 @@ class DashboardController extends Controller
     }
 }
 
-  private function calculateProductsProfit($storeId, $startTime, $endTime)
-{
-    $totalSalesValue = 0;
-    $totalCostValue = 0;
+    private function calculateProductsProfit($storeId, $startTime, $endTime)
+    {
+        $totalSalesValue = 0.0;
+        $totalCostValue = 0.0;
 
-    Sale::where('store_id', $storeId)
-        ->whereBetween('created_at', [$startTime, $endTime])
-        ->where(function ($query) {
-            $query->whereNull('description')
-                ->orWhere('description', '!=', 'manual_invoice_entry');
-        })
-        ->with(['items' => function($query) {
-            $query->select('sale_id', 'product_id', 'quantity', 'price');
-        }])
-        ->select('id')
-        ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
-            foreach ($salesChunk as $sale) {
-                foreach ($sale->items as $item) {
-                    $totalSalesValue += $item->quantity * $item->price;
+        Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$startTime, $endTime])
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->with(['items.product'])
+            ->select('id')
+            ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
+                foreach ($salesChunk as $sale) {
+                    foreach ($sale->items as $item) {
+                        // سعر البيع يجب أن يأتي من sale_items.total لأنه يمثل إجمالي السطر وقت البيع
+                        // وقد يختلف عن quantity * price في الرولات أو بعد تعديل العملية.
+                        $lineSalesValue = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
+                        $stockQuantity = $this->saleItemStockQuantityForReport($item, $item->product);
+                        $lineCostValue = $stockQuantity * (float) ($item->product->cost_price ?? 0);
 
-                    $product = DB::table('products')
-                        ->where('id', $item->product_id)
-                        ->select('cost_price', 'is_splittable', 'items_per_unit')
-                        ->first();
-
-                    if ($product && $product->cost_price) {
-                        // إذا كان المنتج طقماً وتم بيعه بالحبة
-                        if ($product->is_splittable == 1 && $product->items_per_unit > 0) {
-                            // تكلفة الحبة = تكلفة الطقم ÷ عدد الحبات
-                            $costPerPiece = $product->cost_price / $product->items_per_unit;
-                            $itemCost = $item->quantity * $costPerPiece;
-                        } else {
-                            // منتج عادي أو طقم كامل
-                            $itemCost = $item->quantity * $product->cost_price;
-                        }
-
-                        $totalCostValue += $itemCost;
+                        $totalSalesValue += $lineSalesValue;
+                        $totalCostValue += $lineCostValue;
                     }
                 }
-            }
-        });
+            });
 
-    return [
-        'sales_value' => $totalSalesValue,
-        'cost_value' => $totalCostValue,
-        'profit' => $totalSalesValue - $totalCostValue,
-    ];
-}
+        return [
+            'sales_value' => $totalSalesValue,
+            'cost_value' => $totalCostValue,
+            'profit' => $totalSalesValue - $totalCostValue,
+        ];
+    }
+
+    private function saleItemStockQuantityForReport($item, $product): float
+    {
+        $quantity = (float) ($item->quantity ?? 0);
+        $stockQuantity = (float) ($item->custom_consumption ?? $quantity);
+
+        // للرول/المتر/القص المخصص نخزن غالباً custom_consumption ككمية المخزون الأساسية
+        // (مثل عدد الأمتار المخصومة)، لذلك نعتمدها مباشرة في تكلفة التقرير.
+        if ($item->custom_consumption !== null) {
+            return $stockQuantity;
+        }
+
+        if (!$product) {
+            return $quantity;
+        }
+
+        // احتياط لعمليات الرول القديمة التي قد لا تحتوي custom_consumption:
+        // إذا كانت الوحدة رول/وحدة لمنتج fractional نحول عدد الرولات إلى أمتار قبل حساب التكلفة.
+        if (($product->product_type ?? null) === 'fractional' && in_array((string) ($item->unit_type ?? ''), ['roll', 'unit'], true)) {
+            $rollLength = (float) ($item->roll_length_at_sale ?: $product->roll_length ?: 0);
+            if ($rollLength > 0) {
+                return $quantity * $rollLength;
+            }
+        }
+
+        // إذا كان المنتج طقماً وتم بيعه بالحبة، نحول الحبات إلى كمية الطقم الأساسية.
+        if (!empty($product->is_splittable) && (string) ($item->unit_type ?? '') === 'piece') {
+            return $quantity / max(1, (float) ($product->items_per_unit ?? 1));
+        }
+
+        return $quantity;
+    }
+
     private function generateReportAndWhatsApp($store, $accountant, $reportData)
     {
         // 1. التحقق من الحد اليومي
@@ -1014,7 +1052,8 @@ class DashboardController extends Controller
     }
     $message .= "💰 اجمالي العمليات: " . number_format($totalSales, 2) . " ريال\n";
     $message .= "🛒 قيمة المبيعات (بسعر البيع): " . number_format($productsSalesValue, 2) . " ريال\n";
-    $message .= "📦 قيمة التكلفة: " . number_format($productsCostValue, 2) . " ريال\n";
+    $message .= "📦 تكلفة المنتجات (بسعر التكلفة): " . number_format($productsCostValue, 2) . " ريال\n";
+    $message .= "📈 ربح المنتجات: " . number_format($productsSalesValue - $productsCostValue, 2) . " ريال\n";
     $message .= "💵 عمليات الكاش: " . number_format($cashSales, 2) . " ريال\n";
     $message .= "💳 عمليات الشبكة: " . number_format($cardSales, 2) . " ريال\n";
     $message .= "📤 مصاريف: " . number_format($totalOutgoing, 2) . " ريال\n";
