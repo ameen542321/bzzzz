@@ -462,6 +462,45 @@
                                     </div>
                                     @endif
 
+                                    @if(($sale->items ?? collect())->count() > 0)
+                                    <div class="rounded-xl border border-gray-700 bg-gray-800/40 p-3">
+                                        <div class="flex items-center justify-between gap-2 mb-3">
+                                            <div>
+                                                <h4 class="text-white font-bold text-sm">تعديل المنتجات</h4>
+                                                <p class="text-xs text-gray-500 mt-1">يمكن تعديل الكمية وسعر البيع لكل منتج، وسيتم تحديث إجمالي العملية والمخزون بالفارق.</p>
+                                            </div>
+                                            <span class="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">راجع الكميات قبل الحفظ</span>
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            @foreach($sale->items as $itemIndex => $item)
+                                            <div class="rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+                                                <input type="hidden" name="item_ids[]" value="{{ $item->id }}">
+                                                <div class="flex items-start justify-between gap-2 mb-2">
+                                                    <div>
+                                                        <p class="text-sm font-bold text-white">{{ $item->display_name ?? $item->product_name ?? 'منتج غير معروف' }}</p>
+                                                        <p class="text-[11px] text-gray-500">الوحدة المعروضة: {{ $item->display_unit ?? 'وحدة' }} — الإجمالي الحالي: {{ number_format($item->total ?? 0, 2) }} ر.س</p>
+                                                    </div>
+                                                    <span class="text-[11px] text-gray-400">#{{ $item->id }}</span>
+                                                </div>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label class="text-xs text-gray-300 block mb-1">الكمية</label>
+                                                        <input type="number" step="0.01" min="0.01" name="item_quantities[]" value="{{ old('item_quantities.' . $itemIndex, $item->quantity) }}"
+                                                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                                    </div>
+                                                    <div>
+                                                        <label class="text-xs text-gray-300 block mb-1">سعر البيع</label>
+                                                        <input type="number" step="0.01" min="0" name="item_prices[]" value="{{ old('item_prices.' . $itemIndex, $item->price) }}"
+                                                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    @endif
+
                                     <div>
                                         <label class="text-sm text-gray-300 block mb-1">نوع البيع</label>
                                         <select id="sale-type-{{ $sale->id }}" name="sale_type" onchange="updateEditSaleFields({{ $sale->id }})" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
