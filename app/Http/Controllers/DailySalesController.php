@@ -700,7 +700,7 @@ class DailySalesController extends Controller
 
             $lineTotal = $newQuantity * $newPrice;
             $productsTotal += $lineTotal;
-            $productsCostTotal += ((float) ($item->product->cost_price ?? 0)) * $newStockQuantity;
+            $productsCostTotal += $this->calculateSaleItemCost($item, $newStockQuantity);
 
             $updates[] = [
                 'item' => $item,
@@ -747,6 +747,23 @@ class DailySalesController extends Controller
         }
 
         return $quantity;
+    }
+
+    private function calculateSaleItemCost($item, float $stockQuantity): float
+    {
+        $costPrice = (float) ($item->cost_price ?? $item->product?->cost_price ?? 0);
+        $productType = $item->product_type ?? $item->product?->product_type ?? null;
+
+        // في صفحة المنتجات يتم تقييم المنتج fractional على أن cost_price هو تكلفة الرول الكامل
+        // والمخزون محفوظ بوحدة المتر؛ لذلك نقسم تكلفة الرول على طوله للحصول على تكلفة المتر.
+        if ($productType === 'fractional') {
+            $rollLength = (float) ($item->roll_length_at_sale ?? $item->roll_length ?? $item->product?->roll_length ?? 0);
+            if ($rollLength > 0) {
+                return ($costPrice / $rollLength) * $stockQuantity;
+            }
+        }
+
+        return $costPrice * $stockQuantity;
     }
 
     private function applySaleItemEditPlan(array $plan, Store $store, Sale $sale): void
@@ -1202,8 +1219,9 @@ class DailySalesController extends Controller
             // إجمالي المنتج
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
-            // تكلفة المنتج
-            $itemCost = $item->cost_price * $stockQuantity;
+            // تكلفة المنتج: في منتجات الرول تكون cost_price تكلفة الرول الكامل،
+            // لذلك نحولها إلى تكلفة وحدة المخزون الأساسية (متر غالباً) قبل ضربها في الكمية المخصومة.
+            $itemCost = $this->calculateSaleItemCost($item, $stockQuantity);
 
             // ربح المنتج
             $itemProfit = $itemTotal - $itemCost;

@@ -708,7 +708,7 @@ class DashboardController extends Controller
                     $stockQuantity = $this->saleItemStockQuantityForReport($item, $product);
                     $lineTotal = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
                     $costPrice = (float) ($product->cost_price ?? 0);
-                    $lineCost = $costPrice * $stockQuantity;
+                    $lineCost = $this->saleItemCostForReport($item, $product, $stockQuantity);
 
                     $productsSalesValue += $lineTotal;
                     $productsCost += $lineCost;
@@ -720,6 +720,7 @@ class DashboardController extends Controller
                         'total' => $lineTotal,
                         'stock_quantity' => $stockQuantity,
                         'cost_price' => $costPrice,
+                        'cost_unit_price' => $stockQuantity > 0 ? ($lineCost / $stockQuantity) : 0,
                         'cost_total' => $lineCost,
                         'profit' => $lineTotal - $lineCost,
                     ];
@@ -904,7 +905,7 @@ class DashboardController extends Controller
                         // وقد يختلف عن quantity * price في الرولات أو بعد تعديل العملية.
                         $lineSalesValue = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
                         $stockQuantity = $this->saleItemStockQuantityForReport($item, $item->product);
-                        $lineCostValue = $stockQuantity * (float) ($item->product->cost_price ?? 0);
+                        $lineCostValue = $this->saleItemCostForReport($item, $item->product, $stockQuantity);
 
                         $totalSalesValue += $lineSalesValue;
                         $totalCostValue += $lineCostValue;
@@ -949,6 +950,22 @@ class DashboardController extends Controller
         }
 
         return $quantity;
+    }
+
+    private function saleItemCostForReport($item, $product, float $stockQuantity): float
+    {
+        $costPrice = (float) ($product->cost_price ?? 0);
+
+        // نفس منطق صفحة المنتجات: سعر تكلفة المنتج fractional يمثل تكلفة الرول الكامل،
+        // بينما كمية المخزون/البيع المحسوبة هنا بالمتر؛ لذلك تكلفة المتر = تكلفة الرول ÷ طول الرول.
+        if (($product->product_type ?? null) === 'fractional') {
+            $rollLength = (float) ($item->roll_length_at_sale ?: $product->roll_length ?: 0);
+            if ($rollLength > 0) {
+                return ($costPrice / $rollLength) * $stockQuantity;
+            }
+        }
+
+        return $costPrice * $stockQuantity;
     }
 
     private function generateReportAndWhatsApp($store, $accountant, $reportData)

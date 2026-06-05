@@ -568,7 +568,7 @@
                                         الكمية {{ $product['quantity'] ?? 0 }} ×
                                         سعر الوحدة {{ number_format((float)($product['price'] ?? 0), 2) }} =
                                         {{ number_format((float)($product['total'] ?? 0), 2) }} ر.س
-                                        | تكلفة الوحدة {{ number_format((float)($product['cost_price'] ?? 0), 2) }}
+                                        | تكلفة وحدة المخزون {{ number_format((float)($product['cost_unit_price'] ?? $product['cost_price'] ?? 0), 2) }}
                                         | إجمالي التكلفة {{ number_format((float)($product['cost_total'] ?? 0), 2) }} ر.س
                                         | الربح {{ number_format((float)($product['profit'] ?? 0), 2) }} ر.س
                                     </li>
