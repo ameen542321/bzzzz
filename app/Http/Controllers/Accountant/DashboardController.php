@@ -159,7 +159,13 @@ class DashboardController extends Controller
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
             ->selectRaw('
-                COALESCE(SUM(final_total), 0) as total_sales,
+                -- إجمالي لوحة المحاسب يجب أن يطابق المبلغ المستلم فعلياً في الشفت
+                -- وليس final_total، لأن final_total يدخل الآجل/المتبقي ويرفع الإجمالي خطأ.
+                COALESCE(SUM(CASE
+                    WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0)
+                    THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0))
+                    ELSE COALESCE(paid_amount, 0)
+                END), 0) as total_sales,
 
                 -- المبالغ النقدية: من مبيعات كاش + الجزء النقدي من المختلط
                 COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
