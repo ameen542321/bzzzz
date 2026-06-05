@@ -1056,10 +1056,6 @@ class DashboardController extends Controller
     $message .= "📤 مصاريف: " . number_format($totalOutgoing, 2) . " ريال\n";
     $message .= "🔢 عدد العمليات: " . number_format($operationsCount) . "\n\n";
 
-    if (($reportData['labor_total'] ?? 0) > 0) {
-        $message .= "👷 *أجرة اليد:* " . number_format((float) $reportData['labor_total'], 2) . " ريال\n\n";
-    }
-
     $message .= "💵 *مطابقة الصندوق:*\n";
     $message .= "💰 الكاش المتوقع: " . number_format((float) ($reportData['cash_details']['expected'] ?? 0), 2) . " ريال\n";
     $message .= "💵 الكاش المستلم: " . number_format((float) ($reportData['cash_details']['actual'] ?? 0), 2) . " ريال\n";
