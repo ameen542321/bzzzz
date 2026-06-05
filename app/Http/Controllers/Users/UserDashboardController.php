@@ -31,12 +31,12 @@ class UserDashboardController extends Controller
         $employeesCount   = $user->employees()->count();
         $employeesWithoutSalary = $user->employees()
             ->where(function ($query) {
-                $query->whereNull('salary')
-                    ->orWhere('salary', '<=', 0);
+                $query->whereNull('employees.salary')
+                    ->orWhere('employees.salary', '<=', 0);
             })
             ->with('store:id,name')
-            ->select('id', 'store_id', 'name', 'salary')
-            ->orderBy('name')
+            ->select('employees.id', 'employees.store_id', 'employees.name', 'employees.salary')
+            ->orderBy('employees.name')
             ->get();
         $employeesWithoutSalaryCount = $employeesWithoutSalary->count();
 
