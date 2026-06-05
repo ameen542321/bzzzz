@@ -998,8 +998,8 @@ class DailySalesController extends Controller
                 ->forceDelete();
 
             $sale->items()->delete();
-            // المطلوب حذف عملية المبيعات نهائياً، وليس نقلها للحذف المؤقت.
-            $sale->forceDelete();
+            // Sale لا يستخدم SoftDeletes حالياً؛ delete هنا حذف نهائي من جدول sales.
+            $sale->delete();
         });
 
         return back()->with('success', 'تم حذف العملية واسترجاع المخزون بنجاح.');

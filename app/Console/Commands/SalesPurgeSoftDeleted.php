@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\CreditSale;
-use App\Models\Sale;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class SalesPurgeSoftDeleted extends Command
 {
@@ -26,8 +25,19 @@ class SalesPurgeSoftDeleted extends Command
             return self::FAILURE;
         }
 
-        $query = Sale::onlyTrashed()
+        if (! Schema::hasColumn('sales', 'deleted_at')) {
+            $this->info('جدول sales لا يحتوي deleted_at؛ لا توجد عمليات مبيعات محذوفة مؤقتاً لتنظيفها.');
+            $this->table(['البند', 'القيمة'], [
+                ['المتجر', $storeId],
+                ['عمليات محذوفة مؤقتاً قابلة للحذف النهائي', 0],
+            ]);
+
+            return self::SUCCESS;
+        }
+
+        $query = DB::table('sales')
             ->where('store_id', $storeId)
+            ->whereNotNull('deleted_at')
             ->orderBy('id');
 
         $count = (clone $query)->count();
@@ -46,19 +56,23 @@ class SalesPurgeSoftDeleted extends Command
 
         DB::transaction(function () use ($query, $storeId, &$deleted) {
             $query->chunkById(100, function ($sales) use ($storeId, &$deleted) {
-                foreach ($sales as $sale) {
-                    // هذه العمليات سبق حذفها مؤقتاً؛ هنا ننظف السجلات التابعة ثم نحذف سجل البيع نهائياً.
-                    $sale->items()->delete();
-                    $sale->invoice()->delete();
+                $saleIds = $sales->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-                    CreditSale::withTrashed()
-                        ->where('store_id', $storeId)
-                        ->where('description', 'like', '%#' . $sale->id . '%')
-                        ->forceDelete();
-
-                    $sale->forceDelete();
-                    $deleted++;
+                if (empty($saleIds)) {
+                    return;
                 }
+
+                DB::table('sale_items')->whereIn('sale_id', $saleIds)->delete();
+                DB::table('invoices')->whereIn('sale_id', $saleIds)->delete();
+
+                foreach ($saleIds as $saleId) {
+                    DB::table('employee_credit_sales')
+                        ->where('store_id', $storeId)
+                        ->where('description', 'like', '%#' . $saleId . '%')
+                        ->delete();
+                }
+
+                $deleted += DB::table('sales')->whereIn('id', $saleIds)->delete();
             });
         });
 
