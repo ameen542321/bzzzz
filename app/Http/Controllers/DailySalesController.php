@@ -61,6 +61,7 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
+                'sale_items.roll_length_at_sale',
                 'sale_items.unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
@@ -159,6 +160,7 @@ class DailySalesController extends Controller
                     'custom_name' => $row->custom_name,
                     'custom_consumption' => $row->custom_consumption,
                     'custom_meters' => $row->custom_meters,
+                    'roll_length_at_sale' => $row->roll_length_at_sale,
                     'unit_type' => $row->unit_type,
                     'product_name' => $row->product_name ?? 'منتج غير معروف',
                     'cost_price' => $row->product_cost_price ?? 0,
@@ -514,6 +516,7 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
+                'sale_items.roll_length_at_sale',
                 'sale_items.unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
@@ -550,6 +553,7 @@ class DailySalesController extends Controller
                 'custom_name' => $row->custom_name,
                 'custom_consumption' => $row->custom_consumption,
                 'custom_meters' => $row->custom_meters,
+                'roll_length_at_sale' => $row->roll_length_at_sale,
                 'unit_type' => $row->unit_type,
                 'product_name' => $row->product_name ?? 'منتج غير معروف',
                 'cost_price' => $row->product_cost_price ?? 0,
@@ -678,6 +682,9 @@ class DailySalesController extends Controller
             $oldQuantity = (float) ($item->quantity ?? 0);
             $newQuantity = (float) ($quantities[$index] ?? $oldQuantity);
             $newPrice = (float) ($prices[$index] ?? $item->price ?? 0);
+
+            // دعم الرول/القص/التجزئة: نحسب كمية المخزون الأساسية أولاً (غالباً بالمتر)،
+            // ثم نرجع الكمية القديمة مؤقتاً للتحقق من أن الكمية الجديدة متاحة.
             $oldStockQuantity = $this->saleItemStockQuantity($item, $oldQuantity);
             $newStockQuantity = $this->saleItemStockQuantity($item, $newQuantity);
             $availableAfterRestore = (float) $item->product->quantity + $oldStockQuantity;
@@ -717,10 +724,24 @@ class DailySalesController extends Controller
         $oldQuantity = (float) ($item->quantity ?? 0);
         $oldStockQuantity = (float) ($item->custom_consumption ?? $oldQuantity);
 
+        // نعم، التعديل يدعم الرول والقص المخصص: custom_consumption هو مقدار المخزون
+        // الذي خُصم فعلياً وقت البيع (مثلاً بالأمتار للرولات). عند تغيير الكمية نستخدم
+        // نفس النسبة القديمة حتى يبقى تعديل الرول/المتر/التجزئة متوافقاً مع الخصم الأصلي.
         if ($oldQuantity > 0 && abs($oldStockQuantity - $oldQuantity) > 0.0001) {
             return ($oldStockQuantity / $oldQuantity) * $quantity;
         }
 
+        // احتياط للعمليات التي حُفظت بوحدة رول بدون custom_consumption: الرول الواحد
+        // يساوي طول الرول وقت البيع إن وجد، وإلا نستخدم طول الرول الحالي للمنتج.
+        if ($item->product && $item->product->product_type === 'fractional' && in_array($item->unit_type, ['roll', 'unit'], true)) {
+            $rollLength = (float) ($item->roll_length_at_sale ?: $item->product->roll_length ?: 0);
+            if ($rollLength > 0) {
+                return $quantity * $rollLength;
+            }
+        }
+
+        // دعم منتجات الأطقم عند بيعها بالحبة: نحول عدد الحبات إلى كمية الطقم الأساسية
+        // قبل مقارنة المخزون أو تسجيل حركة المخزون.
         if ($item->product && $item->product->is_splittable && $item->unit_type === 'piece') {
             return $quantity / max(1, (float) ($item->product->items_per_unit ?? 1));
         }
@@ -736,6 +757,9 @@ class DailySalesController extends Controller
             $product = $item->product;
             $oldStockQuantity = (float) $update['old_stock_quantity'];
             $newStockQuantity = (float) $update['new_stock_quantity'];
+            // stockDelta موجب يعني تقليل الكمية المباعة وإرجاع الفرق للمخزون،
+            // وسالب يعني زيادة الكمية المباعة وخصم الفرق من المخزون. هذا ينطبق أيضاً على الرول
+            // لأن القيم هنا بعد تحويلها إلى وحدة المخزون الأساسية.
             $stockDelta = $oldStockQuantity - $newStockQuantity;
             $beforeStock = (float) $product->quantity;
             $afterStock = $beforeStock + $stockDelta;

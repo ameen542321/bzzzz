@@ -467,7 +467,7 @@
                                         <div class="flex items-center justify-between gap-2 mb-3">
                                             <div>
                                                 <h4 class="text-white font-bold text-sm">تعديل المنتجات</h4>
-                                                <p class="text-xs text-gray-500 mt-1">يمكن تعديل الكمية وسعر البيع لكل منتج، وسيتم تحديث إجمالي العملية والمخزون بالفارق.</p>
+                                                <p class="text-xs text-gray-500 mt-1">يمكن تعديل الكمية وسعر البيع لكل منتج، وسيتم تحديث إجمالي العملية والمخزون بالفارق. يدعم أيضاً منتجات الرول/القص لأن الخصم يُحسب بوحدة المخزون الأساسية.</p>
                                             </div>
                                             <span class="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">راجع الكميات قبل الحفظ</span>
                                         </div>
