@@ -630,16 +630,24 @@ class DashboardController extends Controller
         $salesSummary = Sale::where('store_id', $store->id)
             ->whereBetween('created_at', [$startTime, $endTime])
             ->selectRaw('
-                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN final_total ELSE 0 END), 0) as total_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN sale_type = "mixed" THEN cash_amount ELSE 0 END), 0) as cash_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "card" THEN paid_amount ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN sale_type = "mixed" THEN card_amount ELSE 0 END), 0) as card_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END), 0) as credit_payments,
-                COALESCE(SUM(CASE WHEN sale_type = "credit" THEN final_total ELSE 0 END), 0) as credit_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "internal_use" THEN final_total ELSE 0 END), 0) as internal_use_sales,
-                COALESCE(SUM(CASE WHEN (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NOT NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as official_credit_sales,
-                COALESCE(SUM(CASE WHEN (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as payment_gaps,
+                COALESCE(SUM(CASE
+                    WHEN (description IS NULL OR description != "manual_invoice_entry") THEN
+                        CASE
+                            WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0)
+                            THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0))
+                            ELSE COALESCE(paid_amount, 0)
+                        END
+                    ELSE 0
+                END), 0) as total_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "mixed" THEN cash_amount ELSE 0 END), 0) as cash_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "card" THEN paid_amount ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "mixed" THEN card_amount ELSE 0 END), 0) as card_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "credit" THEN paid_amount ELSE 0 END), 0) as credit_payments,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "credit" THEN final_total ELSE 0 END), 0) as credit_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "internal_use" THEN final_total ELSE 0 END), 0) as internal_use_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NOT NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as official_credit_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as payment_gaps,
                 COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN labor_total ELSE 0 END), 0) as total_labor
             ')
             ->first();
@@ -670,6 +678,7 @@ class DashboardController extends Controller
         $netProfit = ($totalSales - $totalProductsCostValue) + $collectedFromCurrentPeriod;
 
         $expenses = Expense::where('store_id', $store->id)
+            ->where('actor_type', '!=', 'owner_purchase')
             ->whereBetween('created_at', [$startTime, $endTime])
             ->sum('amount') ?? 0;
 

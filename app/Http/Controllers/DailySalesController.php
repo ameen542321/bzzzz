@@ -749,6 +749,28 @@ class DailySalesController extends Controller
         return $quantity;
     }
 
+    private function displaySaleItemStockQuantity($item): float
+    {
+        $quantity = (float) ($item->quantity ?? 0);
+
+        if (($item->custom_consumption ?? null) !== null) {
+            return (float) $item->custom_consumption;
+        }
+
+        if (($item->product_type ?? null) === 'fractional' && in_array((string) ($item->unit_type ?? ''), ['roll', 'unit'], true)) {
+            $rollLength = (float) ($item->roll_length_at_sale ?? $item->roll_length ?? 0);
+            if ($rollLength > 0) {
+                return $quantity * $rollLength;
+            }
+        }
+
+        if (!empty($item->is_splittable) && (string) ($item->unit_type ?? '') === 'piece') {
+            return $quantity / max(1, (float) ($item->items_per_unit ?? 1));
+        }
+
+        return $quantity;
+    }
+
     private function calculateSaleItemCost($item, float $stockQuantity): float
     {
         $costPrice = (float) ($item->cost_price ?? $item->product?->cost_price ?? 0);
@@ -1199,8 +1221,9 @@ class DailySalesController extends Controller
                 $item->display_name = $item->product_name ?? 'منتج غير معروف';
             }
 
-            // الكمية الأساسية المحسوبة للمخزون
-            $stockQuantity = (float) ($item->custom_consumption ?? $item->quantity ?? 0);
+            // الكمية الأساسية المحسوبة للمخزون بنفس منطق تقرير إغلاق الشفت،
+            // حتى تتطابق تكلفة المنتجات بين صفحة المبيعات وتقرير الواتساب.
+            $stockQuantity = $this->displaySaleItemStockQuantity($item);
 
             // الكمية/الوحدة المعروضة للمستخدم
             $displayQuantity = (float) ($item->quantity ?? 0);
