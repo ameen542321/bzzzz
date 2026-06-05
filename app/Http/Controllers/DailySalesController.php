@@ -9,9 +9,11 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
+use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DailySalesController extends Controller
 {
@@ -632,6 +634,131 @@ class DailySalesController extends Controller
         return 'default_shift';
     }
 
+    private function buildSaleItemEditPlan(Sale $sale, Request $request): ?array
+    {
+        $itemIds = collect($request->input('item_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($itemIds->isEmpty()) {
+            return null;
+        }
+
+        $quantities = array_values($request->input('item_quantities', []));
+        $prices = array_values($request->input('item_prices', []));
+        $items = SaleItem::with('product')
+            ->where('sale_id', $sale->id)
+            ->whereIn('id', $itemIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($items->count() !== $itemIds->unique()->count()) {
+            abort(403, 'لا يمكن تعديل منتجات لا تنتمي لهذه العملية');
+        }
+
+        $updates = [];
+        $productsTotal = 0.0;
+        $productsCostTotal = 0.0;
+
+        foreach ($itemIds as $index => $itemId) {
+            $item = $items->get($itemId);
+            if (!$item) {
+                continue;
+            }
+
+            if (!$item->product || $item->product->store_id !== $sale->store_id) {
+                abort(403, 'أحد منتجات العملية لا ينتمي لهذا المتجر');
+            }
+
+            $oldQuantity = (float) ($item->quantity ?? 0);
+            $newQuantity = (float) ($quantities[$index] ?? $oldQuantity);
+            $newPrice = (float) ($prices[$index] ?? $item->price ?? 0);
+            $oldStockQuantity = $this->saleItemStockQuantity($item, $oldQuantity);
+            $newStockQuantity = $this->saleItemStockQuantity($item, $newQuantity);
+            $availableAfterRestore = (float) $item->product->quantity + $oldStockQuantity;
+
+            if ($newStockQuantity - $availableAfterRestore > 0.0001) {
+                session()->flash('edit_sale_modal', $sale->id);
+                $productName = $item->product->name ?? 'منتج غير معروف';
+
+                throw ValidationException::withMessages([
+                    'item_quantities.' . $index => "المخزون غير كافٍ لتعديل كمية المنتج {$productName}. المتاح بعد استرجاع الكمية القديمة: " . number_format($availableAfterRestore, 3),
+                ]);
+            }
+
+            $lineTotal = $newQuantity * $newPrice;
+            $productsTotal += $lineTotal;
+            $productsCostTotal += ((float) ($item->product->cost_price ?? 0)) * $newStockQuantity;
+
+            $updates[] = [
+                'item' => $item,
+                'quantity' => $newQuantity,
+                'price' => $newPrice,
+                'total' => $lineTotal,
+                'old_stock_quantity' => $oldStockQuantity,
+                'new_stock_quantity' => $newStockQuantity,
+            ];
+        }
+
+        return [
+            'updates' => $updates,
+            'products_total' => $productsTotal,
+            'products_cost_total' => $productsCostTotal,
+        ];
+    }
+
+    private function saleItemStockQuantity(SaleItem $item, float $quantity): float
+    {
+        $oldQuantity = (float) ($item->quantity ?? 0);
+        $oldStockQuantity = (float) ($item->custom_consumption ?? $oldQuantity);
+
+        if ($oldQuantity > 0 && abs($oldStockQuantity - $oldQuantity) > 0.0001) {
+            return ($oldStockQuantity / $oldQuantity) * $quantity;
+        }
+
+        if ($item->product && $item->product->is_splittable && $item->unit_type === 'piece') {
+            return $quantity / max(1, (float) ($item->product->items_per_unit ?? 1));
+        }
+
+        return $quantity;
+    }
+
+    private function applySaleItemEditPlan(array $plan, Store $store, Sale $sale): void
+    {
+        foreach ($plan['updates'] as $update) {
+            /** @var SaleItem $item */
+            $item = $update['item'];
+            $product = $item->product;
+            $oldStockQuantity = (float) $update['old_stock_quantity'];
+            $newStockQuantity = (float) $update['new_stock_quantity'];
+            $stockDelta = $oldStockQuantity - $newStockQuantity;
+            $beforeStock = (float) $product->quantity;
+            $afterStock = $beforeStock + $stockDelta;
+
+            $item->update([
+                'quantity' => $update['quantity'],
+                'price' => $update['price'],
+                'total' => $update['total'],
+                'custom_consumption' => $item->custom_consumption !== null ? $newStockQuantity : null,
+            ]);
+
+            if (abs($stockDelta) > 0.0001) {
+                $product->update(['quantity' => $afterStock]);
+                $product->stockMovements()->create([
+                    'store_id' => $store->id,
+                    'user_id' => auth()->id(),
+                    'product_id' => $product->id,
+                    'type' => $stockDelta > 0 ? 'increase' : 'decrease',
+                    'quantity' => abs($stockDelta),
+                    'roll_length_at_movement' => $beforeStock,
+                    'meters' => $afterStock,
+                    'note' => "تعديل منتجات عملية المبيعات اليومية #{$sale->id}",
+                ]);
+            }
+        }
+    }
+
     public function update(Store $store, Sale $sale, Request $request)
     {
         if ($sale->store_id !== $store->id) {
@@ -647,10 +774,17 @@ class DailySalesController extends Controller
             'card_amount' => 'nullable|numeric|min:0',
             'employee_id' => 'nullable|exists:employees,id',
             'debt_amount' => 'nullable|numeric|min:0',
+            'item_ids' => 'nullable|array',
+            'item_ids.*' => 'integer|exists:sale_items,id',
+            'item_quantities' => 'nullable|array',
+            'item_quantities.*' => 'nullable|numeric|min:0.01',
+            'item_prices' => 'nullable|array',
+            'item_prices.*' => 'nullable|numeric|min:0',
         ]);
 
         $originalSaleType = $sale->sale_type;
-        $productsTotal = (float) ($sale->products_total ?? 0);
+        $productEditPlan = $this->buildSaleItemEditPlan($sale, $request);
+        $productsTotal = $productEditPlan ? $productEditPlan['products_total'] : (float) ($sale->products_total ?? 0);
         $taxRate = (float) ($sale->tax_rate ?? 0);
         $laborTotal = (float) ($validated['labor_total'] ?? 0);
 
@@ -664,7 +798,7 @@ class DailySalesController extends Controller
         $cashAmount = 0.0;
         $cardAmount = 0.0;
         $storedOperationAmount = (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0));
-        $baseOperationAmount = max($finalTotal, $storedOperationAmount);
+        $baseOperationAmount = $productEditPlan ? $finalTotal : max($finalTotal, $storedOperationAmount);
         $hasCollectedCreditConversion = $originalSaleType === 'credit'
             && (float) ($sale->paid_amount ?? 0) > 0
             && (float) ($sale->remaining_amount ?? 0) > 0
@@ -771,8 +905,12 @@ class DailySalesController extends Controller
             }
         }
 
-        DB::transaction(function () use ($sale, $store, $validated, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
-            $sale->update([
+        DB::transaction(function () use ($sale, $store, $validated, $productEditPlan, $productsTotal, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
+            if ($productEditPlan) {
+                $this->applySaleItemEditPlan($productEditPlan, $store, $sale);
+            }
+
+            $saleData = [
                 'sale_type'          => $validated['sale_type'],
                 'labor_total'        => $laborTotal,
                 'description'        => $validated['description'] ?? null,
@@ -785,7 +923,15 @@ class DailySalesController extends Controller
                 'employee_id'        => ($validated['sale_type'] === 'credit' || $remainingAmount > 0)
                     ? $selectedEmployeeId
                     : null,
-            ]);
+            ];
+
+            if ($productEditPlan) {
+                $saleData['products_total'] = $productsTotal;
+                $saleData['total'] = $finalTotal;
+                $saleData['profit'] = $finalTotal - (float) $productEditPlan['products_cost_total'];
+            }
+
+            $sale->update($saleData);
 
             $creditRows = CreditSale::where('store_id', $store->id)
                 ->where('description', 'like', '%#' . $sale->id . '%')
