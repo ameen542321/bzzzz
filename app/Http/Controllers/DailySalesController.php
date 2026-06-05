@@ -9,11 +9,9 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
-use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class DailySalesController extends Controller
 {
@@ -61,8 +59,6 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
-                'sale_items.roll_length_at_sale',
-                'sale_items.unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
                 'products.product_type as product_type',
@@ -160,8 +156,6 @@ class DailySalesController extends Controller
                     'custom_name' => $row->custom_name,
                     'custom_consumption' => $row->custom_consumption,
                     'custom_meters' => $row->custom_meters,
-                    'roll_length_at_sale' => $row->roll_length_at_sale,
-                    'unit_type' => $row->unit_type,
                     'product_name' => $row->product_name ?? 'منتج غير معروف',
                     'cost_price' => $row->product_cost_price ?? 0,
                     'product_type' => $row->product_type,
@@ -516,8 +510,6 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
-                'sale_items.roll_length_at_sale',
-                'sale_items.unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
                 'products.product_type as product_type',
@@ -553,8 +545,6 @@ class DailySalesController extends Controller
                 'custom_name' => $row->custom_name,
                 'custom_consumption' => $row->custom_consumption,
                 'custom_meters' => $row->custom_meters,
-                'roll_length_at_sale' => $row->roll_length_at_sale,
-                'unit_type' => $row->unit_type,
                 'product_name' => $row->product_name ?? 'منتج غير معروف',
                 'cost_price' => $row->product_cost_price ?? 0,
                 'product_type' => $row->product_type,
@@ -642,190 +632,6 @@ class DailySalesController extends Controller
         return 'default_shift';
     }
 
-    private function buildSaleItemEditPlan(Sale $sale, Request $request): ?array
-    {
-        $itemIds = collect($request->input('item_ids', []))
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->values();
-
-        if ($itemIds->isEmpty()) {
-            return null;
-        }
-
-        $quantities = array_values($request->input('item_quantities', []));
-        $prices = array_values($request->input('item_prices', []));
-        $items = SaleItem::with('product')
-            ->where('sale_id', $sale->id)
-            ->whereIn('id', $itemIds)
-            ->get()
-            ->keyBy('id');
-
-        if ($items->count() !== $itemIds->unique()->count()) {
-            abort(403, 'لا يمكن تعديل منتجات لا تنتمي لهذه العملية');
-        }
-
-        $updates = [];
-        $productsTotal = 0.0;
-        $productsCostTotal = 0.0;
-
-        foreach ($itemIds as $index => $itemId) {
-            $item = $items->get($itemId);
-            if (!$item) {
-                continue;
-            }
-
-            if (!$item->product || $item->product->store_id !== $sale->store_id) {
-                abort(403, 'أحد منتجات العملية لا ينتمي لهذا المتجر');
-            }
-
-            $oldQuantity = (float) ($item->quantity ?? 0);
-            $newQuantity = (float) ($quantities[$index] ?? $oldQuantity);
-            $newPrice = (float) ($prices[$index] ?? $item->price ?? 0);
-
-            // دعم الرول/القص/التجزئة: نحسب كمية المخزون الأساسية أولاً (غالباً بالمتر)،
-            // ثم نرجع الكمية القديمة مؤقتاً للتحقق من أن الكمية الجديدة متاحة.
-            $oldStockQuantity = $this->saleItemStockQuantity($item, $oldQuantity);
-            $newStockQuantity = $this->saleItemStockQuantity($item, $newQuantity);
-            $availableAfterRestore = (float) $item->product->quantity + $oldStockQuantity;
-
-            if ($newStockQuantity - $availableAfterRestore > 0.0001) {
-                $productName = $item->product->name ?? 'منتج غير معروف';
-                session()->flash('edit_sale_modal', $sale->id);
-
-                throw ValidationException::withMessages([
-                    'item_quantities.' . $index => "المخزون غير كافٍ لتعديل كمية المنتج {$productName}. المتاح بعد استرجاع الكمية القديمة: " . number_format($availableAfterRestore, 3)
-                ]);
-            }
-
-            $lineTotal = $newQuantity * $newPrice;
-            $productsTotal += $lineTotal;
-            $productsCostTotal += $this->calculateSaleItemCost($item, $newStockQuantity);
-
-            $updates[] = [
-                'item' => $item,
-                'quantity' => $newQuantity,
-                'price' => $newPrice,
-                'total' => $lineTotal,
-                'old_stock_quantity' => $oldStockQuantity,
-                'new_stock_quantity' => $newStockQuantity,
-            ];
-        }
-
-        return [
-            'updates' => $updates,
-            'products_total' => $productsTotal,
-            'products_cost_total' => $productsCostTotal,
-        ];
-    }
-
-    private function saleItemStockQuantity(SaleItem $item, float $quantity): float
-    {
-        $oldQuantity = (float) ($item->quantity ?? 0);
-        $oldStockQuantity = (float) ($item->custom_consumption ?? $oldQuantity);
-
-        // نعم، التعديل يدعم الرول والقص المخصص: custom_consumption هو مقدار المخزون
-        // الذي خُصم فعلياً وقت البيع (مثلاً بالأمتار للرولات). عند تغيير الكمية نستخدم
-        // نفس النسبة القديمة حتى يبقى تعديل الرول/المتر/التجزئة متوافقاً مع الخصم الأصلي.
-        if ($oldQuantity > 0 && abs($oldStockQuantity - $oldQuantity) > 0.0001) {
-            return ($oldStockQuantity / $oldQuantity) * $quantity;
-        }
-
-        // احتياط للعمليات التي حُفظت بوحدة رول بدون custom_consumption: الرول الواحد
-        // يساوي طول الرول وقت البيع إن وجد، وإلا نستخدم طول الرول الحالي للمنتج.
-        if ($item->product && $item->product->product_type === 'fractional' && in_array($item->unit_type, ['roll', 'unit'], true)) {
-            $rollLength = (float) ($item->roll_length_at_sale ?: $item->product->roll_length ?: 0);
-            if ($rollLength > 0) {
-                return $quantity * $rollLength;
-            }
-        }
-
-        // دعم منتجات الأطقم عند بيعها بالحبة: نحول عدد الحبات إلى كمية الطقم الأساسية
-        // قبل مقارنة المخزون أو تسجيل حركة المخزون.
-        if ($item->product && $item->product->is_splittable && $item->unit_type === 'piece') {
-            return $quantity / max(1, (float) ($item->product->items_per_unit ?? 1));
-        }
-
-        return $quantity;
-    }
-
-    private function displaySaleItemStockQuantity($item): float
-    {
-        $quantity = (float) ($item->quantity ?? 0);
-
-        if (($item->custom_consumption ?? null) !== null) {
-            return (float) $item->custom_consumption;
-        }
-
-        if (($item->product_type ?? null) === 'fractional' && in_array((string) ($item->unit_type ?? ''), ['roll', 'unit'], true)) {
-            $rollLength = (float) ($item->roll_length_at_sale ?? $item->roll_length ?? 0);
-            if ($rollLength > 0) {
-                return $quantity * $rollLength;
-            }
-        }
-
-        if (!empty($item->is_splittable) && (string) ($item->unit_type ?? '') === 'piece') {
-            return $quantity / max(1, (float) ($item->items_per_unit ?? 1));
-        }
-
-        return $quantity;
-    }
-
-    private function calculateSaleItemCost($item, float $stockQuantity): float
-    {
-        $costPrice = (float) ($item->cost_price ?? $item->product?->cost_price ?? 0);
-        $productType = $item->product_type ?? $item->product?->product_type ?? null;
-
-        // في صفحة المنتجات يتم تقييم المنتج fractional على أن cost_price هو تكلفة الرول الكامل
-        // والمخزون محفوظ بوحدة المتر؛ لذلك نقسم تكلفة الرول على طوله للحصول على تكلفة المتر.
-        if ($productType === 'fractional') {
-            $rollLength = (float) ($item->roll_length_at_sale ?? $item->roll_length ?? $item->product?->roll_length ?? 0);
-            if ($rollLength > 0) {
-                return ($costPrice / $rollLength) * $stockQuantity;
-            }
-        }
-
-        return $costPrice * $stockQuantity;
-    }
-
-    private function applySaleItemEditPlan(array $plan, Store $store, Sale $sale): void
-    {
-        foreach ($plan['updates'] as $update) {
-            /** @var SaleItem $item */
-            $item = $update['item'];
-            $product = $item->product;
-            $oldStockQuantity = (float) $update['old_stock_quantity'];
-            $newStockQuantity = (float) $update['new_stock_quantity'];
-            // stockDelta موجب يعني تقليل الكمية المباعة وإرجاع الفرق للمخزون،
-            // وسالب يعني زيادة الكمية المباعة وخصم الفرق من المخزون. هذا ينطبق أيضاً على الرول
-            // لأن القيم هنا بعد تحويلها إلى وحدة المخزون الأساسية.
-            $stockDelta = $oldStockQuantity - $newStockQuantity;
-            $beforeStock = (float) $product->quantity;
-            $afterStock = $beforeStock + $stockDelta;
-
-            $item->update([
-                'quantity' => $update['quantity'],
-                'price' => $update['price'],
-                'total' => $update['total'],
-                'custom_consumption' => $item->custom_consumption !== null ? $newStockQuantity : null,
-            ]);
-
-            if (abs($stockDelta) > 0.0001) {
-                $product->update(['quantity' => $afterStock]);
-                $product->stockMovements()->create([
-                    'store_id' => $store->id,
-                    'user_id' => auth()->id(),
-                    'product_id' => $product->id,
-                    'type' => $stockDelta > 0 ? 'increase' : 'decrease',
-                    'quantity' => abs($stockDelta),
-                    'roll_length_at_movement' => $beforeStock,
-                    'meters' => $afterStock,
-                    'note' => "تعديل منتجات عملية المبيعات اليومية #{$sale->id}",
-                ]);
-            }
-        }
-    }
-
     public function update(Store $store, Sale $sale, Request $request)
     {
         if ($sale->store_id !== $store->id) {
@@ -841,19 +647,10 @@ class DailySalesController extends Controller
             'card_amount' => 'nullable|numeric|min:0',
             'employee_id' => 'nullable|exists:employees,id',
             'debt_amount' => 'nullable|numeric|min:0',
-            'item_ids' => 'nullable|array',
-            'item_ids.*' => 'integer|exists:sale_items,id',
-            'item_quantities' => 'nullable|array',
-            'item_quantities.*' => 'nullable|numeric|min:0.01',
-            'item_prices' => 'nullable|array',
-            'item_prices.*' => 'nullable|numeric|min:0',
         ]);
 
         $originalSaleType = $sale->sale_type;
-        $productEditPlan = $this->buildSaleItemEditPlan($sale, $request);
-        $productsTotal = $productEditPlan
-            ? $productEditPlan['products_total']
-            : (float) ($sale->products_total ?? 0);
+        $productsTotal = (float) ($sale->products_total ?? 0);
         $taxRate = (float) ($sale->tax_rate ?? 0);
         $laborTotal = (float) ($validated['labor_total'] ?? 0);
 
@@ -867,7 +664,7 @@ class DailySalesController extends Controller
         $cashAmount = 0.0;
         $cardAmount = 0.0;
         $storedOperationAmount = (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0));
-        $baseOperationAmount = $productEditPlan ? $finalTotal : max($finalTotal, $storedOperationAmount);
+        $baseOperationAmount = max($finalTotal, $storedOperationAmount);
         $hasCollectedCreditConversion = $originalSaleType === 'credit'
             && (float) ($sale->paid_amount ?? 0) > 0
             && (float) ($sale->remaining_amount ?? 0) > 0
@@ -884,12 +681,12 @@ class DailySalesController extends Controller
         }
 
         if ($validated['sale_type'] === 'cash') {
-            $cashEditableAmount = $hasCollectedCreditConversion ? $editableOperationAmount : $baseOperationAmount;
+            $cashEditableAmount = $hasCollectedCreditConversion ? $editableOperationAmount : $enteredAmount;
             $paidAmount = $alreadyCollectedAmount + $cashEditableAmount;
             $remainingAmount = 0;
             $cashAmount = $baseCashAmount + $cashEditableAmount;
         } elseif ($validated['sale_type'] === 'card') {
-            $cardEditableAmount = $hasCollectedCreditConversion ? $editableOperationAmount : $baseOperationAmount;
+            $cardEditableAmount = $hasCollectedCreditConversion ? $editableOperationAmount : $enteredAmount;
             $paidAmount = $alreadyCollectedAmount + $cardEditableAmount;
             $remainingAmount = 0;
             $cashAmount = $baseCashAmount;
@@ -974,19 +771,12 @@ class DailySalesController extends Controller
             }
         }
 
-        DB::transaction(function () use ($sale, $store, $validated, $productEditPlan, $productsTotal, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
-            if ($productEditPlan) {
-                $this->applySaleItemEditPlan($productEditPlan, $store, $sale);
-            }
-
+        DB::transaction(function () use ($sale, $store, $validated, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
             $sale->update([
                 'sale_type'          => $validated['sale_type'],
-                'products_total'     => $productsTotal,
                 'labor_total'        => $laborTotal,
                 'description'        => $validated['description'] ?? null,
                 'final_total'        => $finalTotal,
-                'total'              => $finalTotal,
-                'profit'             => $productEditPlan ? ($finalTotal - (float) $productEditPlan['products_cost_total']) : $sale->profit,
                 'paid_amount'        => $paidAmount,
                 'remaining_amount'   => $remainingAmount,
                 'cash_amount'        => $cashAmount,
@@ -1221,9 +1011,8 @@ class DailySalesController extends Controller
                 $item->display_name = $item->product_name ?? 'منتج غير معروف';
             }
 
-            // الكمية الأساسية المحسوبة للمخزون بنفس منطق تقرير إغلاق الشفت،
-            // حتى تتطابق تكلفة المنتجات بين صفحة المبيعات وتقرير الواتساب.
-            $stockQuantity = $this->displaySaleItemStockQuantity($item);
+            // الكمية الأساسية المحسوبة للمخزون
+            $stockQuantity = (float) ($item->custom_consumption ?? $item->quantity ?? 0);
 
             // الكمية/الوحدة المعروضة للمستخدم
             $displayQuantity = (float) ($item->quantity ?? 0);
@@ -1242,9 +1031,8 @@ class DailySalesController extends Controller
             // إجمالي المنتج
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
-            // تكلفة المنتج: في منتجات الرول تكون cost_price تكلفة الرول الكامل،
-            // لذلك نحولها إلى تكلفة وحدة المخزون الأساسية (متر غالباً) قبل ضربها في الكمية المخصومة.
-            $itemCost = $this->calculateSaleItemCost($item, $stockQuantity);
+            // تكلفة المنتج
+            $itemCost = $item->cost_price * $stockQuantity;
 
             // ربح المنتج
             $itemProfit = $itemTotal - $itemCost;

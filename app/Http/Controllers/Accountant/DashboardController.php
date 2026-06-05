@@ -931,50 +931,15 @@ class DashboardController extends Controller
 
     private function saleItemStockQuantityForReport($item, $product): float
     {
-        $quantity = (float) ($item->quantity ?? 0);
-        $stockQuantity = (float) ($item->custom_consumption ?? $quantity);
-
-        // للرول/المتر/القص المخصص نخزن غالباً custom_consumption ككمية المخزون الأساسية
-        // (مثل عدد الأمتار المخصومة)، لذلك نعتمدها مباشرة في تكلفة التقرير.
-        if ($item->custom_consumption !== null) {
-            return $stockQuantity;
-        }
-
-        if (!$product) {
-            return $quantity;
-        }
-
-        // احتياط لعمليات الرول القديمة التي قد لا تحتوي custom_consumption:
-        // إذا كانت الوحدة رول/وحدة لمنتج fractional نحول عدد الرولات إلى أمتار قبل حساب التكلفة.
-        if (($product->product_type ?? null) === 'fractional' && in_array((string) ($item->unit_type ?? ''), ['roll', 'unit'], true)) {
-            $rollLength = (float) ($item->roll_length_at_sale ?: $product->roll_length ?: 0);
-            if ($rollLength > 0) {
-                return $quantity * $rollLength;
-            }
-        }
-
-        // إذا كان المنتج طقماً وتم بيعه بالحبة، نحول الحبات إلى كمية الطقم الأساسية.
-        if (!empty($product->is_splittable) && (string) ($item->unit_type ?? '') === 'piece') {
-            return $quantity / max(1, (float) ($product->items_per_unit ?? 1));
-        }
-
-        return $quantity;
+        // لا نغير منطق صفحة المبيعات هنا: صفحة المبيعات تعتمد custom_consumption إن وُجد،
+        // وإلا تعتمد quantity كما هي. تقرير الشفت يجب أن يطابقها لا أن يعيد تفسير الرول/الحبة.
+        return (float) ($item->custom_consumption ?? $item->quantity ?? 0);
     }
 
     private function saleItemCostForReport($item, $product, float $stockQuantity): float
     {
-        $costPrice = (float) ($product->cost_price ?? 0);
-
-        // نفس منطق صفحة المنتجات: سعر تكلفة المنتج fractional يمثل تكلفة الرول الكامل،
-        // بينما كمية المخزون/البيع المحسوبة هنا بالمتر؛ لذلك تكلفة المتر = تكلفة الرول ÷ طول الرول.
-        if (($product->product_type ?? null) === 'fractional') {
-            $rollLength = (float) ($item->roll_length_at_sale ?: $product->roll_length ?: 0);
-            if ($rollLength > 0) {
-                return ($costPrice / $rollLength) * $stockQuantity;
-            }
-        }
-
-        return $costPrice * $stockQuantity;
+        // نفس مصدر وتفسير صفحة المبيعات اليومية: cost_price الحالي للمنتج × كمية المخزون المحسوبة.
+        return (float) ($product->cost_price ?? 0) * $stockQuantity;
     }
 
     private function generateReportAndWhatsApp($store, $accountant, $reportData)
