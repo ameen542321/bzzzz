@@ -998,7 +998,8 @@ class DailySalesController extends Controller
                 ->forceDelete();
 
             $sale->items()->delete();
-            $sale->delete();
+            // المطلوب حذف عملية المبيعات نهائياً، وليس نقلها للحذف المؤقت.
+            $sale->forceDelete();
         });
 
         return back()->with('success', 'تم حذف العملية واسترجاع المخزون بنجاح.');
