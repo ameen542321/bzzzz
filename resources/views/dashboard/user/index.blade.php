@@ -71,6 +71,20 @@
             </div>
         @endif
 
+        @if(($employeesWithoutSalaryCount ?? 0) > 0)
+            <div class="alert-box bg-red-900/40 border-red-700 text-red-200">
+                ⚠️ يوجد {{ $employeesWithoutSalaryCount }} موظف بدون راتب محدد.
+                @if(isset($employeesWithoutSalary) && $employeesWithoutSalary->isNotEmpty())
+                    <span class="block text-xs mt-1 text-red-100/80">
+                        {{ $employeesWithoutSalary->take(3)->map(fn($employee) => $employee->name . ($employee->store?->name ? ' - ' . $employee->store->name : ''))->implode('، ') }}
+                        @if($employeesWithoutSalaryCount > 3)
+                            ، وآخرون
+                        @endif
+                    </span>
+                @endif
+            </div>
+        @endif
+
     </div>
 
 

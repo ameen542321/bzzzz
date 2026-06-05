@@ -29,6 +29,16 @@ class UserDashboardController extends Controller
         // المحاسبين والموظفين
         $accountantsCount = $user->accountants()->count();
         $employeesCount   = $user->employees()->count();
+        $employeesWithoutSalary = $user->employees()
+            ->where(function ($query) {
+                $query->whereNull('salary')
+                    ->orWhere('salary', '<=', 0);
+            })
+            ->with('store:id,name')
+            ->select('id', 'store_id', 'name', 'salary')
+            ->orderBy('name')
+            ->get();
+        $employeesWithoutSalaryCount = $employeesWithoutSalary->count();
 
         // الاشتراك
         $subscriptionEnd  = $user->subscription_end_at;
@@ -270,7 +280,8 @@ class UserDashboardController extends Controller
         }
 
         return view('dashboard.user.index', array_merge(compact(
-            'stores', 'accountantsCount', 'employeesCount', 'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
+            'stores', 'accountantsCount', 'employeesCount', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
+            'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
@@ -314,6 +325,7 @@ class UserDashboardController extends Controller
     {
         return [
             'stores' => $stores, 'user' => $user, 'accountantsCount' => 0, 'employeesCount' => 0,
+            'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
             'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0, 'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
             'metricStoreBreakdowns' => [],
