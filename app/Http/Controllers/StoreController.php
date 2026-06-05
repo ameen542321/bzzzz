@@ -1197,8 +1197,6 @@ class StoreController extends Controller
         $salesCosts = DB::table('sales')
             ->leftJoin('sale_items', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.store_id', $storeId)
-            // Sale يستخدم SoftDeletes؛ لذلك استعلام DB الخام يجب أن يستبعد العمليات المحذوفة يدوياً.
-            ->whereNull('sales.deleted_at')
             ->whereBetween('sales.created_at', [$start, $end])
             ->whereIn('sales.sale_type', $saleTypes)
             ->where(function ($query) {
