@@ -12,10 +12,11 @@ use App\Models\Withdrawal;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Http\Request;
 
 class UserDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth('web')->user();
 
@@ -60,15 +61,24 @@ class UserDashboardController extends Controller
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
 
+        // يمكن للمالك مقارنة متجر محدد مباشرة بصفحة مبيعاته اليومية.
+        // عند عدم اختيار متجر تبقى البطاقات إجمالاً لجميع المتاجر.
+        $requestedSummaryStoreId = $request->integer('summary_store_id');
+        $selectedSummaryStore = $requestedSummaryStoreId > 0
+            ? $stores->firstWhere('id', $requestedSummaryStoreId)
+            : null;
+        $summaryStores = $selectedSummaryStore ? collect([$selectedSummaryStore]) : $stores;
+
         // نبني ملخص كل متجر من نفس فترات الشفتات ونفس العمليات التي تعتمدها
-        // صفحة المبيعات اليومية، ثم نجمعها لبطاقات لوحة المالك.
+        // صفحة المبيعات اليومية، ثم نجمع النطاق المختار فقط في البطاقات.
         $dailyStoreSummaries = $stores->mapWithKeys(function ($store) use ($todayStart) {
             return [$store->id => $this->dailyStoreFinancialSummary($store->id, $todayStart)];
         });
-        $salesToday = (float) $dailyStoreSummaries->sum('collected_total');
-        $productsCostToday = (float) $dailyStoreSummaries->sum('total_cost');
-        $profitToday = (float) $dailyStoreSummaries->sum('recognized_profit');
-        $expensesToday = (float) $dailyStoreSummaries->sum('expenses');
+        $selectedDailySummaries = $dailyStoreSummaries->only($summaryStores->pluck('id')->all());
+        $salesToday = (float) $selectedDailySummaries->sum('sales_value');
+        $productsCostToday = (float) $selectedDailySummaries->sum('total_cost');
+        $profitToday = (float) $selectedDailySummaries->sum('recognized_profit');
+        $expensesToday = (float) $selectedDailySummaries->sum('expenses');
 
         // الملخص الشهري يبقى معتمداً على إجمالي المبلغ المستلم الفعلي في التقارير.
         $salesMonth = $this->receivedSalesTotal($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
@@ -137,12 +147,12 @@ class UserDashboardController extends Controller
 
             $singleStoreIds = [$storeId];
             $storeDailySummary = $dailyStoreSummaries->get($storeId, [
-                'collected_total' => 0,
+                'sales_value' => 0,
                 'total_cost' => 0,
                 'recognized_profit' => 0,
                 'expenses' => 0,
             ]);
-            $storeSalesToday = $storeDailySummary['collected_total'];
+            $storeSalesToday = $storeDailySummary['sales_value'];
             $storeProductsCostToday = $storeDailySummary['total_cost'];
             $storeProfitToday = $storeDailySummary['recognized_profit'];
             $storeExpensesToday = $storeDailySummary['expenses'];
@@ -178,6 +188,7 @@ class UserDashboardController extends Controller
                 - (float) $storeAccountantConsumptionMonth;
 
             $metricStoreBreakdowns[] = [
+                'store_id' => (int) $store->id,
                 'store_name' => $store->name,
                 'profit_today' => (float) $storeProfitToday,
                 'sales_today' => (float) $storeSalesToday,
@@ -200,7 +211,7 @@ class UserDashboardController extends Controller
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
-            'creditClosed', 'creditLate', 'user', 'activities'
+            'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore'
         ), $chartData));
     }
 
@@ -226,9 +237,12 @@ class UserDashboardController extends Controller
             });
         $this->applyDailyWindows($salesQuery, $windows, 'sales.created_at');
 
-        $visibleSaleIds = (clone $salesQuery)->pluck('sales.id')->map(fn ($id) => (int) $id)->all();
         $summary = $salesQuery
-            ->selectRaw('COALESCE(SUM(COALESCE(sales.paid_amount, 0)), 0) as collected_total')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN (COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)) > COALESCE(sales.paid_amount, 0)
+                THEN COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)
+                ELSE COALESCE(sales.paid_amount, 0)
+            END), 0) as sales_value')
             ->selectRaw('COALESCE(SUM(COALESCE(sale_item_costs.total_cost, 0)), 0) as total_cost')
             ->selectRaw('COALESCE(SUM(CASE
                 WHEN COALESCE(sales.remaining_amount, 0) > 0
@@ -243,9 +257,8 @@ class UserDashboardController extends Controller
         $this->applyDailyWindows($expensesQuery, $windows, 'created_at');
 
         return [
-            // صفحة المبيعات تضيف تحصيلات الآجل المستقلة إلى إجمالي المستلم فقط.
-            'collected_total' => (float) ($summary->collected_total ?? 0)
-                + $this->dailyCreditCollectionsTotal($storeId, $windows, $visibleSaleIds),
+            // يطابق حقل "قيمة المبيعات" في ملخص صفحة المبيعات، ولا يضيف تحصيلات الآجل المستقلة.
+            'sales_value' => (float) ($summary->sales_value ?? 0),
             'total_cost' => (float) ($summary->total_cost ?? 0),
             'recognized_profit' => (float) ($summary->recognized_profit ?? 0),
             'expenses' => (float) $expensesQuery->sum('amount'),
@@ -312,48 +325,6 @@ class UserDashboardController extends Controller
             foreach ($windows as $window) {
                 $periodQuery->orWhereBetween($column, [$window['start'], $window['end']]);
             }
-        });
-    }
-
-    private function dailyCreditCollectionsTotal(int $storeId, $windows, array $visibleSaleIds): float
-    {
-        $endTime = $windows->max('end');
-        $collections = DB::table('employee_credit_sales')
-            ->where('store_id', $storeId)
-            ->whereNull('deleted_at')
-            ->where('created_at', '<=', $endTime)
-            ->whereColumn('remaining_amount', '<', 'amount')
-            ->get(['amount', 'remaining_amount', 'partial_payments', 'updated_at', 'description']);
-
-        return (float) $collections->sum(function ($collection) use ($windows, $visibleSaleIds) {
-            if (preg_match('/#(\d+)/', (string) ($collection->description ?? ''), $matches) === 1
-                && in_array((int) $matches[1], $visibleSaleIds, true)) {
-                return 0;
-            }
-
-            $payments = is_string($collection->partial_payments)
-                ? json_decode($collection->partial_payments, true)
-                : $collection->partial_payments;
-
-            if (!is_array($payments) || empty($payments)) {
-                $payments = [[
-                    'amount' => (float) $collection->amount - (float) $collection->remaining_amount,
-                    'date' => $collection->updated_at,
-                ]];
-            }
-
-            return collect($payments)->sum(function ($payment) use ($windows) {
-                if (empty($payment['date']) || (float) ($payment['amount'] ?? 0) <= 0) {
-                    return 0;
-                }
-
-                $paymentDate = Carbon::parse($payment['date']);
-                $insideDisplayedPeriod = $windows->contains(
-                    fn ($window) => $paymentDate->betweenIncluded($window['start'], $window['end'])
-                );
-
-                return $insideDisplayedPeriod ? (float) $payment['amount'] : 0;
-            });
         });
     }
 
@@ -447,7 +418,7 @@ class UserDashboardController extends Controller
             'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
             'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0, 'monthlyPurchasesAndConsumption' => 0,
             'creditOpen' => 0,
-            'metricStoreBreakdowns' => [],
+            'metricStoreBreakdowns' => [], 'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
         ];

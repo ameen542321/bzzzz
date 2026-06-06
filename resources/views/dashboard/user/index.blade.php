@@ -121,7 +121,31 @@
 @endif
     {{--  القسم الرابع: الإحصائيات العامة (دمج بين الداشبوردين) --}}
     {{-- ========================================================= --}}
-    <p class="text-xs font-semibold text-gray-400 mt-1 mb-2">الملخص اليومي</p>
+    <div class="mt-1 mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+            <p class="text-xs font-semibold text-gray-400">الملخص المالي اليومي</p>
+            <p class="mt-1 text-[11px] text-gray-500">
+                النطاق الحالي:
+                <span class="font-semibold text-cyan-300">{{ $selectedSummaryStore?->name ?? 'جميع المتاجر' }}</span>
+            </p>
+        </div>
+        <form method="GET" action="{{ route('user.dashboard') }}" class="flex items-end gap-2">
+            <label class="text-[11px] text-gray-400">
+                المقارنة مع صفحة مبيعات متجر
+                <select name="summary_store_id" class="mt-1 block min-w-48 rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-white" onchange="this.form.submit()">
+                    <option value="">جميع المتاجر</option>
+                    @foreach($stores as $summaryStore)
+                        <option value="{{ $summaryStore->id }}" @selected(($selectedSummaryStore?->id ?? null) === $summaryStore->id)>
+                            {{ $summaryStore->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+            @if($selectedSummaryStore)
+                <a href="{{ route('user.dashboard') }}" class="rounded-lg border border-gray-700 px-3 py-2 text-xs text-gray-300 hover:border-gray-500">إلغاء الفلتر</a>
+            @endif
+        </form>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
         {{-- الربح المحتسب اليوم كما يظهر في صفحة المبيعات اليومية --}}
@@ -132,8 +156,8 @@
         </button>
 
         {{-- [تعديل آمن] مبيعات اليوم محسوبة من المحصّل الفعلي --}}
-        <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: إجمالي المستلم اليوم حسب كل متجر">
-            <x-stat-card title="إجمالي المستلم اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
+        <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: قيمة المبيعات اليوم حسب كل متجر">
+            <x-stat-card title="قيمة المبيعات اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
         </button>
 
         {{-- مصروفات اليوم --}}
@@ -395,9 +419,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
+    const selectedSummaryStoreId = @json($selectedSummaryStore?->id);
     const metricDefinitions = {
         profit_today: { title: 'الربح المحتسب اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'يطابق الربح المحتسب في صفحة المبيعات اليومية، ولا تُخصم منه المصروفات لأنها معروضة في بطاقة مستقلة.' },
-        sales_today: { title: 'إجمالي المستلم اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'مجموع المبالغ المستلمة من العمليات وتحصيلات الآجل المستقلة ضمن فترات الشفتات نفسها المعروضة في صفحة المبيعات اليومية.' },
+        sales_today: { title: 'قيمة المبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'يطابق حقل قيمة المبيعات في صفحة المبيعات اليومية للنطاق المختار، ولا يضيف تحصيلات الآجل المستقلة.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
@@ -432,7 +457,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!data) return;
             titleEl.textContent = data.title;
             valueEl.textContent = data.value;
-            const rows = storeBreakdowns.map((store) => {
+            const dailyMetrics = ['profit_today', 'sales_today', 'expenses_today', 'products_cost_today'];
+            const visibleBreakdowns = selectedSummaryStoreId && dailyMetrics.includes(key)
+                ? storeBreakdowns.filter((store) => Number(store.store_id) === Number(selectedSummaryStoreId))
+                : storeBreakdowns;
+            const rows = visibleBreakdowns.map((store) => {
                 return `<li class="flex items-center justify-between border-b border-gray-800 py-2">
                     <span class="text-gray-200">${store.store_name}</span>
                     <span>${formatByMetric(key, store[key])} <span class="text-gray-500 text-xs">ر.س</span></span>
