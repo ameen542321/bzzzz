@@ -180,8 +180,8 @@
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">الملخص الشهري</p>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي النتيجة الشهرية حسب كل متجر">
-            <x-stat-card title="صافي النتيجة الشهرية"
+        <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: المتبقي بعد التكاليف الشهرية حسب كل متجر">
+            <x-stat-card title="المتبقي بعد التكاليف الشهرية"
                 value="{{ number_format($profitMonth, 2) }}"
                 color="{{ $profitMonth >= 0 ? 'emerald' : 'red' }}" />
         </button>
@@ -191,15 +191,19 @@
         <button type="button" class="text-right metric-card" data-metric="expenses_month" title="للمزيد من التفاصيل اضغط: مصروفات الشهر حسب كل متجر">
             <x-stat-card title="مصروفات الشهر" value="{{ number_format($expensesMonth, 2) }}" color="red" />
         </button>
-        <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر (للتوضيح فقط)">
-            <x-stat-card title="الرواتب الشهرية (للتوضيح)" value="{{ number_format($monthlySalaries ?? 0, 2) }}" color="indigo" />
+        <button type="button" class="text-right metric-card" data-metric="products_cost_month" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة خلال الشهر حسب كل متجر">
+            <x-stat-card title="تكلفة المنتجات المباعة (شهري)" value="{{ number_format($productsCostMonth ?? 0, 2) }}" color="yellow" />
         </button>
     </div>
 
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">التشغيل والاستهلاك</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <x-stat-card title="عدد المتاجر" value="{{ $stores->count() }}" color="indigo" />
         <x-stat-card title="عدد الموظفين" value="{{ $employeesCount }}" color="yellow" />
+
+        <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر (للتوضيح فقط)">
+            <x-stat-card title="الرواتب الشهرية (للتوضيح)" value="{{ number_format($monthlySalaries ?? 0, 2) }}" color="indigo" />
+        </button>
 
         <x-stat-card title="مشتريات المالك (شهري)"
             value="{{ number_format($monthlyOwnerPurchases ?? 0, 2) }} ر.س"
@@ -430,9 +434,10 @@ document.addEventListener('DOMContentLoaded', function () {
         sales_today: { title: 'قيمة المبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'يطابق حقل قيمة المبيعات في صفحة المبيعات اليومية للنطاق المختار، ولا يضيف تحصيلات الآجل المستقلة.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        profit_month: { title: 'صافي النتيجة الشهرية', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'المحصل - (تكلفة المنتجات + الاستهلاك الداخلي + مشتريات المالك + المصروفات). الرواتب والسحوبات لا تدخل في هذه المعادلة، مثل التقرير الشهري.' },
+        profit_month: { title: 'المتبقي بعد التكاليف الشهرية', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'المحصل - (تكلفة المنتجات + الاستهلاك الداخلي + مشتريات المالك + المصروفات). الرواتب والسحوبات لا تدخل في هذه المعادلة، مثل التقرير الشهري.' },
         sales_month: { title: 'مبيعات الشهر', value: '{{ number_format($salesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
+        products_cost_month: { title: 'تكلفة المنتجات المباعة (شهري)', value: '{{ number_format($productsCostMonth ?? 0, 2) }} ر.س', details: 'تكلفة البضاعة المباعة خلال الشهر، وهي أحد البنود المخصومة للوصول إلى المتبقي بعد التكاليف.' },
         salaries_month: { title: 'الرواتب الشهرية (للتوضيح)', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'تعرض للمراجعة فقط ولا تُخصم من صافي النتيجة، مثل التقرير الشهري. السحوبات المسجلة: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };

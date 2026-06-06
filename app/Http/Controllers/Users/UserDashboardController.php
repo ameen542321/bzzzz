@@ -184,6 +184,7 @@ class UserDashboardController extends Controller
                 'profit_month' => (float) $storeProfitMonth,
                 'sales_month' => (float) $storeSalesMonth,
                 'expenses_month' => (float) $storeExpensesMonth,
+                'products_cost_month' => (float) $storeProductsCostMonth,
                 'salaries_month' => (float) $storeSalariesMonth,
                 'monthly_owner_purchases' => (float) $storeOwnerPurchasesMonth,
                 'monthly_accountant_consumption' => (float) $storeAccountantConsumptionMonth,
@@ -193,7 +194,7 @@ class UserDashboardController extends Controller
 
         return view('dashboard.user.index', array_merge(compact(
             'stores', 'accountantsCount', 'employeesCount', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
-            'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
+            'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday', 'productsCostMonth',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
             'dailySalesOperationsCount', 'dailyCashSales', 'dailyCardSales',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
@@ -417,7 +418,7 @@ class UserDashboardController extends Controller
         return [
             'stores' => $stores, 'user' => $user, 'accountantsCount' => 0, 'employeesCount' => 0,
             'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
-            'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
+            'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'productsCostMonth' => 0, 'expensesToday' => 0,
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
             'dailySalesOperationsCount' => 0, 'dailyCashSales' => 0, 'dailyCardSales' => 0,
             'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
