@@ -1009,55 +1009,72 @@ class DailySalesController extends Controller
     public function updateShiftDate(Store $store, Request $request)
     {
         $validated = $request->validate([
-            'shift_key' => 'required|string',
-            'shift_date' => 'required|date',
+            'shift_key' => ['required', 'string', 'regex:/^shift_\d+$/'],
+            'shift_date' => ['required', 'date_format:Y-m-d'],
+        ], [
+            'shift_key.regex' => 'لا يمكن تعديل تاريخ هذا الشفت.',
+            'shift_date.required' => 'اختر التاريخ الجديد للشفت.',
+            'shift_date.date_format' => 'تاريخ الشفت المحدد غير صالح.',
         ]);
 
-        if (!preg_match('/^shift_(\d+)$/', $validated['shift_key'], $matches)) {
-            return back()->withErrors(['shift_date' => 'لا يمكن تعديل تاريخ هذا الشفت.'])->withInput();
-        }
-
+        preg_match('/^shift_(\d+)$/', $validated['shift_key'], $matches);
         $balanceId = (int) ($matches[1] ?? 0);
-        $balance = DailyBalance::where('store_id', $store->id)->find($balanceId);
+        $targetDate = Carbon::createFromFormat('Y-m-d', $validated['shift_date'])->startOfDay();
 
-        if (!$balance || !$balance->start_time || !$balance->end_time) {
-            return back()->withErrors(['shift_date' => 'الشفت غير صالح أو غير مغلق.'])->withInput();
-        }
+        $movedRecordsCount = DB::transaction(function () use ($store, $balanceId, $targetDate) {
+            // قفل سجل الشفت يمنع تعديل أو إغلاق متزامن أثناء نقل عملياته.
+            $balance = DailyBalance::where('store_id', $store->id)
+                ->whereKey($balanceId)
+                ->lockForUpdate()
+                ->first();
 
-        $targetDate = Carbon::parse($validated['shift_date'])->startOfDay();
-        $startTime = Carbon::parse($balance->start_time);
-        $endTime = Carbon::parse($balance->end_time);
+            if (!$balance || !$balance->start_time || !$balance->end_time) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'الشفت غير صالح أو غير مغلق.',
+                ]);
+            }
 
-        // ننقل الفترة بنفس مقدار فرق الأيام للمحافظة على وقت البداية والنهاية،
-        // وكذلك المحافظة على الشفتات التي تمتد بعد منتصف الليل.
-        $dateOffsetSeconds = $targetDate->getTimestamp() - $startTime->copy()->startOfDay()->getTimestamp();
-        $newStartTime = $startTime->copy()->addSeconds($dateOffsetSeconds);
-        $newEndTime = $endTime->copy()->addSeconds($dateOffsetSeconds);
+            $startTime = Carbon::parse($balance->start_time);
+            $endTime = Carbon::parse($balance->end_time);
 
-        $overlappingShiftExists = DailyBalance::where('store_id', $store->id)
-            ->where('id', '!=', $balance->id)
-            ->whereNotNull('start_time')
-            ->whereNotNull('end_time')
-            ->where('start_time', '<', $newEndTime)
-            ->where('end_time', '>', $newStartTime)
-            ->exists();
+            if ($startTime->isSameDay($targetDate)) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'التاريخ المختار هو تاريخ الشفت الحالي بالفعل.',
+                ]);
+            }
 
-        if ($overlappingShiftExists) {
-            return back()->withErrors(['shift_date' => 'لا يمكن نقل الشفت لهذا التاريخ لأنه سيتداخل مع شفت مغلق آخر.'])->withInput();
-        }
+            // ننقل الفترة بنفس مقدار فرق الأيام للمحافظة على وقت البداية والنهاية،
+            // وكذلك المحافظة على الشفتات التي تمتد بعد منتصف الليل.
+            $dateOffsetSeconds = $targetDate->getTimestamp() - $startTime->copy()->startOfDay()->getTimestamp();
+            $newStartTime = $startTime->copy()->addSeconds($dateOffsetSeconds);
+            $newEndTime = $endTime->copy()->addSeconds($dateOffsetSeconds);
 
-        DB::transaction(function () use ($store, $startTime, $endTime, $targetDate, $dateOffsetSeconds, $newStartTime, $newEndTime, $balance) {
-            $moveShiftRecords = function ($query, callable $afterSet = null) use ($dateOffsetSeconds) {
-                $query->orderBy('id')->get()->each(function ($row) use ($dateOffsetSeconds, $afterSet) {
-                    // نحرك السجل بنفس فرق تاريخ الشفت بدلاً من استبدال التاريخ فقط،
-                    // حتى لا تُجمع عمليات ما بعد منتصف الليل في يوم واحد بالخطأ.
+            $overlappingShiftExists = DailyBalance::where('store_id', $store->id)
+                ->where('id', '!=', $balance->id)
+                ->whereNotNull('start_time')
+                ->whereNotNull('end_time')
+                ->where('start_time', '<', $newEndTime)
+                ->where('end_time', '>', $newStartTime)
+                ->exists();
+
+            if ($overlappingShiftExists) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'تعذر النقل: وقت هذا الشفت يتداخل مع شفت مغلق موجود في التاريخ المختار.',
+                ]);
+            }
+
+            $movedRecordsCount = 0;
+            $moveShiftRecords = function ($query, callable $afterSet = null) use ($dateOffsetSeconds, &$movedRecordsCount) {
+                $query->orderBy('id')->get()->each(function ($row) use ($dateOffsetSeconds, $afterSet, &$movedRecordsCount) {
+                    // تحريك كل سجل بنفس فرق التاريخ يحافظ على تسلسل العمليات بعد منتصف الليل.
                     $row->created_at = Carbon::parse($row->created_at)->addSeconds($dateOffsetSeconds);
 
                     if ($afterSet) {
                         $afterSet($row);
                     }
 
-                    $row->save();
+                    $row->saveOrFail();
+                    $movedRecordsCount++;
                 });
             };
 
@@ -1067,7 +1084,7 @@ class DailySalesController extends Controller
             );
 
             $moveShiftRecords(
-                \App\Models\Expense::where('store_id', $store->id)
+                Expense::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
@@ -1077,7 +1094,7 @@ class DailySalesController extends Controller
             );
 
             $moveShiftRecords(
-                \App\Models\Withdrawal::where('store_id', $store->id)
+                Withdrawal::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime]),
                 function ($row) {
                     if (isset($row->date)) {
@@ -1088,17 +1105,26 @@ class DailySalesController extends Controller
 
             $balance->start_time = $newStartTime;
             $balance->end_time = $newEndTime;
-            // يعتمد عرض الشفتات المغلقة على تاريخ created_at، لذلك نثبته على اليوم المختار
-            // مع الاحتفاظ بوقت إنشاء سجل الإغلاق.
+            // يعتمد عرض الشفتات المغلقة على created_at، لذلك يجب نقله إلى اليوم المختار أيضاً.
             $balance->created_at = Carbon::parse($balance->created_at)->setDateFrom($targetDate);
-            $balance->updated_at = now();
-            $balance->save();
+            $balance->saveOrFail();
+
+            // تحقق صريح يمنع إظهار رسالة نجاح إذا لم تُحفظ التواريخ فعلياً.
+            $balance->refresh();
+            if (!Carbon::parse($balance->start_time)->equalTo($newStartTime)
+                || !Carbon::parse($balance->end_time)->equalTo($newEndTime)
+                || !Carbon::parse($balance->created_at)->isSameDay($targetDate)) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'تعذر حفظ تاريخ الشفت الجديد. لم يتم اعتماد أي تغيير.',
+                ]);
+            }
+
+            return $movedRecordsCount;
         });
 
-        // عرض التاريخ الجديد مباشرةً يؤكد للمستخدم نجاح النقل بدلاً من إعادته إلى اليوم القديم.
         return redirect()
             ->route('user.stores.daily', ['store' => $store->id, 'date' => $targetDate->toDateString()])
-            ->with('success', 'تم تعديل تاريخ الشفت والعمليات المرتبطة به بنجاح.');
+            ->with('success', "تم نقل الشفت إلى {$targetDate->format('Y-m-d')} وتحديث {$movedRecordsCount} عملية مرتبطة به.");
     }
 
     public function destroy(Store $store, Sale $sale)

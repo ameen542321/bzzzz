@@ -3,6 +3,24 @@
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-6 text-right" dir="rtl">
 
+    {{-- رسائل تعديل تاريخ الشفت تظهر داخل الصفحة حتى لا يبدو أن الزر لم ينفذ شيئاً. --}}
+    @if($errors->any())
+        <div class="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div class="font-bold mb-1"><i class="fa-solid fa-circle-exclamation ml-1"></i>تعذر تعديل تاريخ الشفت</div>
+            <ul class="list-disc list-inside space-y-1">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @if(session('success'))
+        <div class="mb-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
+            <i class="fa-solid fa-circle-check ml-1"></i>{{ session('success') }}
+        </div>
+    @endif
+
     {{-- ===== شريط العنوان والبحث المتقدم ===== --}}
     <div class="mb-6 bg-gray-800/50 p-4 rounded-2xl border border-gray-700">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -143,8 +161,7 @@
                 <span class="text-gray-400">{{ $shift['start']->format('h:i A') }} → {{ $shift['end']->format('h:i A') }}</span>
             </div>
             @if($isClosedShift)
-            {{-- نستخدم URL مباشر بدل route() لتفادي تعطل الصفحة إذا كانت أسماء المسارات غير محدثة في بيئة التشغيل. --}}
-            <form method="POST" action="{{ url('/user/stores/' . $store->id . '/daily-sales/shift-date') }}" class="mb-2 flex items-center gap-2 flex-wrap">
+            <form method="POST" action="{{ route('user.stores.daily.shift-date', $store->id) }}" class="mb-2 flex items-center gap-2 flex-wrap">
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="shift_key" value="{{ $shift['key'] }}">
