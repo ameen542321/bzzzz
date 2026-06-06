@@ -156,12 +156,30 @@ class UserDashboardController extends Controller
             ] : null;
         })->filter()->values();
 
-        $lowStockProducts = Product::whereIn('store_id', $storeIds)
+        $lowStockQuery = Product::whereIn('store_id', $storeIds)->lowStock();
+        $lowStockCount = (clone $lowStockQuery)->count();
+        $outOfStockCount = Product::whereIn('store_id', $storeIds)->where('quantity', '<=', 0)->count();
+        $lowStockProducts = (clone $lowStockQuery)
             ->with('store:id,name')
-            ->lowStock()
             ->orderBy('quantity')
+            ->limit(5)
             ->get(['id', 'store_id', 'name', 'quantity', 'min_stock', 'product_type', 'roll_length']);
-        $outOfStockCount = $lowStockProducts->where('quantity', '<=', 0)->count();
+
+        $topSellingProducts = DB::table('sale_items')
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->join('products', 'sale_items.product_id', '=', 'products.id')
+            ->join('stores', 'sales.store_id', '=', 'stores.id')
+            ->whereIn('sales.store_id', $storeIds)
+            ->whereBetween('sales.created_at', [$monthStart, $monthEnd])
+            ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
+            ->where(function ($query) {
+                $query->whereNull('sales.description')->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
+            ->selectRaw('products.id, products.name, stores.name as store_name, SUM(COALESCE(sale_items.quantity, 0)) as sold_quantity, SUM(COALESCE(sale_items.total, 0)) as sales_value, COUNT(DISTINCT sales.id) as operations_count')
+            ->groupBy('products.id', 'products.name', 'stores.name')
+            ->orderByDesc('sold_quantity')
+            ->limit(5)
+            ->get();
 
         $monthlyOwnerPurchases = (float) $monthlyStoreSummaries->sum('owner_purchases');
         $monthlyAccountantConsumption = (float) $monthlyStoreSummaries->sum('internal_use');
@@ -194,7 +212,11 @@ class UserDashboardController extends Controller
         $chartData = $this->prepareChartData($storeIds);
 
         /* آخر العمليات */
-        $activities = Log::with('store')->whereIn('store_id', $storeIds)->latest()->limit(10)->get();
+        $activities = Log::with(['store:id,name', 'user:id,name'])
+            ->whereIn('store_id', $storeIds)
+            ->latest()
+            ->limit(12)
+            ->get();
 
         // تفاصيل كل مؤشر لكل متجر (لاستخدامها في نافذة تفاصيل البطاقات)
         $metricStoreBreakdowns = [];
@@ -275,7 +297,8 @@ class UserDashboardController extends Controller
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
             'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore',
-            'longOpenShifts', 'lowStockProducts', 'outOfStockCount', 'bestStorePerformance', 'worstStorePerformance'
+            'longOpenShifts', 'lowStockProducts', 'lowStockCount', 'outOfStockCount', 'topSellingProducts',
+            'bestStorePerformance', 'worstStorePerformance'
         ), $chartData));
     }
 
@@ -516,7 +539,8 @@ class UserDashboardController extends Controller
             'creditOpen' => 0,
             'metricStoreBreakdowns' => [], 'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
-            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'outOfStockCount' => 0,
+            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'lowStockCount' => 0, 'outOfStockCount' => 0,
+            'topSellingProducts' => collect(),
             'bestStorePerformance' => null, 'worstStorePerformance' => null,
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartProductCosts' => []
         ];

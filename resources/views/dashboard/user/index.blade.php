@@ -80,18 +80,6 @@
             </div>
         @endif
 
-        @if(($lowStockProducts ?? collect())->isNotEmpty())
-            <div class="alert-box bg-amber-900/40 border-amber-700 text-amber-200">
-                ⚠️ يوجد {{ $lowStockProducts->count() }} منتج منخفض أو نافد المخزون
-                @if(($outOfStockCount ?? 0) > 0)
-                    — منها {{ $outOfStockCount }} نافد بالكامل.
-                @endif
-                <span class="block text-xs mt-1 text-amber-100/80">
-                    {{ $lowStockProducts->take(5)->map(fn($product) => $product->name . ' - ' . ($product->store?->name ?? 'متجر غير معروف'))->implode('، ') }}
-                </span>
-            </div>
-        @endif
-
         @if(($employeesWithoutSalaryCount ?? 0) > 0)
             <div class="alert-box bg-red-900/40 border-red-700 text-red-200">
                 ⚠️ يوجد {{ $employeesWithoutSalaryCount }} موظف بدون راتب محدد.
@@ -251,6 +239,65 @@
         </button>
     </div>
 
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <p class="text-sm font-semibold text-white">حالة المخزون</p>
+                    <p class="text-xs text-gray-500 mt-1">ملخص غير مزعج للمنتجات التي تحتاج متابعة</p>
+                </div>
+                <div class="text-left">
+                    <p class="text-amber-300 font-black text-xl">{{ number_format($lowStockCount ?? 0) }}</p>
+                    <p class="text-[11px] text-gray-500">منخفض أو نافد</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <div class="rounded-xl bg-red-500/10 border border-red-500/20 p-3">
+                    <p class="text-xs text-gray-400">نافد بالكامل</p>
+                    <p class="text-red-300 font-bold mt-1">{{ number_format($outOfStockCount ?? 0) }}</p>
+                </div>
+                <div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
+                    <p class="text-xs text-gray-400">منخفض فقط</p>
+                    <p class="text-amber-300 font-bold mt-1">{{ number_format(max(0, ($lowStockCount ?? 0) - ($outOfStockCount ?? 0))) }}</p>
+                </div>
+            </div>
+            <div class="space-y-2">
+                @forelse(($lowStockProducts ?? collect()) as $product)
+                    <div class="flex items-center justify-between text-xs border-b border-gray-800 pb-2 last:border-0">
+                        <div><span class="text-gray-200">{{ $product->name }}</span><span class="text-gray-500 mr-1">— {{ $product->store?->name }}</span></div>
+                        <span class="{{ $product->quantity <= 0 ? 'text-red-300' : 'text-amber-300' }} font-bold">{{ number_format($product->quantity, 2) }}</span>
+                    </div>
+                @empty
+                    <p class="text-xs text-emerald-300">المخزون ضمن الحدود المحددة.</p>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
+            <div class="mb-4">
+                <p class="text-sm font-semibold text-white">المنتجات الأكثر مبيعًا هذا الشهر</p>
+                <p class="text-xs text-gray-500 mt-1">مرتبة حسب الكمية المباعة من عمليات البيع</p>
+            </div>
+            <div class="space-y-3">
+                @forelse(($topSellingProducts ?? collect()) as $index => $product)
+                    <div class="flex items-center gap-3 border-b border-gray-800 pb-3 last:border-0">
+                        <span class="w-7 h-7 rounded-full bg-cyan-500/10 text-cyan-300 flex items-center justify-center text-xs font-bold">{{ $index + 1 }}</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-gray-100 truncate">{{ $product->name }}</p>
+                            <p class="text-[11px] text-gray-500">{{ $product->store_name }} — {{ number_format($product->operations_count) }} عملية</p>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-emerald-300 font-bold text-sm">{{ number_format($product->sold_quantity, 2) }}</p>
+                            <p class="text-[10px] text-gray-500">{{ number_format($product->sales_value, 2) }} ر.س</p>
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-gray-500">لا توجد مبيعات منتجات خلال الشهر.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
     @if($bestStorePerformance)
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
@@ -301,46 +348,31 @@
     {{--  القسم السابع: آخر العمليات --}}
     {{-- ========================================================= --}}
     <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
-    <p class="text-sm font-semibold text-white mb-3">آخر العمليات</p>
+    <div class="flex items-center justify-between gap-3 mb-3">
+        <p class="text-sm font-semibold text-white">آخر العمليات</p>
+        <a href="{{ route('user.logs.index') }}" class="text-xs text-cyan-300 hover:text-cyan-200">عرض السجل الكامل</a>
+    </div>
 
     <div class="space-y-4 max-h-72 overflow-y-auto custom-scrollbar">
 
         @forelse ($activities as $activity)
-            @php
-                $store = $activity->store;
-                $employeeName = null;
-
-                // استخراج اسم الموظف من الوصف إذا كان موجودًا
-                if (preg_match('/الْمُوَظَّف\s+([^\s]+)/u', $activity->description, $matches)) {
-                    $employeeName = $matches[1];
-                }
-            @endphp
-
             <div class="border-b border-gray-800 pb-3 last:border-none">
-
-                {{-- اسم المتجر --}}
-                <p class="text-xs text-emerald-400 font-semibold">
-                    {{ $store->name ?? 'متجر غير معروف' }}
-                </p>
-
-                {{-- اسم الموظف إن وجد --}}
-                @if($employeeName)
-                    <p class="text-xs text-gray-400">
-                        الموظف: {{ $employeeName }}
-                    </p>
-                @endif
-
-                {{-- وصف العملية --}}
-                <p class="text-xs text-gray-300 mt-1 leading-relaxed">
-                    {{ $activity->description }}
-                </p>
-
-                {{-- الوقت --}}
-                <p class="text-[11px] text-gray-500 mt-1">
-                    {{ $activity->created_at->format('Y-m-d H:i') }}
-                </p>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="rounded-md bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-300">{{ $activity->action_label }}</span>
+                        <span class="text-xs text-emerald-400 font-semibold">{{ $activity->store?->name ?? 'متجر غير معروف' }}</span>
+                    </div>
+                    <span class="text-[10px] text-gray-500">{{ $activity->created_at->diffForHumans() }}</span>
+                </div>
+                <p class="text-xs text-gray-300 mt-2 leading-relaxed">{{ $activity->snippet ?: 'عملية مسجلة بدون وصف' }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-gray-500">
+                    <span>بواسطة: <span class="text-gray-300">{{ $activity->actor_display_name }}</span></span>
+                    <span>{{ $activity->created_at->format('Y-m-d H:i') }}</span>
+                    @if($activity->model_id)
+                        <span>مرجع #{{ $activity->model_id }}</span>
+                    @endif
+                </div>
             </div>
-
         @empty
             <p class="text-xs text-gray-500">لا توجد عمليات مسجلة.</p>
         @endforelse
