@@ -7,9 +7,11 @@ use App\Models\Sale;
 use App\Models\Expense;
 use App\Models\Purchase;
 use App\Models\CreditSale;
+use App\Models\DailyBalance;
 use App\Models\Withdrawal;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class UserDashboardController extends Controller
 {
@@ -55,21 +57,18 @@ class UserDashboardController extends Controller
         $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
 
         $todayStart = today()->startOfDay();
-        $todayEnd = today()->endOfDay();
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
 
-        // الملخص اليومي يطابق صفحة المبيعات اليومية: إجمالي المستلم هو paid_amount،
-        // والتكلفة والربح المحتسبان مشتقان من عناصر كل عملية بيع.
-        $dailyFinancialSummary = $this->dailySalesFinancialSummary(
-            $storeIds,
-            $todayStart,
-            $todayEnd,
-            $includedSaleTypes
-        );
-        $salesToday = $dailyFinancialSummary['collected_total'];
-        $productsCostToday = $dailyFinancialSummary['total_cost'];
-        $profitToday = $dailyFinancialSummary['recognized_profit'];
+        // نبني ملخص كل متجر من نفس فترات الشفتات ونفس العمليات التي تعتمدها
+        // صفحة المبيعات اليومية، ثم نجمعها لبطاقات لوحة المالك.
+        $dailyStoreSummaries = $stores->mapWithKeys(function ($store) use ($todayStart) {
+            return [$store->id => $this->dailyStoreFinancialSummary($store->id, $todayStart)];
+        });
+        $salesToday = (float) $dailyStoreSummaries->sum('collected_total');
+        $productsCostToday = (float) $dailyStoreSummaries->sum('total_cost');
+        $profitToday = (float) $dailyStoreSummaries->sum('recognized_profit');
+        $expensesToday = (float) $dailyStoreSummaries->sum('expenses');
 
         // الملخص الشهري يبقى معتمداً على إجمالي المبلغ المستلم الفعلي في التقارير.
         $salesMonth = $this->receivedSalesTotal($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
@@ -77,7 +76,6 @@ class UserDashboardController extends Controller
 
         // مشتريات المالك لها بطاقة مستقلة، لذلك نستبعد قيود owner_purchase من المصروفات
         // حتى لا تُخصم مرتين من صافي الربح الشهري.
-        $expensesToday = $this->expensesTotal($storeIds, $todayStart, $todayEnd);
         $expensesMonth = $this->expensesTotal($storeIds, $monthStart, $monthEnd);
 
         // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
@@ -138,16 +136,16 @@ class UserDashboardController extends Controller
             $storeId = $store->id;
 
             $singleStoreIds = [$storeId];
-            $storeDailySummary = $this->dailySalesFinancialSummary(
-                $singleStoreIds,
-                $todayStart,
-                $todayEnd,
-                $includedSaleTypes
-            );
+            $storeDailySummary = $dailyStoreSummaries->get($storeId, [
+                'collected_total' => 0,
+                'total_cost' => 0,
+                'recognized_profit' => 0,
+                'expenses' => 0,
+            ]);
             $storeSalesToday = $storeDailySummary['collected_total'];
             $storeProductsCostToday = $storeDailySummary['total_cost'];
             $storeProfitToday = $storeDailySummary['recognized_profit'];
-            $storeExpensesToday = $this->expensesTotal($singleStoreIds, $todayStart, $todayEnd);
+            $storeExpensesToday = $storeDailySummary['expenses'];
 
             $storeSalesMonth = $this->receivedSalesTotal($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
             $storeProductsCostMonth = $this->soldProductsCost($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
@@ -207,28 +205,29 @@ class UserDashboardController extends Controller
     }
 
     /**
-     * حساب بطاقات اليوم بنفس تعريف صفحة المبيعات اليومية.
-     * الربح في هذه البطاقة هو الربح المحتسب للعملية، ولا تُخصم منه المصروفات
-     * لأنها معروضة في بطاقة مستقلة في الصف نفسه.
+     * يعيد ملخص متجر واحد مطابقاً لبطاقات صفحة المبيعات اليومية عند عرض تاريخ اليوم.
      */
-    private function dailySalesFinancialSummary($storeIds, $start, $end, array $saleTypes): array
+    private function dailyStoreFinancialSummary(int $storeId, Carbon $selectedDate): array
     {
+        $windows = $this->dailySalesWindows($storeId, $selectedDate);
         $saleItemsCosts = DB::table('sale_items')
             ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
             ->selectRaw('sale_items.sale_id, SUM(COALESCE(products.cost_price, 0) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)) as total_cost')
             ->groupBy('sale_items.sale_id');
 
-        $summary = DB::table('sales')
+        $salesQuery = DB::table('sales')
             ->leftJoinSub($saleItemsCosts, 'sale_item_costs', function ($join) {
                 $join->on('sales.id', '=', 'sale_item_costs.sale_id');
             })
-            ->whereIn('sales.store_id', $storeIds)
-            ->whereBetween('sales.created_at', [$start, $end])
-            ->whereIn('sales.sale_type', $saleTypes)
+            ->where('sales.store_id', $storeId)
             ->where(function ($query) {
                 $query->whereNull('sales.description')
                     ->orWhere('sales.description', '!=', 'manual_invoice_entry');
-            })
+            });
+        $this->applyDailyWindows($salesQuery, $windows, 'sales.created_at');
+
+        $visibleSaleIds = (clone $salesQuery)->pluck('sales.id')->map(fn ($id) => (int) $id)->all();
+        $summary = $salesQuery
             ->selectRaw('COALESCE(SUM(COALESCE(sales.paid_amount, 0)), 0) as collected_total')
             ->selectRaw('COALESCE(SUM(COALESCE(sale_item_costs.total_cost, 0)), 0) as total_cost')
             ->selectRaw('COALESCE(SUM(CASE
@@ -239,11 +238,123 @@ class UserDashboardController extends Controller
             END), 0) as recognized_profit')
             ->first();
 
+        $expensesQuery = Expense::where('store_id', $storeId)
+            ->where('actor_type', '!=', 'owner_purchase');
+        $this->applyDailyWindows($expensesQuery, $windows, 'created_at');
+
         return [
-            'collected_total' => (float) ($summary->collected_total ?? 0),
+            // صفحة المبيعات تضيف تحصيلات الآجل المستقلة إلى إجمالي المستلم فقط.
+            'collected_total' => (float) ($summary->collected_total ?? 0)
+                + $this->dailyCreditCollectionsTotal($storeId, $windows, $visibleSaleIds),
             'total_cost' => (float) ($summary->total_cost ?? 0),
             'recognized_profit' => (float) ($summary->recognized_profit ?? 0),
+            'expenses' => (float) $expensesQuery->sum('amount'),
         ];
+    }
+
+    private function dailySalesWindows(int $storeId, Carbon $selectedDate)
+    {
+        $dayStart = $selectedDate->copy()->startOfDay();
+        $dayEnd = $selectedDate->copy()->endOfDay();
+
+        $windows = DailyBalance::where('store_id', $storeId)
+            ->whereNotNull('start_time')
+            ->whereNotNull('end_time')
+            ->whereDate('created_at', $selectedDate->toDateString())
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn ($balance) => [
+                'start' => Carbon::parse($balance->start_time),
+                'end' => Carbon::parse($balance->end_time),
+            ]);
+
+        $hasClosedWindows = $windows->isNotEmpty();
+
+        if ($selectedDate->isToday()) {
+            $lastClosed = DailyBalance::where('store_id', $storeId)
+                ->whereNotNull('end_time')
+                ->latest('end_time')
+                ->first();
+            $openStart = $lastClosed ? Carbon::parse($lastClosed->end_time) : $dayStart;
+
+            if ($openStart->lt(now())) {
+                $windows->push(['start' => $openStart, 'end' => now()]);
+            }
+        }
+
+        if ($windows->isEmpty()) {
+            return collect([['start' => $dayStart, 'end' => $dayEnd]]);
+        }
+
+        $windows = $windows->sortBy('start')->values();
+
+        // نفس fallback في صفحة المبيعات: إذا كانت هناك شفتات مغلقة ولكنها لم تُرجع
+        // أي عملية، تُعرض الفترة اليومية التقويمية للتاريخ المحدد.
+        if ($hasClosedWindows) {
+            $salesExist = Sale::where('store_id', $storeId)
+                ->where(function ($query) {
+                    $query->whereNull('description')
+                        ->orWhere('description', '!=', 'manual_invoice_entry');
+                });
+            $this->applyDailyWindows($salesExist, $windows, 'created_at');
+
+            if (!$salesExist->exists()) {
+                return collect([['start' => $dayStart, 'end' => $dayEnd]]);
+            }
+        }
+
+        return $windows;
+    }
+
+    private function applyDailyWindows($query, $windows, string $column): void
+    {
+        $query->where(function ($periodQuery) use ($windows, $column) {
+            foreach ($windows as $window) {
+                $periodQuery->orWhereBetween($column, [$window['start'], $window['end']]);
+            }
+        });
+    }
+
+    private function dailyCreditCollectionsTotal(int $storeId, $windows, array $visibleSaleIds): float
+    {
+        $endTime = $windows->max('end');
+        $collections = DB::table('employee_credit_sales')
+            ->where('store_id', $storeId)
+            ->whereNull('deleted_at')
+            ->where('created_at', '<=', $endTime)
+            ->whereColumn('remaining_amount', '<', 'amount')
+            ->get(['amount', 'remaining_amount', 'partial_payments', 'updated_at', 'description']);
+
+        return (float) $collections->sum(function ($collection) use ($windows, $visibleSaleIds) {
+            if (preg_match('/#(\d+)/', (string) ($collection->description ?? ''), $matches) === 1
+                && in_array((int) $matches[1], $visibleSaleIds, true)) {
+                return 0;
+            }
+
+            $payments = is_string($collection->partial_payments)
+                ? json_decode($collection->partial_payments, true)
+                : $collection->partial_payments;
+
+            if (!is_array($payments) || empty($payments)) {
+                $payments = [[
+                    'amount' => (float) $collection->amount - (float) $collection->remaining_amount,
+                    'date' => $collection->updated_at,
+                ]];
+            }
+
+            return collect($payments)->sum(function ($payment) use ($windows) {
+                if (empty($payment['date']) || (float) ($payment['amount'] ?? 0) <= 0) {
+                    return 0;
+                }
+
+                $paymentDate = Carbon::parse($payment['date']);
+                $insideDisplayedPeriod = $windows->contains(
+                    fn ($window) => $paymentDate->betweenIncluded($window['start'], $window['end'])
+                );
+
+                return $insideDisplayedPeriod ? (float) $payment['amount'] : 0;
+            });
+        });
     }
 
     private function receivedSalesTotal($storeIds, $start, $end, array $saleTypes): float

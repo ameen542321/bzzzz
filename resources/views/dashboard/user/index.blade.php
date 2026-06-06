@@ -397,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
     const metricDefinitions = {
         profit_today: { title: 'الربح المحتسب اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'يطابق الربح المحتسب في صفحة المبيعات اليومية، ولا تُخصم منه المصروفات لأنها معروضة في بطاقة مستقلة.' },
-        sales_today: { title: 'إجمالي المستلم اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'مجموع paid_amount للعمليات، وهو نفس تعريف إجمالي المستلم في صفحة المبيعات اليومية.' },
+        sales_today: { title: 'إجمالي المستلم اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'مجموع المبالغ المستلمة من العمليات وتحصيلات الآجل المستقلة ضمن فترات الشفتات نفسها المعروضة في صفحة المبيعات اليومية.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
