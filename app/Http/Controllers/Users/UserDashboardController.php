@@ -156,16 +156,18 @@ class UserDashboardController extends Controller
             ] : null;
         })->filter()->values();
 
-        $lowStockQuery = Product::whereIn('store_id', $storeIds)->lowStock();
+        // تعرض بطاقة المخزون المنتجات المنخفضة القابلة للبيع فقط، دون المنتجات النافدة.
+        $lowStockQuery = Product::whereIn('store_id', $storeIds)
+            ->where('quantity', '>', 0)
+            ->lowStock();
         $lowStockCount = (clone $lowStockQuery)->count();
-        $outOfStockCount = Product::whereIn('store_id', $storeIds)->where('quantity', '<=', 0)->count();
         $lowStockProducts = (clone $lowStockQuery)
             ->with('store:id,name')
             ->orderBy('quantity')
-            ->limit(5)
+            ->limit(8)
             ->get(['id', 'store_id', 'name', 'quantity', 'min_stock', 'product_type', 'roll_length']);
 
-        $topSellingProducts = DB::table('sale_items')
+        $topSellingProductRows = DB::table('sale_items')
             ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
             ->join('products', 'sale_items.product_id', '=', 'products.id')
             ->join('stores', 'sales.store_id', '=', 'stores.id')
@@ -175,11 +177,18 @@ class UserDashboardController extends Controller
             ->where(function ($query) {
                 $query->whereNull('sales.description')->orWhere('sales.description', '!=', 'manual_invoice_entry');
             })
-            ->selectRaw('products.id, products.name, stores.name as store_name, SUM(COALESCE(sale_items.quantity, 0)) as sold_quantity, SUM(COALESCE(sale_items.total, 0)) as sales_value, COUNT(DISTINCT sales.id) as operations_count')
-            ->groupBy('products.id', 'products.name', 'stores.name')
+            ->selectRaw('sales.store_id, products.id, products.name, stores.name as store_name, SUM(COALESCE(sale_items.quantity, 0)) as sold_quantity, SUM(COALESCE(sale_items.total, 0)) as sales_value, COUNT(DISTINCT sales.id) as operations_count')
+            ->groupBy('sales.store_id', 'products.id', 'products.name', 'stores.name')
+            ->orderBy('stores.name')
             ->orderByDesc('sold_quantity')
-            ->limit(5)
             ->get();
+
+        // منتج واحد متصدر لكل متجر، حتى تكون جميع المتاجر ممثلة في البطاقة.
+        $topSellingProducts = $topSellingProductRows
+            ->groupBy('store_id')
+            ->map(fn ($products) => $products->sortByDesc('sold_quantity')->first())
+            ->sortBy('store_name')
+            ->values();
 
         $monthlyOwnerPurchases = (float) $monthlyStoreSummaries->sum('owner_purchases');
         $monthlyAccountantConsumption = (float) $monthlyStoreSummaries->sum('internal_use');
@@ -297,7 +306,7 @@ class UserDashboardController extends Controller
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
             'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore',
-            'longOpenShifts', 'lowStockProducts', 'lowStockCount', 'outOfStockCount', 'topSellingProducts',
+            'longOpenShifts', 'lowStockProducts', 'lowStockCount', 'topSellingProducts',
             'bestStorePerformance', 'worstStorePerformance'
         ), $chartData));
     }
@@ -539,7 +548,7 @@ class UserDashboardController extends Controller
             'creditOpen' => 0,
             'metricStoreBreakdowns' => [], 'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
-            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'lowStockCount' => 0, 'outOfStockCount' => 0,
+            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'lowStockCount' => 0,
             'topSellingProducts' => collect(),
             'bestStorePerformance' => null, 'worstStorePerformance' => null,
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartProductCosts' => []

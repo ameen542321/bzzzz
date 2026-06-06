@@ -79,9 +79,25 @@ class Log extends Model
             'set_current' => 'تعيين متجر',
             'status_change' => 'تغيير حالة',
             'balance_done' => 'إقفال شفت',
+            'withdrawal' => 'سحب موظف',
+            'employee_absence' => 'غياب موظف',
+            'employee_debt' => 'مديونية موظف',
+            'employee_debt_collect_partial' => 'تحصيل جزئي لمديونية',
+            'employee_debt_collect_full' => 'تحصيل كامل لمديونية',
+            'debt_collect' => 'تحصيل مديونية',
+            'credit_sale' => 'بيع آجل',
+            'credit_sale_partial' => 'تحصيل جزئي لبيع آجل',
+            'credit_sale_deducted' => 'تحصيل كامل لبيع آجل',
+            'sale' => 'عملية بيع',
+            'expense' => 'مصروف',
+            'purchase' => 'مشتريات',
+            'restore' => 'استعادة',
+            'force_delete' => 'حذف نهائي',
+            'login' => 'تسجيل دخول',
+            'logout' => 'تسجيل خروج',
         ];
 
-        return $labels[$this->action] ?? str_replace('_', ' ', (string) $this->action);
+        return $labels[$this->action] ?? 'عملية مسجلة';
     }
 
     protected static function boot()

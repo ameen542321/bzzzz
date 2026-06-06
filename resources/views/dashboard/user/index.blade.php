@@ -243,29 +243,19 @@
         <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
             <div class="flex items-center justify-between gap-3 mb-4">
                 <div>
-                    <p class="text-sm font-semibold text-white">حالة المخزون</p>
-                    <p class="text-xs text-gray-500 mt-1">ملخص غير مزعج للمنتجات التي تحتاج متابعة</p>
+                    <p class="text-sm font-semibold text-white">المنتجات منخفضة المخزون</p>
+                    <p class="text-xs text-gray-500 mt-1">المنتجات المتبقية التي وصلت إلى الحد الأدنى؛ المنتجات النافدة غير معروضة</p>
                 </div>
-                <div class="text-left">
+                <div class="text-left rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-2">
                     <p class="text-amber-300 font-black text-xl">{{ number_format($lowStockCount ?? 0) }}</p>
-                    <p class="text-[11px] text-gray-500">منخفض أو نافد</p>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mb-3">
-                <div class="rounded-xl bg-red-500/10 border border-red-500/20 p-3">
-                    <p class="text-xs text-gray-400">نافد بالكامل</p>
-                    <p class="text-red-300 font-bold mt-1">{{ number_format($outOfStockCount ?? 0) }}</p>
-                </div>
-                <div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
-                    <p class="text-xs text-gray-400">منخفض فقط</p>
-                    <p class="text-amber-300 font-bold mt-1">{{ number_format(max(0, ($lowStockCount ?? 0) - ($outOfStockCount ?? 0))) }}</p>
+                    <p class="text-[11px] text-gray-500">منتج منخفض</p>
                 </div>
             </div>
             <div class="space-y-2">
                 @forelse(($lowStockProducts ?? collect()) as $product)
                     <div class="flex items-center justify-between text-xs border-b border-gray-800 pb-2 last:border-0">
                         <div><span class="text-gray-200">{{ $product->name }}</span><span class="text-gray-500 mr-1">— {{ $product->store?->name }}</span></div>
-                        <span class="{{ $product->quantity <= 0 ? 'text-red-300' : 'text-amber-300' }} font-bold">{{ number_format($product->quantity, 2) }}</span>
+                        <span class="text-amber-300 font-bold">{{ number_format($product->quantity, 2) }}</span>
                     </div>
                 @empty
                     <p class="text-xs text-emerald-300">المخزون ضمن الحدود المحددة.</p>
@@ -275,8 +265,8 @@
 
         <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
             <div class="mb-4">
-                <p class="text-sm font-semibold text-white">المنتجات الأكثر مبيعًا هذا الشهر</p>
-                <p class="text-xs text-gray-500 mt-1">مرتبة حسب الكمية المباعة من عمليات البيع</p>
+                <p class="text-sm font-semibold text-white">أفضل منتج في كل متجر</p>
+                <p class="text-xs text-gray-500 mt-1">المنتج الأعلى مبيعًا خلال الشهر لكل متجر تابع</p>
             </div>
             <div class="space-y-3">
                 @forelse(($topSellingProducts ?? collect()) as $index => $product)
@@ -284,7 +274,8 @@
                         <span class="w-7 h-7 rounded-full bg-cyan-500/10 text-cyan-300 flex items-center justify-center text-xs font-bold">{{ $index + 1 }}</span>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm text-gray-100 truncate">{{ $product->name }}</p>
-                            <p class="text-[11px] text-gray-500">{{ $product->store_name }} — {{ number_format($product->operations_count) }} عملية</p>
+                            <p class="text-[11px] text-cyan-400">{{ $product->store_name }}</p>
+                            <p class="text-[10px] text-gray-500">{{ number_format($product->operations_count) }} عملية بيع</p>
                         </div>
                         <div class="text-left">
                             <p class="text-emerald-300 font-bold text-sm">{{ number_format($product->sold_quantity, 2) }}</p>
@@ -292,7 +283,7 @@
                         </div>
                     </div>
                 @empty
-                    <p class="text-xs text-gray-500">لا توجد مبيعات منتجات خلال الشهر.</p>
+                    <p class="text-xs text-gray-500">لا توجد مبيعات منتجات في المتاجر خلال الشهر.</p>
                 @endforelse
             </div>
         </div>
@@ -362,7 +353,7 @@
                         <span class="rounded-md bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-300">{{ $activity->action_label }}</span>
                         <span class="text-xs text-emerald-400 font-semibold">{{ $activity->store?->name ?? 'متجر غير معروف' }}</span>
                     </div>
-                    <span class="text-[10px] text-gray-500">{{ $activity->created_at->diffForHumans() }}</span>
+                    <span class="text-[10px] text-gray-500">{{ $activity->created_at->locale('ar')->diffForHumans() }}</span>
                 </div>
                 <p class="text-xs text-gray-300 mt-2 leading-relaxed">{{ $activity->snippet ?: 'عملية مسجلة بدون وصف' }}</p>
                 <div class="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-gray-500">
