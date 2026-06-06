@@ -98,8 +98,9 @@
             @endif
         </form>
 
-        <div class="mt-3 text-[11px] text-gray-400">
-            تلميح سريع: اضغط <kbd class="px-1.5 py-0.5 rounded bg-gray-900 border border-gray-700 text-gray-300">/</kbd> للانتقال مباشرة إلى مربع البحث.
+        <div class="mt-3 text-[11px] text-gray-400 flex flex-wrap items-center justify-between gap-2">
+            <span>تلميح سريع: اضغط <kbd class="px-1.5 py-0.5 rounded bg-gray-900 border border-gray-700 text-gray-300">/</kbd> للانتقال مباشرة إلى مربع البحث.</span>
+            <span class="text-emerald-300"><i class="fa-solid fa-arrow-trend-up ml-1"></i>الترتيب الافتراضي: الأكثر مبيعاً أولاً</span>
         </div>
 
         <div class="mt-3 border border-gray-700 rounded-xl p-2 bg-gray-900/40 max-h-52 overflow-y-auto">

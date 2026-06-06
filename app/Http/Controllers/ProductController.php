@@ -17,7 +17,10 @@ class ProductController extends Controller
 {
     public function index(Store $store, Request $request)
     {
-        $query = $store->products()->with('category:id,name');
+        $query = $store->products()
+            ->with('category:id,name')
+            // إجمالي الكمية المباعة تاريخياً للترتيب الافتراضي، ويطبق أيضاً داخل نتائج البحث.
+            ->withSum('saleItems as sold_quantity', 'quantity');
 
         // بحث بالاسم والوصف فقط
         if ($request->filled('search')) {
@@ -39,14 +42,9 @@ class ProductController extends Controller
             $query->where('status', $request->status);
         }
 
-        // ترتيب موحد في العرض العادي ونتائج البحث:
-        // المتوفر أولاً، ثم منخفض المخزون، ثم المنتهي.
-        $effectiveQuantity = "CASE WHEN product_type = 'fractional' AND roll_length > 0 THEN quantity / roll_length ELSE quantity END";
-        $query->orderByRaw("CASE
-                WHEN {$effectiveQuantity} <= 0 THEN 2
-                WHEN {$effectiveQuantity} <= COALESCE(min_stock, 0) THEN 1
-                ELSE 0
-            END ASC")
+        // الترتيب الافتراضي في القائمة ونتائج البحث: الأكثر مبيعاً أولاً.
+        // نستخدم الاسم كترتيب احتياطي عند تساوي الكمية المباعة أو عدم وجود مبيعات.
+        $query->orderByDesc('sold_quantity')
             ->orderBy('name');
 
         // Pagination
