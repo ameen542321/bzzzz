@@ -36,12 +36,10 @@
         $totalProductsCount = $stats->total_count ?? 0;
         $totalCostValue = $stats->total_cost ?? 0;
         $totalStockValue = $stats->total_value ?? 0;
-        $availableStockCount = $stats->available_stock_count ?? 0;
         $lowStockCount = $stats->low_stock_count ?? 0;
-        $outOfStockCount = $stats->out_of_stock_count ?? 0;
     @endphp
 
-    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6 text-[12px] sm:text-sm">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 text-[12px] sm:text-sm">
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
             <p class="text-gray-400 text-xs">إجمالي التكلفة</p>
             <p class="text-green-500 font-bold text-lg sm:text-xl">{{ number_format($totalCostValue, 0) }} <span class="text-xs text-gray-500">ر.س</span></p>
@@ -55,16 +53,8 @@
             <p class="text-purple-500 font-bold text-lg sm:text-xl">{{ $totalProductsCount }}</p>
         </div>
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
-            <p class="text-gray-400 text-xs">متوفر</p>
-            <p class="text-green-500 font-bold text-lg sm:text-xl">{{ $availableStockCount }}</p>
-        </div>
-        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
-            <p class="text-gray-400 text-xs">مخزون منخفض</p>
-            <p class="{{ $lowStockCount > 0 ? 'text-amber-400' : 'text-gray-500' }} font-bold text-lg sm:text-xl">{{ $lowStockCount }}</p>
-        </div>
-        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
-            <p class="text-gray-400 text-xs">منتهي</p>
-            <p class="{{ $outOfStockCount > 0 ? 'text-red-500' : 'text-gray-500' }} font-bold text-lg sm:text-xl">{{ $outOfStockCount }}</p>
+            <p class="text-gray-400 text-xs">المخزون المنخفض</p>
+            <p class="text-{{ $lowStockCount > 0 ? 'red' : 'gray' }}-500 font-bold text-lg sm:text-xl">{{ $lowStockCount }}</p>
         </div>
     </div>
 
@@ -88,13 +78,6 @@
                 @endforeach
             </select>
 
-            <select name="stock_status" class="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-sm text-white w-full lg:w-auto">
-                <option value="">📦 كل حالات المخزون</option>
-                <option value="available" @selected(request('stock_status') === 'available')>متوفر</option>
-                <option value="low" @selected(request('stock_status') === 'low')>منخفض</option>
-                <option value="out" @selected(request('stock_status') === 'out')>منتهي</option>
-            </select>
-
             <select name="status" class="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-sm text-white w-full lg:w-auto">
                 <option value="">👁️ النشط والمخفي</option>
                 <option value="active" @selected(request('status') === 'active')>نشط</option>
@@ -106,7 +89,7 @@
                 <span>بحث</span>
             </button>
 
-            @if(request('search') || request('category_id') || request('stock_status') || request('status'))
+            @if(request('search') || request('category_id') || request('status'))
                 <a href="{{ route('user.stores.products.index', $store->id) }}"
                    class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-2 justify-center">
                     <i class="fas fa-times"></i>
@@ -379,7 +362,7 @@
             <div class="text-center py-16 bg-gray-800/30 rounded-2xl border border-gray-700">
                 <i class="fas fa-box-open text-5xl text-gray-600 mb-4"></i>
                 <p class="text-gray-500 text-lg">لا توجد منتجات</p>
-                @if(request('search') || request('category_id') || request('stock_status') || request('status'))
+                @if(request('search') || request('category_id') || request('status'))
                     <a href="{{ route('user.stores.products.index', $store->id) }}"
                        class="mt-4 inline-block bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-xl">
                         عرض جميع المنتجات
