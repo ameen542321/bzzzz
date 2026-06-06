@@ -59,11 +59,20 @@ class UserDashboardController extends Controller
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
 
-        // جميع مؤشرات لوحة المالك تستخدم نفس نطاق المبيعات المعتمد في التقارير:
-        // الأنواع التجارية فقط، استبعاد الفواتير اليدوية، والمبلغ المستلم فعلياً.
-        $salesToday = $this->receivedSalesTotal($storeIds, $todayStart, $todayEnd, $includedSaleTypes);
+        // الملخص اليومي يطابق صفحة المبيعات اليومية: إجمالي المستلم هو paid_amount،
+        // والتكلفة والربح المحتسبان مشتقان من عناصر كل عملية بيع.
+        $dailyFinancialSummary = $this->dailySalesFinancialSummary(
+            $storeIds,
+            $todayStart,
+            $todayEnd,
+            $includedSaleTypes
+        );
+        $salesToday = $dailyFinancialSummary['collected_total'];
+        $productsCostToday = $dailyFinancialSummary['total_cost'];
+        $profitToday = $dailyFinancialSummary['recognized_profit'];
+
+        // الملخص الشهري يبقى معتمداً على إجمالي المبلغ المستلم الفعلي في التقارير.
         $salesMonth = $this->receivedSalesTotal($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
-        $productsCostToday = $this->soldProductsCost($storeIds, $todayStart, $todayEnd, $includedSaleTypes);
         $productsCostMonth = $this->soldProductsCost($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
 
         // مشتريات المالك لها بطاقة مستقلة، لذلك نستبعد قيود owner_purchase من المصروفات
@@ -77,9 +86,6 @@ class UserDashboardController extends Controller
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
         $netMonthlySalaries = max(0, (float) $monthlySalaries - $monthlyWorkerWithdrawals);
-
-        // صافي اليوم = المحصل الفعلي - تكلفة المنتجات المباعة - المصروفات التشغيلية.
-        $profitToday = (float) $salesToday - (float) $productsCostToday - (float) $expensesToday;
 
         $monthlyOwnerPurchases = Purchase::whereIn('store_id', $storeIds)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
@@ -132,10 +138,16 @@ class UserDashboardController extends Controller
             $storeId = $store->id;
 
             $singleStoreIds = [$storeId];
-            $storeSalesToday = $this->receivedSalesTotal($singleStoreIds, $todayStart, $todayEnd, $includedSaleTypes);
-            $storeProductsCostToday = $this->soldProductsCost($singleStoreIds, $todayStart, $todayEnd, $includedSaleTypes);
+            $storeDailySummary = $this->dailySalesFinancialSummary(
+                $singleStoreIds,
+                $todayStart,
+                $todayEnd,
+                $includedSaleTypes
+            );
+            $storeSalesToday = $storeDailySummary['collected_total'];
+            $storeProductsCostToday = $storeDailySummary['total_cost'];
+            $storeProfitToday = $storeDailySummary['recognized_profit'];
             $storeExpensesToday = $this->expensesTotal($singleStoreIds, $todayStart, $todayEnd);
-            $storeProfitToday = (float) $storeSalesToday - (float) $storeProductsCostToday - (float) $storeExpensesToday;
 
             $storeSalesMonth = $this->receivedSalesTotal($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
             $storeProductsCostMonth = $this->soldProductsCost($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
@@ -192,6 +204,46 @@ class UserDashboardController extends Controller
             'creditOpen', 'metricStoreBreakdowns',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
+    }
+
+    /**
+     * حساب بطاقات اليوم بنفس تعريف صفحة المبيعات اليومية.
+     * الربح في هذه البطاقة هو الربح المحتسب للعملية، ولا تُخصم منه المصروفات
+     * لأنها معروضة في بطاقة مستقلة في الصف نفسه.
+     */
+    private function dailySalesFinancialSummary($storeIds, $start, $end, array $saleTypes): array
+    {
+        $saleItemsCosts = DB::table('sale_items')
+            ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
+            ->selectRaw('sale_items.sale_id, SUM(COALESCE(products.cost_price, 0) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)) as total_cost')
+            ->groupBy('sale_items.sale_id');
+
+        $summary = DB::table('sales')
+            ->leftJoinSub($saleItemsCosts, 'sale_item_costs', function ($join) {
+                $join->on('sales.id', '=', 'sale_item_costs.sale_id');
+            })
+            ->whereIn('sales.store_id', $storeIds)
+            ->whereBetween('sales.created_at', [$start, $end])
+            ->whereIn('sales.sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
+            ->selectRaw('COALESCE(SUM(COALESCE(sales.paid_amount, 0)), 0) as collected_total')
+            ->selectRaw('COALESCE(SUM(COALESCE(sale_item_costs.total_cost, 0)), 0) as total_cost')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN COALESCE(sales.remaining_amount, 0) > 0
+                    AND (sales.sale_type IN ("credit", "mixed") OR COALESCE(sales.has_partial_credit, 0) = 1)
+                THEN 0
+                ELSE COALESCE(sales.paid_amount, 0) - COALESCE(sale_item_costs.total_cost, 0)
+            END), 0) as recognized_profit')
+            ->first();
+
+        return [
+            'collected_total' => (float) ($summary->collected_total ?? 0),
+            'total_cost' => (float) ($summary->total_cost ?? 0),
+            'recognized_profit' => (float) ($summary->recognized_profit ?? 0),
+        ];
     }
 
     private function receivedSalesTotal($storeIds, $start, $end, array $saleTypes): float

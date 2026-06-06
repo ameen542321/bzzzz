@@ -124,16 +124,16 @@
     <p class="text-xs font-semibold text-gray-400 mt-1 mb-2">الملخص اليومي</p>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {{-- صافي الربح اليوم --}}
-        <button type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: صافي الربح اليومي حسب كل متجر">
-            <x-stat-card title="صافي الربح اليوم"
+        {{-- الربح المحتسب اليوم كما يظهر في صفحة المبيعات اليومية --}}
+        <button type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: الربح المحتسب اليوم حسب كل متجر">
+            <x-stat-card title="الربح المحتسب اليوم"
                 value="{{ number_format($profitToday) }}"
                 color="{{ $profitToday >= 0 ? 'emerald' : 'red' }}" />
         </button>
 
         {{-- [تعديل آمن] مبيعات اليوم محسوبة من المحصّل الفعلي --}}
-        <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: مبيعات اليوم حسب كل متجر">
-            <x-stat-card title="مبيعات اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
+        <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: إجمالي المستلم اليوم حسب كل متجر">
+            <x-stat-card title="إجمالي المستلم اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
         </button>
 
         {{-- مصروفات اليوم --}}
@@ -396,8 +396,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
     const metricDefinitions = {
-        profit_today: { title: 'صافي الربح اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        sales_today: { title: 'مبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
+        profit_today: { title: 'الربح المحتسب اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'يطابق الربح المحتسب في صفحة المبيعات اليومية، ولا تُخصم منه المصروفات لأنها معروضة في بطاقة مستقلة.' },
+        sales_today: { title: 'إجمالي المستلم اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'مجموع paid_amount للعمليات، وهو نفس تعريف إجمالي المستلم في صفحة المبيعات اليومية.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
