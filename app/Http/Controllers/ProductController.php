@@ -829,6 +829,38 @@ class ProductController extends Controller
         return view('user.stores.products.trash', compact('store', 'products'));
     }
 
+    public function emptyTrash(Store $store)
+    {
+        $products = Product::onlyTrashed()
+            ->where('store_id', $store->id)
+            ->get();
+
+        if ($products->isEmpty()) {
+            return redirect()->route('user.stores.products.trash', $store->id)
+                ->with('success', 'سلة محذوفات المنتجات فارغة بالفعل.');
+        }
+
+        $deletedCount = $products->count();
+
+        DB::transaction(function () use ($products) {
+            foreach ($products as $product) {
+                // نحذف خيارات التجزئة أولاً بنفس آلية الحذف النهائي الفردي.
+                $product->fractions()->delete();
+                $product->forceDelete();
+            }
+        });
+
+        // حذف الصور بعد نجاح معاملة قاعدة البيانات حتى لا نفقدها إذا تراجع الحذف.
+        foreach ($products as $product) {
+            if ($product->image && \Storage::disk('public')->exists($product->image)) {
+                \Storage::disk('public')->delete($product->image);
+            }
+        }
+
+        return redirect()->route('user.stores.products.trash', $store->id)
+            ->with('success', "تم إفراغ السلة وحذف {$deletedCount} منتج نهائياً.");
+    }
+
     public function restore(Store $store, $id)
     {
         $product = Product::onlyTrashed()

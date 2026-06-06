@@ -21,7 +21,22 @@
             سلة محذوفات المنتجات
         </h1>
 
-        <div class="w-32"></div>
+        {{-- إفراغ السلة متاح فقط عند وجود منتجات محذوفة. --}}
+        <div class="min-w-32 flex justify-end">
+            @if($products->isNotEmpty())
+                <form action="{{ route('user.stores.products.trash.empty', $store->id) }}"
+                      method="POST"
+                      onsubmit="return confirm('سيتم حذف جميع المنتجات الموجودة في السلة نهائياً، ولن يمكن استرجاعها. هل تريد المتابعة؟');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 border border-red-500 text-white hover:bg-red-500 transition shadow-sm">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span class="text-sm font-medium">إفراغ السلة ({{ $products->count() }})</span>
+                    </button>
+                </form>
+            @endif
+        </div>
 
     </div>
 
