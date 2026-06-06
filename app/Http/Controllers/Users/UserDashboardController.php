@@ -9,6 +9,8 @@ use App\Models\Purchase;
 use App\Models\CreditSale;
 use App\Models\DailyBalance;
 use App\Models\Withdrawal;
+use App\Models\Employee;
+use App\Models\Product;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -91,9 +93,75 @@ class UserDashboardController extends Controller
         // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
         $monthlySalaries = $user->employees()->sum('salary') ?? 0;
         $monthlyWorkerWithdrawals = (float) Withdrawal::whereIn('store_id', $storeIds)
+            ->where('person_type', Employee::class)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
         $netMonthlySalaries = max(0, (float) $monthlySalaries - $monthlyWorkerWithdrawals);
+        $employeeMonthlyWithdrawals = DB::table('employee_withdrawals')
+            ->join('employees', function ($join) {
+                $join->on('employee_withdrawals.person_id', '=', 'employees.id')
+                    ->where('employee_withdrawals.person_type', '=', Employee::class);
+            })
+            ->join('stores', 'employee_withdrawals.store_id', '=', 'stores.id')
+            ->whereIn('employee_withdrawals.store_id', $storeIds)
+            ->whereNull('employee_withdrawals.deleted_at')
+            ->whereNull('employees.deleted_at')
+            ->whereBetween('employee_withdrawals.created_at', [$monthStart, $monthEnd])
+            ->selectRaw('employees.id, employees.name, employees.salary, stores.name as store_name, SUM(employee_withdrawals.amount) as withdrawals_total')
+            ->groupBy('employees.id', 'employees.name', 'employees.salary', 'stores.name')
+            ->orderByDesc('withdrawals_total')
+            ->get()
+            ->map(function ($employee) {
+                $employee->salary = (float) ($employee->salary ?? 0);
+                $employee->withdrawals_total = (float) $employee->withdrawals_total;
+                $employee->salary_remaining = max(0, $employee->salary - $employee->withdrawals_total);
+                return $employee;
+            });
+        $employeeSalaryRemainders = $user->employees()
+            ->with('store:id,name')
+            ->select('employees.id', 'employees.store_id', 'employees.name', 'employees.salary')
+            ->orderBy('employees.name')
+            ->get()
+            ->map(function ($employee) use ($employeeMonthlyWithdrawals) {
+                $withdrawals = (float) optional($employeeMonthlyWithdrawals->firstWhere('id', $employee->id))->withdrawals_total;
+                return (object) [
+                    'name' => $employee->name,
+                    'store_name' => $employee->store?->name,
+                    'salary' => (float) ($employee->salary ?? 0),
+                    'withdrawals_total' => $withdrawals,
+                    'salary_remaining' => max(0, (float) ($employee->salary ?? 0) - $withdrawals),
+                ];
+            });
+
+        $netMonthlySalaries = (float) $employeeSalaryRemainders->sum('salary_remaining');
+
+        $longOpenShifts = $stores->map(function ($store) {
+            $lastClosedAt = DailyBalance::where('store_id', $store->id)
+                ->whereNotNull('end_time')
+                ->latest('end_time')
+                ->value('end_time');
+            $openStart = $lastClosedAt ? Carbon::parse($lastClosedAt) : today()->startOfDay();
+            $hoursOpen = $openStart->diffInHours(now());
+            $hasOperations = Sale::where('store_id', $store->id)
+                ->where('created_at', '>=', $openStart)
+                ->where(function ($query) {
+                    $query->whereNull('description')->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->exists();
+
+            return $hoursOpen >= 12 && $hasOperations ? (object) [
+                'store_name' => $store->name,
+                'hours_open' => $hoursOpen,
+                'started_at' => $openStart,
+            ] : null;
+        })->filter()->values();
+
+        $lowStockProducts = Product::whereIn('store_id', $storeIds)
+            ->with('store:id,name')
+            ->lowStock()
+            ->orderBy('quantity')
+            ->get(['id', 'store_id', 'name', 'quantity', 'min_stock', 'product_type', 'roll_length']);
+        $outOfStockCount = $lowStockProducts->where('quantity', '<=', 0)->count();
 
         $monthlyOwnerPurchases = (float) $monthlyStoreSummaries->sum('owner_purchases');
         $monthlyAccountantConsumption = (float) $monthlyStoreSummaries->sum('internal_use');
@@ -161,6 +229,7 @@ class UserDashboardController extends Controller
 
             $storeSalariesMonth = (float) $store->employees()->sum('salary');
             $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
+                ->where('person_type', Employee::class)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->sum('amount');
             $storeNetSalariesMonth = max(0, $storeSalariesMonth - $storeWorkerWithdrawalsMonth);
@@ -192,15 +261,21 @@ class UserDashboardController extends Controller
             ];
         }
 
+        $rankedStores = collect($metricStoreBreakdowns)->sortByDesc('profit_month')->values();
+        $bestStorePerformance = $rankedStores->first();
+        $worstStorePerformance = $rankedStores->count() > 1 ? $rankedStores->last() : null;
+
         return view('dashboard.user.index', array_merge(compact(
             'stores', 'accountantsCount', 'employeesCount', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
             'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday', 'productsCostMonth',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
             'dailySalesOperationsCount', 'dailyCashSales', 'dailyCardSales',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
+            'employeeMonthlyWithdrawals', 'employeeSalaryRemainders',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
-            'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore'
+            'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore',
+            'longOpenShifts', 'lowStockProducts', 'outOfStockCount', 'bestStorePerformance', 'worstStorePerformance'
         ), $chartData));
     }
 
@@ -379,38 +454,52 @@ class UserDashboardController extends Controller
     private function prepareChartData($storeIds)
     {
         $chartStart = now()->subDays(13)->startOfDay();
-        $chartEnd   = now()->endOfDay();
+        $chartEnd = now()->endOfDay();
 
-        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(CASE WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0) THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) ELSE COALESCE(paid_amount, 0) END) as total, SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END) as credit')
+        // نفس تعريف التقرير الشهري: المبيعات المحصلة = paid_amount والمصروفات تشمل كل القيود.
+        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(paid_amount) as total')
             ->whereIn('store_id', $storeIds)
             ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
             ->whereBetween('created_at', [$chartStart, $chartEnd])
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
             ->groupBy('day')->get()->keyBy('day');
 
         $dailyExpenses = Expense::selectRaw('DATE(created_at) as day, SUM(amount) as total')
             ->whereIn('store_id', $storeIds)
-            ->where(function ($query) {
-                $query->whereNull('actor_type')
-                    ->orWhere('actor_type', '!=', 'owner_purchase');
-            })
             ->whereBetween('created_at', [$chartStart, $chartEnd])
             ->groupBy('day')->get()->keyBy('day');
 
-        $labels = []; $sales = []; $exps = []; $credits = [];
-
-        for ($i = 0; $i < 14; $i++) {
-            $date = $chartStart->copy()->addDays($i)->toDateString();
-            $labels[]  = $date;
-            $sales[]   = $dailySales[$date]->total ?? 0;
-            $credits[] = $dailySales[$date]->credit ?? 0;
-            $exps[]    = $dailyExpenses[$date]->total ?? 0;
+        if (Schema::hasColumn('sale_items', 'total_cost')) {
+            $dailyProductCosts = DB::table('sale_items')
+                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+                ->selectRaw('DATE(sales.created_at) as day, SUM(COALESCE(sale_items.total_cost, 0)) as total')
+                ->whereIn('sales.store_id', $storeIds)
+                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->whereBetween('sales.created_at', [$chartStart, $chartEnd])
+                ->where(function ($query) {
+                    $query->whereNull('sales.description')->orWhere('sales.description', '!=', 'manual_invoice_entry');
+                })
+                ->groupBy('day')->get()->keyBy('day');
+        } else {
+            $dailyProductCosts = Sale::selectRaw('DATE(created_at) as day, SUM(products_total) as total')
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->whereBetween('created_at', [$chartStart, $chartEnd])
+                ->where(function ($query) {
+                    $query->whereNull('description')->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->groupBy('day')->get()->keyBy('day');
         }
 
-        return ['chartLabels' => $labels, 'chartSales' => $sales, 'chartExpenses' => $exps, 'chartCredit' => $credits];
+        $labels = []; $sales = []; $exps = []; $costs = [];
+        for ($i = 0; $i < 14; $i++) {
+            $date = $chartStart->copy()->addDays($i)->toDateString();
+            $labels[] = $date;
+            $sales[] = $dailySales[$date]->total ?? 0;
+            $exps[] = $dailyExpenses[$date]->total ?? 0;
+            $costs[] = $dailyProductCosts[$date]->total ?? 0;
+        }
+
+        return ['chartLabels' => $labels, 'chartSales' => $sales, 'chartExpenses' => $exps, 'chartProductCosts' => $costs];
     }
 
     private function emptyStateData($user, $stores)
@@ -422,11 +511,14 @@ class UserDashboardController extends Controller
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
             'dailySalesOperationsCount' => 0, 'dailyCashSales' => 0, 'dailyCardSales' => 0,
             'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
+            'employeeMonthlyWithdrawals' => collect(), 'employeeSalaryRemainders' => collect(),
             'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0, 'monthlyPurchasesAndConsumption' => 0,
             'creditOpen' => 0,
             'metricStoreBreakdowns' => [], 'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
-            'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
+            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'outOfStockCount' => 0,
+            'bestStorePerformance' => null, 'worstStorePerformance' => null,
+            'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartProductCosts' => []
         ];
     }
 }

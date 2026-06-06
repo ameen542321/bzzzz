@@ -71,6 +71,27 @@
             </div>
         @endif
 
+        @if(($longOpenShifts ?? collect())->isNotEmpty())
+            <div class="alert-box bg-orange-900/40 border-orange-700 text-orange-200">
+                ⚠️ يوجد {{ $longOpenShifts->count() }} شفت مفتوح منذ مدة طويلة.
+                <span class="block text-xs mt-1 text-orange-100/80">
+                    {{ $longOpenShifts->take(3)->map(fn($shift) => $shift->store_name . ' - ' . $shift->hours_open . ' ساعة')->implode('، ') }}
+                </span>
+            </div>
+        @endif
+
+        @if(($lowStockProducts ?? collect())->isNotEmpty())
+            <div class="alert-box bg-amber-900/40 border-amber-700 text-amber-200">
+                ⚠️ يوجد {{ $lowStockProducts->count() }} منتج منخفض أو نافد المخزون
+                @if(($outOfStockCount ?? 0) > 0)
+                    — منها {{ $outOfStockCount }} نافد بالكامل.
+                @endif
+                <span class="block text-xs mt-1 text-amber-100/80">
+                    {{ $lowStockProducts->take(5)->map(fn($product) => $product->name . ' - ' . ($product->store?->name ?? 'متجر غير معروف'))->implode('، ') }}
+                </span>
+            </div>
+        @endif
+
         @if(($employeesWithoutSalaryCount ?? 0) > 0)
             <div class="alert-box bg-red-900/40 border-red-700 text-red-200">
                 ⚠️ يوجد {{ $employeesWithoutSalaryCount }} موظف بدون راتب محدد.
@@ -197,12 +218,20 @@
     </div>
 
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">التشغيل والاستهلاك</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <x-stat-card title="عدد المتاجر" value="{{ $stores->count() }}" color="indigo" />
         <x-stat-card title="عدد الموظفين" value="{{ $employeesCount }}" color="yellow" />
 
         <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر (للتوضيح فقط)">
             <x-stat-card title="الرواتب الشهرية (للتوضيح)" value="{{ number_format($monthlySalaries ?? 0, 2) }}" color="indigo" />
+        </button>
+
+        <button type="button" class="text-right metric-card" data-metric="withdrawals_month" title="عرض الموظفين وسحوباتهم خلال الشهر">
+            <x-stat-card title="سحوبات الموظفين (شهري)" value="{{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }}" color="red" />
+        </button>
+
+        <button type="button" class="text-right metric-card" data-metric="salary_remaining_month" title="عرض المتبقي لكل موظف بعد السحوبات">
+            <x-stat-card title="المتبقي من الرواتب بعد السحوبات" value="{{ number_format($netMonthlySalaries ?? 0, 2) }}" color="emerald" />
         </button>
 
         <x-stat-card title="مشتريات المالك (شهري)"
@@ -222,6 +251,25 @@
         </button>
     </div>
 
+    @if($bestStorePerformance)
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+            <p class="text-xs text-emerald-300">أفضل متجر هذا الشهر</p>
+            <p class="text-white font-bold mt-1">{{ $bestStorePerformance['store_name'] }}</p>
+            <p class="text-sm text-emerald-200 mt-2">المتبقي بعد التكاليف: {{ number_format($bestStorePerformance['profit_month'], 2) }} ر.س</p>
+            <p class="text-xs text-gray-400 mt-1">المبيعات: {{ number_format($bestStorePerformance['sales_month'], 2) }} ر.س</p>
+        </div>
+        @if($worstStorePerformance)
+        <div class="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+            <p class="text-xs text-rose-300">أضعف متجر هذا الشهر</p>
+            <p class="text-white font-bold mt-1">{{ $worstStorePerformance['store_name'] }}</p>
+            <p class="text-sm text-rose-200 mt-2">المتبقي بعد التكاليف: {{ number_format($worstStorePerformance['profit_month'], 2) }} ر.س</p>
+            <p class="text-xs text-gray-400 mt-1">المبيعات: {{ number_format($worstStorePerformance['sales_month'], 2) }} ر.س</p>
+        </div>
+        @endif
+    </div>
+    @endif
+
     {{-- ========================================================= --}}
     {{--  القسم الخامس: تحليل المديونيات --}}
     {{-- ========================================================= --}}
@@ -237,13 +285,13 @@
     <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
         <p class="text-sm font-semibold text-white mb-1">أداء آخر 14 يوم</p>
         <p class="text-xs text-gray-400 mb-3">
-            {{-- [تعديل آمن] القيم في هذا المخطط تعرض اتجاه الأداء اليومي للفواتير والمصروفات والآجل لتسهيل القراءة السريعة. --}}
+            {{-- [تعديل آمن] المخطط يستخدم نفس تعريف التقرير الشهري: المبيعات المحصلة، المصروفات، وتكلفة المنتجات المباعة. --}}
         </p>
 
         <div class="flex flex-wrap gap-4 mb-3 text-xs">
             <span class="inline-flex items-center gap-2 text-emerald-300"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>مبيعات</span>
             <span class="inline-flex items-center gap-2 text-red-300"><span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>مصروفات</span>
-            <span class="inline-flex items-center gap-2 text-blue-300"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>مديونيات</span>
+            <span class="inline-flex items-center gap-2 text-blue-300"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>تكلفة المنتجات</span>
         </div>
 
         <canvas id="smartChart" class="w-full h-64"></canvas>
@@ -322,7 +370,7 @@
     const labels   = @json($chartLabels);
     const sales    = @json($chartSales);
     const expenses = @json($chartExpenses);
-    const credit   = @json($chartCredit);
+    const productCosts = @json($chartProductCosts);
 
     const canvas = document.getElementById('smartChart');
     if (!canvas) return;
@@ -352,7 +400,7 @@
             10,
             ...sales,
             ...expenses,
-            ...credit
+            ...productCosts
         );
 
         const stepX = innerWidth / Math.max(labels.length - 1, 1);
@@ -417,7 +465,7 @@
 
         drawLine(sales, '#34d399');    // مبيعات
         drawLine(expenses, '#f87171'); // مصروفات
-        drawLine(credit, '#60a5fa');   // مديونيات
+        drawLine(productCosts, '#60a5fa'); // تكلفة المنتجات
     }
 
     drawChart();
@@ -429,6 +477,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
     const selectedSummaryStoreId = @json($selectedSummaryStore?->id);
+    const employeeWithdrawals = @json($employeeMonthlyWithdrawals ?? []);
+    const employeeSalaryRemainders = @json($employeeSalaryRemainders ?? []);
     const metricDefinitions = {
         profit_today: { title: 'الربح المحتسب اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'يطابق الربح المحتسب في صفحة المبيعات اليومية، ولا تُخصم منه المصروفات لأنها معروضة في بطاقة مستقلة.' },
         sales_today: { title: 'قيمة المبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'يطابق حقل قيمة المبيعات في صفحة المبيعات اليومية للنطاق المختار، ولا يضيف تحصيلات الآجل المستقلة.' },
@@ -439,6 +489,8 @@ document.addEventListener('DOMContentLoaded', function () {
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_month: { title: 'تكلفة المنتجات المباعة (شهري)', value: '{{ number_format($productsCostMonth ?? 0, 2) }} ر.س', details: 'تكلفة البضاعة المباعة خلال الشهر، وهي أحد البنود المخصومة للوصول إلى المتبقي بعد التكاليف.' },
         salaries_month: { title: 'الرواتب الشهرية (للتوضيح)', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'تعرض للمراجعة فقط ولا تُخصم من صافي النتيجة، مثل التقرير الشهري. السحوبات المسجلة: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
+        withdrawals_month: { title: 'سحوبات الموظفين (شهري)', value: '{{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س', details: 'تفصيل السحوبات حسب الموظفين.' },
+        salary_remaining_month: { title: 'المتبقي من الرواتب بعد السحوبات', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'راتب كل موظف مطروحاً منه سحوباته المسجلة خلال الشهر.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };
 
@@ -467,21 +519,32 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!data) return;
             titleEl.textContent = data.title;
             valueEl.textContent = data.value;
-            const dailyMetrics = ['profit_today', 'sales_today', 'expenses_today', 'products_cost_today'];
-            const visibleBreakdowns = selectedSummaryStoreId && dailyMetrics.includes(key)
-                ? storeBreakdowns.filter((store) => Number(store.store_id) === Number(selectedSummaryStoreId))
-                : storeBreakdowns;
-            const rows = visibleBreakdowns.map((store) => {
-                return `<li class="flex items-center justify-between border-b border-gray-800 py-2">
+            let rows = '';
+            if (key === 'withdrawals_month') {
+                rows = employeeWithdrawals.map((employee) => `<li class="border-b border-gray-800 py-2">
+                    <div class="flex justify-between"><span class="text-gray-200">${employee.name} - ${employee.store_name}</span><span class="text-rose-300 font-bold">${Number(employee.withdrawals_total).toLocaleString('en-US', {minimumFractionDigits: 2})} ر.س</span></div>
+                </li>`).join('');
+            } else if (key === 'salary_remaining_month') {
+                rows = employeeSalaryRemainders.map((employee) => `<li class="border-b border-gray-800 py-2">
+                    <div class="flex justify-between"><span class="text-gray-200">${employee.name} - ${employee.store_name || ''}</span><span class="text-emerald-300 font-bold">${Number(employee.salary_remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ر.س</span></div>
+                    <div class="text-[11px] text-gray-500 mt-1">الراتب ${Number(employee.salary).toLocaleString('en-US')} - السحوبات ${Number(employee.withdrawals_total).toLocaleString('en-US')}</div>
+                </li>`).join('');
+            } else {
+                const dailyMetrics = ['profit_today', 'sales_today', 'expenses_today', 'products_cost_today'];
+                const visibleBreakdowns = selectedSummaryStoreId && dailyMetrics.includes(key)
+                    ? storeBreakdowns.filter((store) => Number(store.store_id) === Number(selectedSummaryStoreId))
+                    : storeBreakdowns;
+                rows = visibleBreakdowns.map((store) => `<li class="flex items-center justify-between border-b border-gray-800 py-2">
                     <span class="text-gray-200">${store.store_name}</span>
                     <span>${formatByMetric(key, store[key])} <span class="text-gray-500 text-xs">ر.س</span></span>
-                </li>`;
-            }).join('');
+                </li>`).join('');
+            }
 
+            const employeeMetric = key === 'withdrawals_month' || key === 'salary_remaining_month';
             detailsEl.innerHTML = `
                 <p class="mb-2">${data.details}</p>
-                <p class="text-xs text-gray-400 mb-1">تفصيل حسب كل متجر:</p>
-                <ul class="max-h-52 overflow-y-auto pr-1">${rows || '<li class="text-gray-500 py-2">لا توجد متاجر متاحة.</li>'}</ul>
+                <p class="text-xs text-gray-400 mb-1">${employeeMetric ? 'تفصيل حسب الموظفين:' : 'تفصيل حسب كل متجر:'}</p>
+                <ul class="max-h-52 overflow-y-auto pr-1">${rows || (employeeMetric ? '<li class="text-gray-500 py-2">لا توجد بيانات موظفين.</li>' : '<li class="text-gray-500 py-2">لا توجد متاجر متاحة.</li>')}</ul>
             `;
             modal.classList.remove('hidden');
         });
