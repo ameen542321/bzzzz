@@ -281,6 +281,19 @@ class DailySalesController extends Controller
             ];
         });
 
+        // ترتيب العرض فقط: الشفت المفتوح أولاً، ثم الشفتات المغلقة من الأحدث إلى الأقدم.
+        // نبقي $shiftWindows بترتيبه الزمني لأن حساب نطاق العمليات يعتمد على أول وآخر نافذة.
+        $shiftSummaries = $shiftSummaries->sort(function (array $left, array $right) {
+            $leftIsOpen = ($left['key'] ?? null) === 'current_open_shift';
+            $rightIsOpen = ($right['key'] ?? null) === 'current_open_shift';
+
+            if ($leftIsOpen !== $rightIsOpen) {
+                return $leftIsOpen ? -1 : 1;
+            }
+
+            return $right['start']->getTimestamp() <=> $left['start']->getTimestamp();
+        })->values();
+
         // الإحصائيات العامة عبر كل الشفتات ضمن الفترة المختارة
         $stats = [
             'total' => $shiftSummaries->sum(fn($s) => $s['stats']['total']),
@@ -1015,63 +1028,55 @@ class DailySalesController extends Controller
         $startTime = Carbon::parse($balance->start_time);
         $endTime = Carbon::parse($balance->end_time);
 
-        $newStartTime = $targetDate->copy()->startOfDay();
-        $newEndTime = $targetDate->copy()->endOfDay();
+        // ننقل الفترة بنفس مقدار فرق الأيام للمحافظة على وقت البداية والنهاية،
+        // وكذلك المحافظة على الشفتات التي تمتد بعد منتصف الليل.
+        $dateOffsetSeconds = $targetDate->getTimestamp() - $startTime->copy()->startOfDay()->getTimestamp();
+        $newStartTime = $startTime->copy()->addSeconds($dateOffsetSeconds);
+        $newEndTime = $endTime->copy()->addSeconds($dateOffsetSeconds);
 
         $overlappingShiftExists = DailyBalance::where('store_id', $store->id)
             ->where('id', '!=', $balance->id)
             ->whereNotNull('start_time')
             ->whereNotNull('end_time')
-            ->where(function ($q) use ($newStartTime, $newEndTime) {
-                $q->whereBetween('start_time', [$newStartTime, $newEndTime])
-                    ->orWhereBetween('end_time', [$newStartTime, $newEndTime])
-                    ->orWhere(function ($q2) use ($newStartTime, $newEndTime) {
-                        $q2->where('start_time', '<', $newStartTime)
-                            ->where('end_time', '>', $newEndTime);
-                    });
-            })
+            ->where('start_time', '<', $newEndTime)
+            ->where('end_time', '>', $newStartTime)
             ->exists();
 
         if ($overlappingShiftExists) {
             return back()->withErrors(['shift_date' => 'لا يمكن نقل الشفت لهذا التاريخ لأنه سيتداخل مع شفت مغلق آخر.'])->withInput();
         }
 
-        DB::transaction(function () use ($store, $startTime, $endTime, $targetDate, $balance) {
-            $newShiftStart = null;
-            $newShiftEnd = null;
-
-            $moveByDayShift = function ($query, callable $afterSet = null) use ($targetDate, &$newShiftStart, &$newShiftEnd) {
-                $query->orderBy('id')->get()->each(function ($row) use ($targetDate, $afterSet) {
-                    $original = Carbon::parse($row->created_at);
-                    $row->created_at = $original->copy()->setDateFrom($targetDate);
-
-                    $rowTime = Carbon::parse($row->created_at);
-                    $newShiftStart = $newShiftStart ? $newShiftStart->copy()->min($rowTime) : $rowTime->copy();
-                    $newShiftEnd = $newShiftEnd ? $newShiftEnd->copy()->max($rowTime) : $rowTime->copy();
+        DB::transaction(function () use ($store, $startTime, $endTime, $targetDate, $dateOffsetSeconds, $newStartTime, $newEndTime, $balance) {
+            $moveShiftRecords = function ($query, callable $afterSet = null) use ($dateOffsetSeconds) {
+                $query->orderBy('id')->get()->each(function ($row) use ($dateOffsetSeconds, $afterSet) {
+                    // نحرك السجل بنفس فرق تاريخ الشفت بدلاً من استبدال التاريخ فقط،
+                    // حتى لا تُجمع عمليات ما بعد منتصف الليل في يوم واحد بالخطأ.
+                    $row->created_at = Carbon::parse($row->created_at)->addSeconds($dateOffsetSeconds);
 
                     if ($afterSet) {
                         $afterSet($row);
                     }
+
                     $row->save();
                 });
             };
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 Sale::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 \App\Models\Expense::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 \App\Models\Purchase::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 \App\Models\Withdrawal::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime]),
                 function ($row) {
@@ -1081,15 +1086,19 @@ class DailySalesController extends Controller
                 }
             );
 
-            $balance->start_time = $newShiftStart ? $newShiftStart->copy() : $targetDate->copy()->startOfDay();
-            $balance->end_time = $newShiftEnd ? $newShiftEnd->copy() : $targetDate->copy()->endOfDay();
-            // مهم: حتى لا يظهر الشفت في يوم إغلاقه القديم بقيم صفر بعد النقل.
+            $balance->start_time = $newStartTime;
+            $balance->end_time = $newEndTime;
+            // يعتمد عرض الشفتات المغلقة على تاريخ created_at، لذلك نثبته على اليوم المختار
+            // مع الاحتفاظ بوقت إنشاء سجل الإغلاق.
             $balance->created_at = Carbon::parse($balance->created_at)->setDateFrom($targetDate);
             $balance->updated_at = now();
             $balance->save();
         });
 
-        return back()->with('success', 'تم تعديل تاريخ الشفت والعمليات المرتبطة به بنجاح.');
+        // عرض التاريخ الجديد مباشرةً يؤكد للمستخدم نجاح النقل بدلاً من إعادته إلى اليوم القديم.
+        return redirect()
+            ->route('user.stores.daily', ['store' => $store->id, 'date' => $targetDate->toDateString()])
+            ->with('success', 'تم تعديل تاريخ الشفت والعمليات المرتبطة به بنجاح.');
     }
 
     public function destroy(Store $store, Sale $sale)
