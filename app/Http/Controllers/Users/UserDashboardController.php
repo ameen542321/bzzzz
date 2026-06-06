@@ -54,76 +54,40 @@ class UserDashboardController extends Controller
         // بدل إجمالي الفواتير، لتطابق الواقع النقدي الفعلي للمتاجر التابعة.
         $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
 
-        // مبيعات اليوم (محصّل فعلي) مع استبعاد القيود المرتبطة بالفاتورة اليدوية
-        $salesToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('paid_amount');
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
 
-        // تكلفة المنتجات المباعة اليوم (لنفس نطاق المبيعات المعتمد أعلاه)
-        $productsCostToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
-            ->value('products_cost');
+        // جميع مؤشرات لوحة المالك تستخدم نفس نطاق المبيعات المعتمد في التقارير:
+        // الأنواع التجارية فقط، استبعاد الفواتير اليدوية، والمبلغ المستلم فعلياً.
+        $salesToday = $this->receivedSalesTotal($storeIds, $todayStart, $todayEnd, $includedSaleTypes);
+        $salesMonth = $this->receivedSalesTotal($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
+        $productsCostToday = $this->soldProductsCost($storeIds, $todayStart, $todayEnd, $includedSaleTypes);
+        $productsCostMonth = $this->soldProductsCost($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
 
-
-        // مبيعات الشهر (محصّل فعلي) مع استبعاد الفواتير اليدوية من المؤشر
-        $salesMonth = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('paid_amount');
-
-        /* المصروفات - نستخدم عمود amount كما هو في جدولك */
-        $expensesToday = Expense::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->sum('amount');
-
-        $expensesMonth = Expense::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->sum('amount');
+        // مشتريات المالك لها بطاقة مستقلة، لذلك نستبعد قيود owner_purchase من المصروفات
+        // حتى لا تُخصم مرتين من صافي الربح الشهري.
+        $expensesToday = $this->expensesTotal($storeIds, $todayStart, $todayEnd);
+        $expensesMonth = $this->expensesTotal($storeIds, $monthStart, $monthEnd);
 
         // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
         $monthlySalaries = $user->employees()->sum('salary') ?? 0;
         $monthlyWorkerWithdrawals = (float) Withdrawal::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
         $netMonthlySalaries = max(0, (float) $monthlySalaries - $monthlyWorkerWithdrawals);
 
-        /* صافي الربح - في هذا النظام المبلغ المحصل هو أساس البيع */
-        $profitToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-            ->value('adjusted_profit') - $expensesToday;
+        // صافي اليوم = المحصل الفعلي - تكلفة المنتجات المباعة - المصروفات التشغيلية.
+        $profitToday = (float) $salesToday - (float) $productsCostToday - (float) $expensesToday;
 
         $monthlyOwnerPurchases = Purchase::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('cost');
 
-        // استهلاك المحاسب الشهري (internal_use) بعد استبعاد قيود الفواتير اليدوية
+        // الاستهلاك الداخلي ليس مبيعات، لذلك لا يدخل في salesMonth أو هامش المبيعات.
         $monthlyAccountantConsumption = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->where('sale_type', 'internal_use')
             ->where(function ($query) {
                 $query->whereNull('description')
@@ -132,23 +96,13 @@ class UserDashboardController extends Controller
             ->sum('total');
 
         $monthlyPurchasesAndConsumption = (float) $monthlyOwnerPurchases + (float) $monthlyAccountantConsumption;
+        $monthlySalesProfit = (float) $salesMonth - (float) $productsCostMonth;
 
-        // ربح المبيعات الشهري بعد تكلفة المنتجات المباعة (هامش البيع التشغيلي قبل المصروفات الثابتة/الإضافية)
-        $monthlyAdjustedSalesProfit = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-            ->value('adjusted_profit');
-
-        // صافي الربح الشهري النهائي = ربح المبيعات المعدّل - المصروفات - الرواتب - المشتريات والاستهلاك
-        $profitMonth = $monthlyAdjustedSalesProfit
-            - $expensesMonth
-            - $netMonthlySalaries
-            - $monthlyPurchasesAndConsumption;
+        // صافي الربح الشهري النهائي دون تكرار خصم المشتريات أو الاستهلاك الداخلي.
+        $profitMonth = $monthlySalesProfit
+            - (float) $expensesMonth
+            - (float) $netMonthlySalaries
+            - (float) $monthlyPurchasesAndConsumption;
 
         /* [تعديل آمن] تحليل المديونيات من جدول employee_credit_sales (المصدر الفعلي للآجل) */
         $creditOpen = CreditSale::whereIn('store_id', $storeIds)
@@ -177,69 +131,28 @@ class UserDashboardController extends Controller
         foreach ($stores as $store) {
             $storeId = $store->id;
 
-            $storeSalesToday = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('paid_amount');
+            $singleStoreIds = [$storeId];
+            $storeSalesToday = $this->receivedSalesTotal($singleStoreIds, $todayStart, $todayEnd, $includedSaleTypes);
+            $storeProductsCostToday = $this->soldProductsCost($singleStoreIds, $todayStart, $todayEnd, $includedSaleTypes);
+            $storeExpensesToday = $this->expensesTotal($singleStoreIds, $todayStart, $todayEnd);
+            $storeProfitToday = (float) $storeSalesToday - (float) $storeProductsCostToday - (float) $storeExpensesToday;
 
-            $storeProductsCostToday = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
-                ->value('products_cost');
-
-            $storeExpensesToday = Expense::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->sum('amount');
-
-            $storeProfitTodayRaw = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-                ->value('adjusted_profit');
-            $storeProfitToday = (float) $storeProfitTodayRaw - (float) $storeExpensesToday;
-
-            $storeSalesMonth = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('paid_amount');
-
-            $storeExpensesMonth = Expense::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->sum('amount');
+            $storeSalesMonth = $this->receivedSalesTotal($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
+            $storeProductsCostMonth = $this->soldProductsCost($singleStoreIds, $monthStart, $monthEnd, $includedSaleTypes);
+            $storeExpensesMonth = $this->expensesTotal($singleStoreIds, $monthStart, $monthEnd);
 
             $storeSalariesMonth = (float) $store->employees()->sum('salary');
             $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->sum('amount');
             $storeNetSalariesMonth = max(0, $storeSalariesMonth - $storeWorkerWithdrawalsMonth);
 
             $storeOwnerPurchasesMonth = Purchase::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->sum('cost');
 
             $storeAccountantConsumptionMonth = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->where('sale_type', 'internal_use')
                 ->where(function ($query) {
                     $query->whereNull('description')
@@ -247,17 +160,8 @@ class UserDashboardController extends Controller
                 })
                 ->sum('total');
 
-            $storeMonthlyAdjustedProfit = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-                ->value('adjusted_profit');
-
-            $storeProfitMonth = (float) $storeMonthlyAdjustedProfit
+            $storeProfitMonth = (float) $storeSalesMonth
+                - (float) $storeProductsCostMonth
                 - (float) $storeExpensesMonth
                 - (float) $storeNetSalariesMonth
                 - (float) $storeOwnerPurchasesMonth
@@ -290,13 +194,57 @@ class UserDashboardController extends Controller
         ), $chartData));
     }
 
+    private function receivedSalesTotal($storeIds, $start, $end, array $saleTypes): float
+    {
+        return (float) Sale::whereIn('store_id', $storeIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->whereIn('sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0)
+                THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0))
+                ELSE COALESCE(paid_amount, 0)
+            END), 0) as received_total')
+            ->value('received_total');
+    }
+
+    private function soldProductsCost($storeIds, $start, $end, array $saleTypes): float
+    {
+        return (float) DB::table('sale_items')
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
+            ->whereIn('sales.store_id', $storeIds)
+            ->whereBetween('sales.created_at', [$start, $end])
+            ->whereIn('sales.sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
+            ->sum(DB::raw('COALESCE(products.cost_price, 0) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)'));
+    }
+
+    private function expensesTotal($storeIds, $start, $end): float
+    {
+        return (float) Expense::whereIn('store_id', $storeIds)
+            ->where(function ($query) {
+                $query->whereNull('actor_type')
+                    ->orWhere('actor_type', '!=', 'owner_purchase');
+            })
+            ->whereBetween('created_at', [$start, $end])
+            ->sum('amount');
+    }
+
     private function prepareChartData($storeIds)
     {
         $chartStart = now()->subDays(13)->startOfDay();
         $chartEnd   = now()->endOfDay();
 
-        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(paid_amount) as total, SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END) as credit')
+        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(CASE WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0) THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) ELSE COALESCE(paid_amount, 0) END) as total, SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END) as credit')
             ->whereIn('store_id', $storeIds)
+            ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
             ->whereBetween('created_at', [$chartStart, $chartEnd])
             ->where(function ($query) {
                 $query->whereNull('description')
@@ -305,7 +253,12 @@ class UserDashboardController extends Controller
             ->groupBy('day')->get()->keyBy('day');
 
         $dailyExpenses = Expense::selectRaw('DATE(created_at) as day, SUM(amount) as total')
-            ->whereIn('store_id', $storeIds)->whereBetween('created_at', [$chartStart, $chartEnd])
+            ->whereIn('store_id', $storeIds)
+            ->where(function ($query) {
+                $query->whereNull('actor_type')
+                    ->orWhere('actor_type', '!=', 'owner_purchase');
+            })
+            ->whereBetween('created_at', [$chartStart, $chartEnd])
             ->groupBy('day')->get()->keyBy('day');
 
         $labels = []; $sales = []; $exps = []; $credits = [];
@@ -327,7 +280,10 @@ class UserDashboardController extends Controller
             'stores' => $stores, 'user' => $user, 'accountantsCount' => 0, 'employeesCount' => 0,
             'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
             'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
-            'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0, 'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
+            'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
+            'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
+            'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0, 'monthlyPurchasesAndConsumption' => 0,
+            'creditOpen' => 0,
             'metricStoreBreakdowns' => [],
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
