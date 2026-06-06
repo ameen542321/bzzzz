@@ -36,10 +36,12 @@
         $totalProductsCount = $stats->total_count ?? 0;
         $totalCostValue = $stats->total_cost ?? 0;
         $totalStockValue = $stats->total_value ?? 0;
+        $availableStockCount = $stats->available_stock_count ?? 0;
         $lowStockCount = $stats->low_stock_count ?? 0;
+        $outOfStockCount = $stats->out_of_stock_count ?? 0;
     @endphp
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 text-[12px] sm:text-sm">
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6 text-[12px] sm:text-sm">
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
             <p class="text-gray-400 text-xs">إجمالي التكلفة</p>
             <p class="text-green-500 font-bold text-lg sm:text-xl">{{ number_format($totalCostValue, 0) }} <span class="text-xs text-gray-500">ر.س</span></p>
@@ -53,8 +55,16 @@
             <p class="text-purple-500 font-bold text-lg sm:text-xl">{{ $totalProductsCount }}</p>
         </div>
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
-            <p class="text-gray-400 text-xs">المخزون المنخفض</p>
-            <p class="text-{{ $lowStockCount > 0 ? 'red' : 'gray' }}-500 font-bold text-lg sm:text-xl">{{ $lowStockCount }}</p>
+            <p class="text-gray-400 text-xs">متوفر</p>
+            <p class="text-green-500 font-bold text-lg sm:text-xl">{{ $availableStockCount }}</p>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
+            <p class="text-gray-400 text-xs">مخزون منخفض</p>
+            <p class="{{ $lowStockCount > 0 ? 'text-amber-400' : 'text-gray-500' }} font-bold text-lg sm:text-xl">{{ $lowStockCount }}</p>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
+            <p class="text-gray-400 text-xs">منتهي</p>
+            <p class="{{ $outOfStockCount > 0 ? 'text-red-500' : 'text-gray-500' }} font-bold text-lg sm:text-xl">{{ $outOfStockCount }}</p>
         </div>
     </div>
 
@@ -78,12 +88,25 @@
                 @endforeach
             </select>
 
+            <select name="stock_status" class="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-sm text-white w-full lg:w-auto">
+                <option value="">📦 كل حالات المخزون</option>
+                <option value="available" @selected(request('stock_status') === 'available')>متوفر</option>
+                <option value="low" @selected(request('stock_status') === 'low')>منخفض</option>
+                <option value="out" @selected(request('stock_status') === 'out')>منتهي</option>
+            </select>
+
+            <select name="status" class="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-sm text-white w-full lg:w-auto">
+                <option value="">👁️ النشط والمخفي</option>
+                <option value="active" @selected(request('status') === 'active')>نشط</option>
+                <option value="inactive" @selected(request('status') === 'inactive')>مخفي</option>
+            </select>
+
             <button type="submit" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2.5 rounded-xl transition flex items-center gap-2 justify-center">
                 <i class="fas fa-search"></i>
                 <span>بحث</span>
             </button>
 
-            @if(request('search') || request('category_id'))
+            @if(request('search') || request('category_id') || request('stock_status') || request('status'))
                 <a href="{{ route('user.stores.products.index', $store->id) }}"
                    class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-2 justify-center">
                     <i class="fas fa-times"></i>
@@ -162,6 +185,21 @@
                     $lowStock = $product->quantity <= $product->min_stock;
                 }
 
+                $effectiveStock = $isFractional ? $rolls : (float) $product->quantity;
+                $isOutOfStock = $effectiveStock <= 0;
+                $isLowStock = !$isOutOfStock && $effectiveStock <= (float) ($product->min_stock ?? 0);
+                $stockStatusLabel = $isOutOfStock ? 'منتهي' : ($isLowStock ? 'منخفض' : 'متوفر');
+                $stockStatusClasses = $isOutOfStock
+                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                    : ($isLowStock
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        : 'bg-green-500/20 text-green-400 border-green-500/30');
+
+                $isHidden = $product->status !== 'active';
+                if ($isHidden) {
+                    $bgColor = 'bg-amber-50 dark:bg-amber-950/35';
+                }
+
                 $productCost = ($product->cost_price ?? 0) * ($isFractional ? $rolls : $product->quantity);
                 $serialNumber = $loop->iteration;
 
@@ -183,7 +221,7 @@
             @endphp
 
             <div id="product-card-{{ $product->id }}"
-                 class="{{ $bgColor }} rounded-xl border border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-500/30 transition-all hover:shadow-lg hover:shadow-green-500/5">
+                 class="{{ $bgColor }} rounded-xl border {{ $isHidden ? 'border-amber-400/60 dark:border-amber-500/50' : 'border-gray-200 dark:border-gray-700' }} hover:border-green-300 dark:hover:border-green-500/30 transition-all hover:shadow-lg hover:shadow-green-500/5">
                 {{-- رأس البطاقة (دائماً ظاهر) --}}
                 <div class="px-3.5 py-2.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors" onclick="toggleDetails('details_{{ $product->id }}', 'arrow_{{ $product->id }}')">
                     <div class="min-w-0 flex-1">
@@ -194,14 +232,17 @@
                         <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1 truncate">
                             النوع: {{ $isSet ? 'طقم' : ($isFractional ? 'رول' : 'عادي') }}
                             <span class="mx-1">•</span>
-                            المخزون: <span class="{{ $lowStock ? 'text-red-400' : 'text-green-400' }} font-semibold">{{ $displayQty }} {{ $unitName }}</span>
+                            المخزون: <span class="{{ $isOutOfStock ? 'text-red-400' : ($isLowStock ? 'text-amber-300' : 'text-green-400') }} font-semibold">{{ $displayQty }} {{ $unitName }}</span>
                             <span class="mx-1">•</span>
                             {{ $headerPriceLabel }}: <span class="text-blue-400 font-semibold">{{ number_format($headerPriceValue, 0) }} ر.س</span>
                         </p>
                     </div>
 
                     <div class="flex items-center gap-2 flex-shrink-0">
-                        <span class="text-xs px-2 py-1 rounded-lg whitespace-nowrap {{ $product->status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400' }}">
+                        <span class="text-xs px-2 py-1 rounded-lg whitespace-nowrap border {{ $stockStatusClasses }}">
+                            {{ $stockStatusLabel }}
+                        </span>
+                        <span class="text-xs px-2 py-1 rounded-lg whitespace-nowrap {{ $product->status === 'active' ? 'bg-sky-500/20 text-sky-400' : 'bg-amber-500/25 text-amber-300 ring-1 ring-amber-500/40' }}">
                             <span class="hidden xs:inline">{{ $product->status === 'active' ? 'نشط' : 'مخفي' }}</span>
                             <i class="fas {{ $product->status === 'active' ? 'fa-eye' : 'fa-eye-slash' }} xs:hidden"></i>
                         </span>
@@ -338,7 +379,7 @@
             <div class="text-center py-16 bg-gray-800/30 rounded-2xl border border-gray-700">
                 <i class="fas fa-box-open text-5xl text-gray-600 mb-4"></i>
                 <p class="text-gray-500 text-lg">لا توجد منتجات</p>
-                @if(request('search') || request('category_id'))
+                @if(request('search') || request('category_id') || request('stock_status') || request('status'))
                     <a href="{{ route('user.stores.products.index', $store->id) }}"
                        class="mt-4 inline-block bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-xl">
                         عرض جميع المنتجات

@@ -34,12 +34,32 @@ class ProductController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
-        // فلترة حسب الحالة
+        // فلترة حسب حالة الظهور (نشط/مخفي).
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // ترتيب المنتجات بحيث تظهر المنتجات منخفضة المخزون أولاً
+        // فلترة حالة المخزون بوحدة العرض الصحيحة للرول والمنتج العادي.
+        $applyStockStatusFilter = function ($builder, ?string $stockStatus) {
+            if (!in_array($stockStatus, ['available', 'low', 'out'], true)) {
+                return;
+            }
+
+            $effectiveQuantity = "CASE WHEN product_type = 'fractional' AND roll_length > 0 THEN quantity / roll_length ELSE quantity END";
+
+            if ($stockStatus === 'available') {
+                $builder->whereRaw("{$effectiveQuantity} > COALESCE(min_stock, 0)");
+            } elseif ($stockStatus === 'low') {
+                $builder->whereRaw("{$effectiveQuantity} > 0")
+                    ->whereRaw("{$effectiveQuantity} <= COALESCE(min_stock, 0)");
+            } else {
+                $builder->whereRaw("{$effectiveQuantity} <= 0");
+            }
+        };
+
+        $applyStockStatusFilter($query, $request->input('stock_status'));
+
+        // ترتيب المنتجات بحيث تظهر المنتجات المنتهية ثم المنخفضة أولاً.
         $query->orderByRaw("CASE WHEN product_type = 'fractional' AND roll_length > 0 THEN ((quantity / roll_length) <= min_stock) ELSE (quantity <= min_stock) END DESC")
               ->orderBy('quantity', 'asc');
 
@@ -66,6 +86,8 @@ class ProductController extends Controller
             $statsQuery->where('status', $request->status);
         }
 
+        $applyStockStatusFilter($statsQuery, $request->input('stock_status'));
+
         $stats = $statsQuery->selectRaw('
             COUNT(*) as total_count,
             SUM(
@@ -82,8 +104,16 @@ class ProductController extends Controller
             ) as total_value
         ')->first();
 
+        $effectiveQuantity = "CASE WHEN product_type = 'fractional' AND roll_length > 0 THEN quantity / roll_length ELSE quantity END";
+        $stats->available_stock_count = (clone $statsQuery)
+            ->whereRaw("{$effectiveQuantity} > COALESCE(min_stock, 0)")
+            ->count();
         $stats->low_stock_count = (clone $statsQuery)
-            ->lowStock()
+            ->whereRaw("{$effectiveQuantity} > 0")
+            ->whereRaw("{$effectiveQuantity} <= COALESCE(min_stock, 0)")
+            ->count();
+        $stats->out_of_stock_count = (clone $statsQuery)
+            ->whereRaw("{$effectiveQuantity} <= 0")
             ->count();
 
         // عدد المحذوفات
