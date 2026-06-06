@@ -180,19 +180,19 @@
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">الملخص الشهري</p>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي الربح الشهري حسب كل متجر">
-            <x-stat-card title="صافي الربح الشهري (بعد الخصومات)"
-                value="{{ number_format($profitMonth) }}"
+        <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي النتيجة الشهرية حسب كل متجر">
+            <x-stat-card title="صافي النتيجة الشهرية"
+                value="{{ number_format($profitMonth, 2) }}"
                 color="{{ $profitMonth >= 0 ? 'emerald' : 'red' }}" />
         </button>
         <button type="button" class="text-right metric-card" data-metric="sales_month" title="للمزيد من التفاصيل اضغط: مبيعات الشهر حسب كل متجر">
-            <x-stat-card title="مبيعات الشهر" value="{{ number_format($salesMonth) }}" color="emerald" />
+            <x-stat-card title="مبيعات الشهر" value="{{ number_format($salesMonth, 2) }}" color="emerald" />
         </button>
         <button type="button" class="text-right metric-card" data-metric="expenses_month" title="للمزيد من التفاصيل اضغط: مصروفات الشهر حسب كل متجر">
-            <x-stat-card title="مصروفات الشهر" value="{{ number_format($expensesMonth) }}" color="red" />
+            <x-stat-card title="مصروفات الشهر" value="{{ number_format($expensesMonth, 2) }}" color="red" />
         </button>
-        <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر">
-            <x-stat-card title="صافي الرواتب (شهري)" value="{{ number_format($netMonthlySalaries ?? 0) }}" color="indigo" />
+        <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر (للتوضيح فقط)">
+            <x-stat-card title="الرواتب الشهرية (للتوضيح)" value="{{ number_format($monthlySalaries ?? 0, 2) }}" color="indigo" />
         </button>
     </div>
 
@@ -430,10 +430,10 @@ document.addEventListener('DOMContentLoaded', function () {
         sales_today: { title: 'قيمة المبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'يطابق حقل قيمة المبيعات في صفحة المبيعات اليومية للنطاق المختار، ولا يضيف تحصيلات الآجل المستقلة.' },
         expenses_today: { title: 'مصروفات اليوم', value: '{{ number_format($expensesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_today: { title: 'تكلفة المنتجات المباعة اليوم', value: '{{ number_format($productsCostToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
+        profit_month: { title: 'صافي النتيجة الشهرية', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'المحصل - (تكلفة المنتجات + الاستهلاك الداخلي + مشتريات المالك + المصروفات). الرواتب والسحوبات لا تدخل في هذه المعادلة، مثل التقرير الشهري.' },
         sales_month: { title: 'مبيعات الشهر', value: '{{ number_format($salesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        salaries_month: { title: 'صافي الرواتب (شهري)', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'بعد خصم سحوبات العمال. إجمالي الرواتب: {{ number_format($monthlySalaries ?? 0, 2) }} ر.س - السحوبات: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
+        salaries_month: { title: 'الرواتب الشهرية (للتوضيح)', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'تعرض للمراجعة فقط ولا تُخصم من صافي النتيجة، مثل التقرير الشهري. السحوبات المسجلة: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };
 
