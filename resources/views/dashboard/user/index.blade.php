@@ -128,6 +128,11 @@
                 النطاق الحالي:
                 <span class="font-semibold text-cyan-300">{{ $selectedSummaryStore?->name ?? 'جميع المتاجر' }}</span>
             </p>
+            <p class="mt-1 text-[11px] text-gray-500">
+                العمليات الداخلة: <span class="text-gray-300">{{ number_format($dailySalesOperationsCount ?? 0) }}</span>
+                — كاش: <span class="text-emerald-300">{{ number_format($dailyCashSales ?? 0, 2) }}</span>
+                — شبكة: <span class="text-cyan-300">{{ number_format($dailyCardSales ?? 0, 2) }}</span>
+            </p>
         </div>
         <form method="GET" action="{{ route('user.dashboard') }}" class="flex items-end gap-2">
             <label class="text-[11px] text-gray-400">
@@ -151,18 +156,18 @@
         {{-- الربح المحتسب اليوم كما يظهر في صفحة المبيعات اليومية --}}
         <button type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: الربح المحتسب اليوم حسب كل متجر">
             <x-stat-card title="الربح المحتسب اليوم"
-                value="{{ number_format($profitToday) }}"
+                value="{{ number_format($profitToday, 2) }}"
                 color="{{ $profitToday >= 0 ? 'emerald' : 'red' }}" />
         </button>
 
         {{-- [تعديل آمن] مبيعات اليوم محسوبة من المحصّل الفعلي --}}
         <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: قيمة المبيعات اليوم حسب كل متجر">
-            <x-stat-card title="قيمة المبيعات اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
+            <x-stat-card title="قيمة المبيعات اليوم" value="{{ number_format($salesToday, 2) }}" color="emerald" />
         </button>
 
         {{-- مصروفات اليوم --}}
         <button type="button" class="text-right metric-card" data-metric="expenses_today" title="للمزيد من التفاصيل اضغط: مصروفات اليوم حسب كل متجر">
-            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday) }}" color="red" />
+            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday, 2) }}" color="red" />
         </button>
 
         <button type="button" class="text-right metric-card" data-metric="products_cost_today" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة اليوم حسب كل متجر">

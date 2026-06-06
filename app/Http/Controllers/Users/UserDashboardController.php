@@ -79,6 +79,9 @@ class UserDashboardController extends Controller
         $productsCostToday = (float) $selectedDailySummaries->sum('total_cost');
         $profitToday = (float) $selectedDailySummaries->sum('recognized_profit');
         $expensesToday = (float) $selectedDailySummaries->sum('expenses');
+        $dailySalesOperationsCount = (int) $selectedDailySummaries->sum('operations_count');
+        $dailyCashSales = (float) $selectedDailySummaries->sum('cash_sales');
+        $dailyCardSales = (float) $selectedDailySummaries->sum('card_sales');
 
         // الملخص الشهري يبقى معتمداً على إجمالي المبلغ المستلم الفعلي في التقارير.
         $salesMonth = $this->receivedSalesTotal($storeIds, $monthStart, $monthEnd, $includedSaleTypes);
@@ -151,6 +154,9 @@ class UserDashboardController extends Controller
                 'total_cost' => 0,
                 'recognized_profit' => 0,
                 'expenses' => 0,
+                'operations_count' => 0,
+                'cash_sales' => 0,
+                'card_sales' => 0,
             ]);
             $storeSalesToday = $storeDailySummary['sales_value'];
             $storeProductsCostToday = $storeDailySummary['total_cost'];
@@ -208,6 +214,7 @@ class UserDashboardController extends Controller
             'stores', 'accountantsCount', 'employeesCount', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
             'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
+            'dailySalesOperationsCount', 'dailyCashSales', 'dailyCardSales',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
@@ -238,6 +245,9 @@ class UserDashboardController extends Controller
         $this->applyDailyWindows($salesQuery, $windows, 'sales.created_at');
 
         $summary = $salesQuery
+            ->selectRaw('COUNT(sales.id) as operations_count')
+            ->selectRaw('COALESCE(SUM(CASE WHEN sales.sale_type = "cash" THEN sales.paid_amount WHEN sales.sale_type = "mixed" THEN sales.cash_amount ELSE 0 END), 0) as cash_sales')
+            ->selectRaw('COALESCE(SUM(CASE WHEN sales.sale_type = "card" THEN sales.paid_amount WHEN sales.sale_type = "mixed" THEN sales.card_amount ELSE 0 END), 0) as card_sales')
             ->selectRaw('COALESCE(SUM(CASE
                 WHEN (COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)) > COALESCE(sales.paid_amount, 0)
                 THEN COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)
@@ -262,6 +272,9 @@ class UserDashboardController extends Controller
             'total_cost' => (float) ($summary->total_cost ?? 0),
             'recognized_profit' => (float) ($summary->recognized_profit ?? 0),
             'expenses' => (float) $expensesQuery->sum('amount'),
+            'operations_count' => (int) ($summary->operations_count ?? 0),
+            'cash_sales' => (float) ($summary->cash_sales ?? 0),
+            'card_sales' => (float) ($summary->card_sales ?? 0),
         ];
     }
 
@@ -415,6 +428,7 @@ class UserDashboardController extends Controller
             'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
             'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
+            'dailySalesOperationsCount' => 0, 'dailyCashSales' => 0, 'dailyCardSales' => 0,
             'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
             'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0, 'monthlyPurchasesAndConsumption' => 0,
             'creditOpen' => 0,
