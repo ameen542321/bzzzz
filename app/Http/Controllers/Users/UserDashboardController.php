@@ -258,7 +258,7 @@ class UserDashboardController extends Controller
             $storeProductsCostMonth = $storeMonthlySummary['products_cost'];
             $storeExpensesMonth = $storeMonthlySummary['expenses'];
 
-$storeSalariesMonth = (float) $store->employees()->sum('salary');
+            $storeSalariesMonth = (float) $store->employees()->sum('salary');
             $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
                 ->where('person_type', Employee::class)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])

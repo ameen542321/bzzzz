@@ -22,14 +22,3 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-
-# Generated frontend artifacts accidentally created at the repository root
-/build
-/manifest.json
-
-# Runtime-generated PDF reports (keep the directory, ignore its contents)
-/public/reports/*
-!/public/reports/.gitkeep
-
-# Accidental Windows cache path created by PDF/font tooling
-/public/%SystemDrive%/
