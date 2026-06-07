@@ -215,7 +215,7 @@ class EmployeeActions
         return $targetHost && $targetHost === $appHost ? $returnTo : null;
     }
 
-    private static function authorizeEmployeeAccess(Employee $employee): void
+    public static function authorizeEmployeeAccess(Employee $employee): void
     {
         if (auth('admin')->check()) {
             return;

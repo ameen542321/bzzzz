@@ -223,6 +223,8 @@ Route::middleware(['owner.unified'])->prefix('user')->name('user.')->group(funct
         Route::get('/{employee}/edit', [EmployeeController::class, 'edit'])->name('edit');
         Route::put('/{employee}', [EmployeeController::class, 'update'])->name('update');
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])->name('destroy');
+        Route::post('/{employee}/suspend', [EmployeeController::class, 'suspend'])->name('suspend');
+        Route::post('/{employee}/activate', [EmployeeController::class, 'activate'])->name('activate');
         Route::post('/{employee}/promote', [EmployeeController::class, 'promote'])->name('promote');
         Route::post('/{employee}/demote', [EmployeeController::class, 'demote'])->name('demote');
         Route::get('/{employee}/actions', [EmployeeActionsController::class, 'index'])->name('actions');

@@ -40,6 +40,7 @@ class EmployeeActionsController extends Controller
 {
     $person = $this->findPerson($id);
     $this->authorizePerson($person);
+    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $actorName = auth('accountant')->user()?->name ?? auth()->user()?->name ?? 'النظام';
 
@@ -164,6 +165,7 @@ public function storeDebt(Request $request, $id)
 {
     $person = $this->findPerson($id);
     $this->authorizePerson($person);
+    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $actorName = auth('accountant')->user()?->name ?? auth()->user()?->name ?? 'النظام';
 
@@ -272,6 +274,7 @@ public function storeCreditSale(Request $request, $employeeId)
 {
     $person = $this->findPerson($employeeId);
     $this->authorizePerson($person);
+    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $validated = $request->validate([
         'amount'      => 'required|numeric|min:1',
@@ -658,4 +661,23 @@ public function collectPartialCreditSale($employeeId, CreditSale $sale, $amount)
 
     abort(403, 'غير مسموح');
 }
+
+    private function ensureFinancialOperationAllowed(Employee $employee, ?string $date): void
+    {
+        if (!$date) {
+            return;
+        }
+
+        try {
+            $operationDate = \Illuminate\Support\Carbon::parse($date);
+        } catch (\Throwable) {
+            return;
+        }
+
+        if (!$employee->canReceiveFinancialOperationOn($operationDate)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'employee' => 'لا يمكن إضافة سحب أو مديونية أو آجل للموظف خلال فترة إيقافه.',
+            ]);
+        }
+    }
 }

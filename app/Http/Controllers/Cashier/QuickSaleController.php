@@ -29,6 +29,7 @@ class QuickSaleController extends Controller
         $storeId = auth('accountant')->user()->store_id;
 
         return \App\Models\Employee::where('store_id', $storeId)
+            ->active()
             ->select('id', 'name')
             ->get();
     }
@@ -81,6 +82,14 @@ class QuickSaleController extends Controller
         $operationTimestamp = $operationDate
             ? Carbon::parse($operationDate)->setTimeFrom(now())
             : now();
+
+        if ($request->employee_id) {
+            $creditEmployee = Employee::where('store_id', $storeId)->findOrFail($request->employee_id);
+            if (!$creditEmployee->canReceiveFinancialOperationOn($operationTimestamp)) {
+                DB::rollBack();
+                return back()->with('error', 'لا يمكن تسجيل آجل أو مديونية على موظف خلال فترة إيقافه.')->withInput();
+            }
+        }
 
         $items = json_decode($request->items, true);
         if (json_last_error() !== JSON_ERROR_NONE) {

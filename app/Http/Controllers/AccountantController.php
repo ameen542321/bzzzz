@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\EmployeeEmploymentService;
 use App\Models\Store;
 use App\Traits\HasLogs;
 use App\Models\Employee;
@@ -286,7 +287,7 @@ if (!$employee->user_id) {
     | إيقاف محاسب
     |--------------------------------------------------------------------------
     */
-    public function suspend($id)
+    public function suspend($id, EmployeeEmploymentService $employmentService)
     {
         $accountant = Accountant::forUserStores()->findOrFail($id);
 
@@ -295,7 +296,7 @@ if (!$employee->user_id) {
         $accountant->update(['status' => 'suspended']);
 
         if ($accountant->employee) {
-            $accountant->employee->update(['status' => 'suspended']);
+            $employmentService->suspend($accountant->employee);
         }
 
         $this->addLog(
@@ -318,7 +319,7 @@ if (!$employee->user_id) {
     | تفعيل محاسب
     |--------------------------------------------------------------------------
     */
-   public function activate($id)
+   public function activate($id, EmployeeEmploymentService $employmentService)
     {
         $accountant = Accountant::forUserStores()->findOrFail($id);
 
@@ -329,7 +330,7 @@ if (!$employee->user_id) {
         RateLimiter::clear($throttleKey);
 
         if ($accountant->employee) {
-            $accountant->employee->update(['status' => 'active']);
+            $employmentService->activate($accountant->employee, now(), auth()->id());
         }
 
         return back()->with('success', 'تم تفعيل الحساب ومسح قيود الدخول بنجاح.');
