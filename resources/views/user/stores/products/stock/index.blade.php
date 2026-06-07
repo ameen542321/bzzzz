@@ -114,13 +114,21 @@
                             <input type="number" name="quantity" step="0.01" min="0.01" required
                                    class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500/50 outline-none transition"
                                    placeholder="0.00">
+                            @if($isFractional)
+                                <p class="text-[10px] text-blue-400 mt-1">اختر هل الكمية المدخلة بالرول أو بالمتر.</p>
+                            @endif
                         </div>
-                        @if($isSet)
+                        @if($isSet || $isFractional)
                         <div class="flex-1">
                             <label class="block text-gray-400 text-[10px] uppercase font-bold mb-1 ml-1">الوحدة</label>
                             <select name="unit_type" class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-3 focus:ring-2 focus:ring-green-500/50 outline-none cursor-pointer">
-                                <option value="unit">طقم</option>
-                                <option value="piece">حبة مفردة</option>
+                                @if($isFractional)
+                                    <option value="roll">رول</option>
+                                    <option value="meter">متر</option>
+                                @else
+                                    <option value="unit">طقم</option>
+                                    <option value="piece">حبة مفردة</option>
+                                @endif
                             </select>
                         </div>
                         @endif
@@ -153,13 +161,21 @@
                             <input type="number" name="quantity" step="0.01" min="0.01" required
                                    class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500/50 outline-none transition"
                                    placeholder="0.00">
+                            @if($isFractional)
+                                <p class="text-[10px] text-blue-400 mt-1">اختر هل الكمية المدخلة بالرول أو بالمتر.</p>
+                            @endif
                         </div>
-                        @if($isSet)
+                        @if($isSet || $isFractional)
                         <div class="flex-1">
                             <label class="block text-gray-400 text-[10px] uppercase font-bold mb-1 ml-1">الوحدة</label>
                             <select name="unit_type" class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-2 py-3 focus:ring-2 focus:ring-red-500/50 outline-none cursor-pointer">
-                                <option value="unit">طقم</option>
-                                <option value="piece">حبة مفردة</option>
+                                @if($isFractional)
+                                    <option value="roll">رول</option>
+                                    <option value="meter">متر</option>
+                                @else
+                                    <option value="unit">طقم</option>
+                                    <option value="piece">حبة مفردة</option>
+                                @endif
                             </select>
                         </div>
                         @endif
@@ -195,7 +211,6 @@
                         <th class="py-4 px-6 font-medium">الكمية ({{ $unitLabel }})</th>
                         <th class="py-4 px-6 font-medium">الرصيد قبل</th>
                         <th class="py-4 px-6 font-medium">الرصيد بعد</th>
-                        <th class="py-4 px-6 font-medium">المستخدم</th>
                         <th class="py-4 px-6 font-medium">التاريخ والوقت</th>
                     </tr>
                 </thead>
@@ -203,8 +218,13 @@
                     @forelse($movements as $move)
                         @php
                             $moveQty = $isFractional ? ($move->quantity / $product->roll_length) : $move->quantity;
-                            $beforeQty = $isFractional ? ($move->previous_balance / $product->roll_length) : $move->previous_balance;
-                            $afterQty = $isFractional ? ($move->current_balance / $product->roll_length) : $move->current_balance;
+                            $hasBalanceSnapshot = !is_null($move->roll_length_at_movement) && !is_null($move->meters);
+                            $beforeQty = $hasBalanceSnapshot
+                                ? ($isFractional ? ($move->previous_balance / $product->roll_length) : $move->previous_balance)
+                                : null;
+                            $afterQty = $hasBalanceSnapshot
+                                ? ($isFractional ? ($move->current_balance / $product->roll_length) : $move->current_balance)
+                                : null;
                         @endphp
                         <tr class="hover:bg-gray-800/20 transition-colors">
                             <td class="py-4 px-6">
@@ -221,24 +241,27 @@
                                 <span class="font-mono font-bold text-white text-base">
                                     {{ number_format($moveQty, 2) }}
                                 </span>
+                                <span class="text-[10px] text-gray-500 mr-1">{{ $unitLabel }}</span>
                             </td>
                             <td class="py-4 px-6">
-                                <span class="font-mono text-gray-300">
-                                    {{ number_format($beforeQty, 2) }}
-                                </span>
+                                @if($hasBalanceSnapshot)
+                                    <span class="font-mono text-gray-300">
+                                        {{ number_format($beforeQty, 2) }}
+                                    </span>
+                                    <span class="text-[10px] text-gray-500 mr-1">{{ $unitLabel }}</span>
+                                @else
+                                    <span class="text-gray-600 text-xs">غير متوفر</span>
+                                @endif
                             </td>
                             <td class="py-4 px-6">
-                                <span class="font-mono text-blue-400 font-bold">
-                                    {{ number_format($afterQty, 2) }}
-                                </span>
-                            </td>
-                            <td class="py-4 px-6 text-gray-400">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-[10px] text-blue-400 border border-gray-700">
-                                        <i class="fa-solid fa-user"></i>
-                                    </div>
-                                    {{ $move->user->name ?? 'نظام' }}
-                                </div>
+                                @if($hasBalanceSnapshot)
+                                    <span class="font-mono text-blue-400 font-bold">
+                                        {{ number_format($afterQty, 2) }}
+                                    </span>
+                                    <span class="text-[10px] text-gray-500 mr-1">{{ $unitLabel }}</span>
+                                @else
+                                    <span class="text-gray-600 text-xs">غير متوفر</span>
+                                @endif
                             </td>
                             <td class="py-4 px-6 text-[11px] text-gray-500 font-mono">
                                 {{ $move->created_at->format('Y-m-d') }}<br>
@@ -247,7 +270,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-16 text-center">
+                            <td colspan="5" class="py-16 text-center">
                                 <i class="fa-solid fa-inbox text-gray-800 text-5xl mb-4 block"></i>
                                 <p class="text-gray-600 italic">لا توجد حركات مخزنية مسجلة حتى الآن</p>
                             </td>
@@ -256,6 +279,11 @@
                 </tbody>
             </table>
         </div>
+        @if($movements->hasPages())
+            <div class="p-4 border-t border-gray-800">
+                {{ $movements->links() }}
+            </div>
+        @endif
     </div>
 </div>
 

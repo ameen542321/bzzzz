@@ -272,7 +272,7 @@
 
 @endsection
 
-@push('scripts')
+<!-- @push('scripts') -->
 <script>
     // تعريف أسعار الخطط مع الضريبة
     const plans = {
@@ -338,9 +338,9 @@
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('submitBtn').classList.add('opacity-50', 'cursor-not-allowed');
 </script>
-@endpush
+<!-- @endpush -->
 
-@push('styles')
+<!-- @push('styles') -->
 <style>
     .plan-card {
         transition: all 0.3s ease;
@@ -381,4 +381,4 @@
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 </style>
-@endpush
+<!-- @endpush -->

@@ -214,10 +214,13 @@
                                 <button @click="removeItem(item)" class="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition">🗑️</button>
                             </div>
                             <div class="flex items-center justify-between border-t border-gray-700/50 pt-2">
-                                <div class="flex items-center bg-gray-900 rounded-lg p-1 border border-gray-700">
+                                <div x-show="!item.is_fractional" class="flex items-center bg-gray-900 rounded-lg p-1 border border-gray-700">
                                     <button @click="decrease(item)" class="w-8 h-8 text-white hover:bg-gray-700 rounded-md font-bold">-</button>
                                     <span class="w-10 text-center text-white font-black text-lg" x-text="item.quantity"></span>
                                     <button @click="increase(item)" class="w-8 h-8 text-white hover:bg-gray-700 rounded-md font-bold">+</button>
+                                </div>
+                                <div x-show="item.is_fractional" class="text-[11px] text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
+                                    خيار الرول يباع كسطر مستقل
                                 </div>
                                 <div class="text-green-400 font-black text-xl" x-text="Math.round(item.total) + ' ر.س'"></div>
                             </div>
@@ -766,8 +769,8 @@ function quickSale() {
             item.total = item.quantity * item.price;
         },
 
-        increase(item) { item.quantity++; this.calculateItemTotal(item); },
-        decrease(item) { if (item.quantity > 1) { item.quantity--; this.calculateItemTotal(item); } },
+        increase(item) { if (item.is_fractional) return; item.quantity++; this.calculateItemTotal(item); },
+        decrease(item) { if (item.is_fractional) return; if (item.quantity > 1) { item.quantity--; this.calculateItemTotal(item); } },
         removeItem(item) { this.cart = this.cart.filter(i => i.temp_id !== item.temp_id); },
 
         get items_total() { return this.cart.reduce((sum, item) => sum + (Math.round(item.total) || 0), 0); },
@@ -819,8 +822,16 @@ function quickSale() {
             }
 
             for (let item of this.cart) {
+                if (item.is_fractional && Number(item.quantity) !== 1) {
+                    return Swal.fire({ title: 'تنبيه', text: `منتج الرول ${item.name} يباع كسطر مستقل ولا يقبل تغيير الكمية.`, icon: 'warning' });
+                }
+
                 if (item.is_fractional && (item.fraction_id === '0' || !item.fraction_id)) {
                     return Swal.fire({ title: 'تنبيه', text: `يرجى اختيار نوع التجزئة لـ ${item.name}`, icon: 'warning' });
+                }
+
+                if (item.is_fractional && item.fraction_id === 'custom' && ((Number(item.custom_consumption) || 0) <= 0 || (Number(item.price) || 0) <= 0)) {
+                    return Swal.fire({ title: 'تنبيه', text: `القص المخصص لـ ${item.name} يتطلب أمتاراً وسعراً أكبر من صفر.`, icon: 'warning' });
                 }
             }
 
