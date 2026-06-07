@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>معاينة البيع السريع للتضليل</title>
+    <style>
+        :root { color-scheme: dark; --bg:#060b16; --panel:#101827; --panel2:#172033; --line:#28344a; --blue:#2563eb; --muted:#94a3b8; --green:#34d399; --amber:#fbbf24; }
+        * { box-sizing:border-box } body { margin:0; font-family:Tahoma,Arial,sans-serif; background:radial-gradient(circle at top,#15203a 0,#080d19 38%,#050913 100%); color:#fff; min-height:100vh }
+        button,input,select { font:inherit } button { cursor:pointer }.page{max-width:1180px;margin:auto;padding:28px 18px 70px}.topbar,.card{background:rgba(15,23,42,.94);border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.24)}
+        .topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;margin-bottom:22px}.title{font-size:22px;font-weight:900}.badge{background:#192235;border:1px solid #334155;border-radius:11px;padding:10px 15px;color:#cbd5e1}.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:20px}.stack{display:grid;gap:18px}.card{padding:18px}.label{display:block;color:#aab6ca;font-size:12px;font-weight:800;margin-bottom:8px}.input{width:100%;background:#1a2436;border:1px solid #334155;border-radius:12px;color:white;padding:13px 14px;outline:none}.input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+        .search-row{display:grid;grid-template-columns:1fr auto;gap:10px}.primary,.secondary,.danger,.ghost{border:0;border-radius:12px;padding:12px 16px;font-weight:900;color:#fff}.primary{background:linear-gradient(135deg,#2563eb,#1d4ed8)}.secondary{background:linear-gradient(135deg,#059669,#047857)}.ghost{background:#202b3f;border:1px solid #3a4861}.danger{background:#7f1d1d}.products{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}.product{background:#172033;border:1px solid #334155;border-radius:14px;padding:13px;display:flex;justify-content:space-between;gap:10px}.product b{display:block;margin-bottom:5px}.stock{font-size:11px;color:var(--green)}.price{color:#60a5fa;font-weight:900;white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.section-head h2{font-size:17px;margin:0}.cart-empty{text-align:center;color:#64748b;padding:34px 10px;border:1px dashed #334155;border-radius:14px}.cart-item{background:#151f31;border:1px solid #334155;border-radius:15px;padding:14px;margin-top:10px}.cart-item-top{display:flex;justify-content:space-between;gap:10px}.cart-meta{font-size:12px;color:#94a3b8;margin-top:7px;line-height:1.8}.cart-price{font-weight:900;color:#60a5fa}.summary{display:grid;gap:11px}.sum-row{display:flex;justify-content:space-between;color:#cbd5e1}.sum-row.total{border-top:1px solid #334155;padding-top:13px;font-size:19px;font-weight:900;color:white}.pay-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.pay{background:#172033;border:1px solid #334155;border-radius:12px;padding:12px;color:#cbd5e1;font-weight:800}.pay.active{border-color:#3b82f6;background:#172554;color:white}.confirm{width:100%;margin-top:16px;padding:16px;font-size:18px}
+        .modal-wrap{position:fixed;inset:0;background:rgba(2,6,23,.82);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:18px;z-index:20}.modal-wrap.open{display:flex}.modal{width:min(850px,100%);max-height:94vh;overflow:auto;background:#0e1728;border:1px solid #34435e;border-radius:22px;box-shadow:0 30px 100px rgba(0,0,0,.6)}.modal-head{position:sticky;top:0;background:#111b2e;border-bottom:1px solid #2b3951;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;z-index:2}.modal-head h2{margin:0;font-size:20px}.modal-body{padding:20px}.choice-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.choice{background:#172238;border:1px solid #334155;border-radius:12px;padding:13px 8px;color:#cbd5e1;font-weight:900}.choice.active{background:#1d4ed8;border-color:#60a5fa;color:#fff}.components{display:grid;gap:12px;margin-top:18px}.component{display:grid;grid-template-columns:130px 1fr 1fr 90px;gap:10px;align-items:end;background:#141e31;border:1px solid #2c3a52;border-radius:15px;padding:13px}.component-name{font-weight:900;padding-bottom:13px}.component small{display:block;color:#64748b;margin-top:5px}.preview-box{margin-top:16px;background:#071426;border:1px solid #1e3a5f;border-radius:15px;padding:15px}.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:#111d30;border:1px solid #263650;border-radius:12px;padding:12px}.metric span{display:block;color:#94a3b8;font-size:11px;margin-bottom:6px}.metric b{font-size:16px}.modal-actions{display:flex;gap:10px;margin-top:18px}.modal-actions .primary{flex:1}.note{font-size:11px;color:#93c5fd;background:#172554;border:1px solid #1d4ed8;border-radius:10px;padding:10px;margin-top:13px;line-height:1.7}.hidden{display:none!important}
+        @media(max-width:850px){.layout{grid-template-columns:1fr}.products{grid-template-columns:1fr}.choice-grid{grid-template-columns:repeat(2,1fr)}.component{grid-template-columns:1fr 1fr}.component-name{grid-column:1/-1;padding-bottom:0}.preview-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.badge{width:100%;text-align:center}}
+    </style>
+</head>
+<body>
+<div class="page">
+    <header class="topbar">
+        <div><div class="title">تسجيل بيع جديد</div><div style="color:#64748b;font-size:12px;margin-top:5px">معاينة مستقلة — لا تحفظ أي بيانات</div></div>
+        <div class="badge">المحاسب: <b style="color:#60a5fa">مستخدم المعاينة</b></div>
+    </header>
+    <main class="layout">
+        <section class="stack">
+            <div class="card">
+                <div class="section-head"><div><span class="label">ابحث عن منتج</span><b>المنتجات السريعة</b></div><button class="secondary" id="openTint">+ تضليل سريع</button></div>
+                <div class="search-row"><input class="input" placeholder="اكتب اسم المنتج..."><button class="ghost">بحث</button></div>
+                <div class="products">
+                    <div class="product"><div><b>01 رول كبير</b><span class="stock">المتوفر: 27 متر</span></div><span class="price">170 ر.س</span></div>
+                    <div class="product"><div><b>01 رول صغير</b><span class="stock">المتوفر: 24.5 متر</span></div><span class="price">70 ر.س</span></div>
+                    <div class="product"><div><b>02 رول كبير</b><span class="stock">المتوفر: 30 متر</span></div><span class="price">180 ر.س</span></div>
+                    <div class="product"><div><b>02 رول صغير</b><span class="stock">المتوفر: 22 متر</span></div><span class="price">75 ر.س</span></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="section-head"><h2>سلة البيع</h2><span id="cartCount" style="color:#94a3b8;font-size:12px">0 عناصر</span></div>
+                <div id="cart"><div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div></div>
+            </div>
+        </section>
+        <aside class="stack">
+            <div class="card"><span class="label">أجور اليد</span><input class="input" type="number" value="0"></div>
+            <div class="card"><span class="label">نوع الدفع</span><div class="pay-grid"><button class="pay active">كاش</button><button class="pay">شبكة</button><button class="pay">مختلط</button><button class="pay">آجل</button></div></div>
+            <div class="card summary">
+                <div class="sum-row"><span>المنتجات</span><b id="productsTotal">0.00 ر.س</b></div>
+                <div class="sum-row"><span>الضريبة</span><b>0.00 ر.س</b></div>
+                <div class="sum-row total"><span>الإجمالي</span><b id="finalTotal">0.00 ر.س</b></div>
+                <button class="primary confirm">تأكيد العملية ✓</button>
+            </div>
+        </aside>
+    </main>
+</div>
+
+<div class="modal-wrap" id="tintModal">
+    <div class="modal">
+        <div class="modal-head"><div><h2>إضافة تضليل سريع</h2><div style="color:#64748b;font-size:11px;margin-top:4px">اختر المكونات مرة واحدة وسيتم تجهيزها تلقائيًا</div></div><button class="danger" id="closeTint">إغلاق</button></div>
+        <div class="modal-body">
+            <span class="label">نوع العملية</span>
+            <div class="choice-grid" id="operationChoices">
+                <button class="choice active" data-mode="full">كامل السيارة</button><button class="choice" data-mode="front">أمامي</button><button class="choice" data-mode="rear">خلفي</button><button class="choice" data-mode="custom">مخصص</button>
+            </div>
+            <div class="components" id="components"></div>
+            <div style="margin-top:16px"><span class="label">السعر النهائي للعميل</span><input class="input" id="salePrice" type="number" value="450" min="1"></div>
+            <div class="preview-box">
+                <div class="preview-grid"><div class="metric"><span>عدد المكونات</span><b id="componentCount">0</b></div><div class="metric"><span>الاستهلاك الكلي</span><b id="metersTotal">0 متر</b></div><div class="metric"><span>التكلفة التقديرية</span><b id="costTotal" style="color:#fbbf24">0 ر.س</b></div></div>
+                <div class="note">هذه معاينة واجهة فقط. في التطبيق الفعلي ستتحول الاختيارات إلى أسطر السلة الحالية، ويخصم كل مكوّن من مخزون الرول المختار.</div>
+            </div>
+            <div class="modal-actions"><button class="primary" id="addTint">إضافة للسلة</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const products={
+ '01-big':{name:'01 رول كبير',cost:170,length:30},'01-small':{name:'01 رول صغير',cost:70,length:30},
+ '02-big':{name:'02 رول كبير',cost:180,length:30},'02-small':{name:'02 رول صغير',cost:75,length:30},
+ 'nickel-big':{name:'نيكل رول كبير',cost:195,length:30},'nickel-small':{name:'نيكل رول صغير',cost:85,length:30}
+};
+const modes={full:[['أمامي','01-big',1.5],['خلفي','01-big',1.5],['الجوانب','01-small',2],['دريشة','02-small',.5]],front:[['أمامي','01-big',1.5]],rear:[['خلفي','01-big',1.5]],custom:[['قطعة مخصصة','01-small',.5]]};
+let mode='full', cart=[];
+const modal=document.getElementById('tintModal'), components=document.getElementById('components');
+function productOptions(selected){return Object.entries(products).map(([id,p])=>`<option value="${id}" ${id===selected?'selected':''}>${p.name}</option>`).join('')}
+function renderComponents(){components.innerHTML=modes[mode].map((row,i)=>`<div class="component" data-index="${i}"><div class="component-name">${row[0]}</div><div><span class="label">الرول المستخدم</span><select class="input product-select">${productOptions(row[1])}</select></div><div><span class="label">الاستهلاك بالمتر</span><input class="input meters" type="number" min="0.1" step="0.1" value="${row[2]}"></div><div><span class="label">العدد</span><input class="input qty" type="number" min="1" value="1"></div></div>`).join('');components.querySelectorAll('select,input').forEach(el=>el.addEventListener('input',updatePreview));updatePreview()}
+function rows(){return [...components.querySelectorAll('.component')].map(el=>{let product=products[el.querySelector('.product-select').value],meters=+el.querySelector('.meters').value||0,qty=+el.querySelector('.qty').value||1;return{name:el.querySelector('.component-name').textContent,product,meters,qty,cost:(product.cost/product.length)*meters*qty}})}
+function updatePreview(){let data=rows(),meters=data.reduce((s,r)=>s+r.meters*r.qty,0),cost=data.reduce((s,r)=>s+r.cost,0);document.getElementById('componentCount').textContent=data.length;document.getElementById('metersTotal').textContent=meters.toFixed(2)+' متر';document.getElementById('costTotal').textContent=cost.toFixed(2)+' ر.س'}
+function renderCart(){let box=document.getElementById('cart');if(!cart.length){box.innerHTML='<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>'}else{box.innerHTML=cart.map((item,i)=>`<div class="cart-item"><div class="cart-item-top"><div><b>${item.title}</b><div class="cart-meta">${item.parts.map(p=>`${p.name}: ${p.product.name} — ${(p.meters*p.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${item.price.toFixed(2)} ر.س</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeItem(${i})">حذف</button></div></div></div>`).join('')}let total=cart.reduce((s,i)=>s+i.price,0);document.getElementById('cartCount').textContent=cart.length+' عناصر';document.getElementById('productsTotal').textContent=total.toFixed(2)+' ر.س';document.getElementById('finalTotal').textContent=total.toFixed(2)+' ر.س'}
+window.removeItem=i=>{cart.splice(i,1);renderCart()};
+document.getElementById('openTint').onclick=()=>{modal.classList.add('open');renderComponents()};document.getElementById('closeTint').onclick=()=>modal.classList.remove('open');modal.onclick=e=>{if(e.target===modal)modal.classList.remove('open')};
+document.querySelectorAll('.choice').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.choice').forEach(b=>b.classList.remove('active'));btn.classList.add('active');mode=btn.dataset.mode;renderComponents()});
+document.getElementById('resetTint').onclick=()=>{mode='full';document.querySelectorAll('.choice').forEach(b=>b.classList.toggle('active',b.dataset.mode==='full'));document.getElementById('salePrice').value=450;renderComponents()};
+document.getElementById('addTint').onclick=()=>{let price=+document.getElementById('salePrice').value||0;if(price<=0){alert('أدخل السعر النهائي');return}cart.push({title:{full:'تضليل كامل السيارة',front:'تضليل أمامي',rear:'تضليل خلفي',custom:'تضليل مخصص'}[mode],parts:rows(),price});renderCart();modal.classList.remove('open')};
+document.querySelectorAll('.pay').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.pay').forEach(b=>b.classList.remove('active'));btn.classList.add('active')});
+renderCart();
+</script>
+</body>
+</html>
