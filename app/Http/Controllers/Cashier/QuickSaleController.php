@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use App\Services\NotificationService;
+use App\Support\ProductProfitCostCalculator;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
@@ -133,6 +134,7 @@ class QuickSaleController extends Controller
             $fractionId = $item['fraction_id'] ?? null;
             $saleUnit = $item['sale_unit'] ?? 'unit';
             $isCustom = ($fractionId === 'custom');
+            $requestedQuantity = (float) ($item['quantity'] ?? 1);
             $quantityToDecrement = 0;
             $customMeters = null;
 
@@ -140,13 +142,26 @@ class QuickSaleController extends Controller
 
             // 1. إذا كان منتج رول (مجزأ)
             if ($product->product_type === 'fractional') {
+                if (abs($requestedQuantity - 1.0) > 0.0001) {
+                    $productErrors[] = "{$product->name}: منتجات الرول تُباع كسطر مستقل لكل خيار، ولا يمكن تغيير الكمية.";
+                    continue;
+                }
+
                 if ($isCustom) {
                     $customMeters = abs((float) ($item['custom_consumption'] ?? 0));
+                    if ($customMeters <= 0 || (float) ($item['price'] ?? 0) <= 0) {
+                        $productErrors[] = "{$product->name}: القص المخصص يتطلب أمتاراً وسعراً أكبر من صفر.";
+                        continue;
+                    }
+
                     $quantityToDecrement = $product->calculateFinalDeduction($customMeters, 'custom');
                 } elseif ($fractionId && $fractionId !== '0') {
                     $fraction = $product->fractions()->find($fractionId);
                     if ($fraction) {
-                        $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'default');
+                        // مهم: قيمة deduction_value في خيارات الرول تمثل الأمتار الفعلية المستهلكة.
+                        // مثال: خيار "زجاج أمامي" بقيمة 1.5 مع رول طوله 30م يخصم 1.5م فقط،
+                        // وليس 1.5 × 30م. لذلك نمرر unitType = meter حتى لا تُعامل القيمة كنسبة من الرول.
+                        $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'meter');
                     }
                 } else {
                     $quantityToDecrement = (float) $item['quantity'];
@@ -172,15 +187,37 @@ class QuickSaleController extends Controller
                 continue;
             }
 
-            $productsTotal += (float) $item['total'];
-            $costPerBaseUnit = (float) ($product->cost_price ?? 0);
-            $itemCostTotal = $costPerBaseUnit * $quantityToDecrement;
-            $totalProfit += ($item['total'] - $itemCostTotal);
+            $itemUnitPrice = (float) ($item['price'] ?? 0);
+            $itemQuantityForSale = $product->product_type === 'fractional' ? 1.0 : $requestedQuantity;
+            $itemLineTotal = $itemUnitPrice * $itemQuantityForSale;
+
+            $productsTotal += $itemLineTotal;
+
+            $costUnitType = 'unit';
+            $costQuantity = $quantityToDecrement;
+            $costConsumedMeters = null;
+
+            if ($product->product_type === 'fractional') {
+                // cost_price للرول يمثل تكلفة الرول الكامل، بينما quantityToDecrement هنا أمتار مستهلكة.
+                // لذلك تمرير custom_consumption يجعل الحاسبة تقسم الاستهلاك على roll_length وتحسب تكلفة الجزء المستخدم فقط.
+                $costUnitType = 'meter';
+                $costConsumedMeters = $quantityToDecrement;
+            } elseif ($product->is_splittable && $saleUnit === 'piece') {
+                $costUnitType = 'piece';
+                $costQuantity = $requestedQuantity;
+            }
+
+            $itemCostTotal = ProductProfitCostCalculator::calculateItemCost($product, [
+                'quantity' => $costQuantity,
+                'unit_type' => $costUnitType,
+                'custom_consumption' => $costConsumedMeters,
+            ]);
+            $totalProfit += ($itemLineTotal - $itemCostTotal);
 
             $itemsWithDeductions[] = [
                 'product' => $product,
                 'quantity_to_subtract' => $quantityToDecrement,
-                'note' => ($product->is_splittable && $saleUnit === 'piece') ? "بيع حبة من طقم (عدد {$item['quantity']})" : ($isCustom ? "قص مخصص: $customMeters متر" : "بيع عادي"),
+                'note' => ($product->is_splittable && $saleUnit === 'piece') ? "بيع حبة من طقم (عدد {$requestedQuantity})" : ($isCustom ? "قص مخصص: $customMeters متر" : "بيع عادي"),
                 'row_data' => [
                     'product_id'          => $item['product_id'],
                     'fraction_id'         => ($isCustom || !$fractionId) ? null : $fractionId,
@@ -189,9 +226,12 @@ class QuickSaleController extends Controller
                     'custom_consumption'  => $quantityToDecrement,
                     'custom_meters'       => $customMeters,
                     'roll_length_at_sale' => $product->roll_length,
-                    'quantity'            => $item['quantity'],
-                    'price'               => $item['price'],
-                    'total'               => $item['total'],
+                    'unit_type'           => $costUnitType,
+                    'cost_price'          => (float) ($product->cost_price ?? 0),
+                    'total_cost'          => $itemCostTotal,
+                    'quantity'            => $itemQuantityForSale,
+                    'price'               => $itemUnitPrice,
+                    'total'               => $itemLineTotal,
                 ]
             ];
         }

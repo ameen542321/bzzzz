@@ -121,11 +121,11 @@ Route::middleware('web')->group(function () {
     | صفحات عامة إضافية
     |--------------------------------------------------------------------------
     */
-    Route::view('/products', 'products.index')->name('products.index');
-    Route::view('/categories', 'categories.index')->name('categories.index');
-    Route::view('/workers', 'workers.index')->name('workers.index');
-    Route::view('/salaries', 'salaries.index')->name('salaries.index');
-    Route::view('/subscriptions', 'subscriptions.index')->name('subscriptions.index');
+    // Route::view('/products', 'products.index')->name('products.index');
+    // Route::view('/categories', 'categories.index')->name('categories.index');
+    // Route::view('/workers', 'workers.index')->name('workers.index');
+    // Route::view('/salaries', 'salaries.index')->name('salaries.index');
+    // Route::view('/subscriptions', 'subscriptions.index')->name('subscriptions.index');
 });
 
 

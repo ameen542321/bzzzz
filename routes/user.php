@@ -179,6 +179,7 @@ Route::middleware(['owner.unified'])->prefix('user')->name('user.')->group(funct
                     Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
                     Route::put('/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('toggle-status');
                     Route::get('/trash', [ProductController::class, 'trash'])->name('trash');
+                    Route::delete('/trash/empty', [ProductController::class, 'emptyTrash'])->name('trash.empty');
                     Route::put('/{id}/restore', [ProductController::class, 'restore'])->name('restore');
                     Route::delete('/{id}/force-delete', [ProductController::class, 'forcedelete'])->name('force-delete');
 

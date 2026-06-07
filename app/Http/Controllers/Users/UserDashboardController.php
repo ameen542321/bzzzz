@@ -7,13 +7,19 @@ use App\Models\Sale;
 use App\Models\Expense;
 use App\Models\Purchase;
 use App\Models\CreditSale;
+use App\Models\DailyBalance;
 use App\Models\Withdrawal;
+use App\Models\Employee;
+use App\Models\Product;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Carbon;
+use Illuminate\Http\Request;
 
 class UserDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth('web')->user();
 
@@ -29,6 +35,16 @@ class UserDashboardController extends Controller
         // المحاسبين والموظفين
         $accountantsCount = $user->accountants()->count();
         $employeesCount   = $user->employees()->count();
+        $employeesWithoutSalary = $user->employees()
+            ->where(function ($query) {
+                $query->whereNull('employees.salary')
+                    ->orWhere('employees.salary', '<=', 0);
+            })
+            ->with('store:id,name')
+            ->select('employees.id', 'employees.store_id', 'employees.name', 'employees.salary')
+            ->orderBy('employees.name')
+            ->get();
+        $employeesWithoutSalaryCount = $employeesWithoutSalary->count();
 
         // الاشتراك
         $subscriptionEnd  = $user->subscription_end_at;
@@ -40,105 +56,150 @@ class UserDashboardController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        // [تعديل آمن] المبيعات في الداشبورد تُحسب من المبالغ المُحصّلة فعليًا (paid_amount)
-        // بدل إجمالي الفواتير، لتطابق الواقع النقدي الفعلي للمتاجر التابعة.
-        $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
+        $todayStart = today()->startOfDay();
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
 
-        // مبيعات اليوم (محصّل فعلي) مع استبعاد القيود المرتبطة بالفاتورة اليدوية
-        $salesToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('paid_amount');
+        // يمكن للمالك مقارنة متجر محدد مباشرة بصفحة مبيعاته اليومية.
+        // عند عدم اختيار متجر تبقى البطاقات إجمالاً لجميع المتاجر.
+        $requestedSummaryStoreId = $request->integer('summary_store_id');
+        $selectedSummaryStore = $requestedSummaryStoreId > 0
+            ? $stores->firstWhere('id', $requestedSummaryStoreId)
+            : null;
+        $summaryStores = $selectedSummaryStore ? collect([$selectedSummaryStore]) : $stores;
 
-        // تكلفة المنتجات المباعة اليوم (لنفس نطاق المبيعات المعتمد أعلاه)
-        $productsCostToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
-            ->value('products_cost');
+        // نبني ملخص كل متجر من نفس فترات الشفتات ونفس العمليات التي تعتمدها
+        // صفحة المبيعات اليومية، ثم نجمع النطاق المختار فقط في البطاقات.
+        $dailyStoreSummaries = $stores->mapWithKeys(function ($store) use ($todayStart) {
+            return [$store->id => $this->dailyStoreFinancialSummary($store->id, $todayStart)];
+        });
+        $selectedDailySummaries = $dailyStoreSummaries->only($summaryStores->pluck('id')->all());
+        $salesToday = (float) $selectedDailySummaries->sum('sales_value');
+        $productsCostToday = (float) $selectedDailySummaries->sum('total_cost');
+        $profitToday = (float) $selectedDailySummaries->sum('recognized_profit');
+        $expensesToday = (float) $selectedDailySummaries->sum('expenses');
+        $dailySalesOperationsCount = (int) $selectedDailySummaries->sum('operations_count');
+        $dailyCashSales = (float) $selectedDailySummaries->sum('cash_sales');
+        $dailyCardSales = (float) $selectedDailySummaries->sum('card_sales');
 
-
-        // مبيعات الشهر (محصّل فعلي) مع استبعاد الفواتير اليدوية من المؤشر
-        $salesMonth = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('paid_amount');
-
-        /* المصروفات - نستخدم عمود amount كما هو في جدولك */
-        $expensesToday = Expense::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->sum('amount');
-
-        $expensesMonth = Expense::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->sum('amount');
+        // الملخص الشهري يستخدم نفس مصادر ومعادلة تقرير المتجر الشهري.
+        $monthlyStoreSummaries = $stores->mapWithKeys(function ($store) use ($monthStart, $monthEnd) {
+            return [$store->id => $this->monthlyStoreFinancialSummary($store->id, $monthStart, $monthEnd)];
+        });
+        $salesMonth = (float) $monthlyStoreSummaries->sum('total_sales');
+        $productsCostMonth = (float) $monthlyStoreSummaries->sum('products_cost');
+        $expensesMonth = (float) $monthlyStoreSummaries->sum('expenses');
 
         // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
         $monthlySalaries = $user->employees()->sum('salary') ?? 0;
         $monthlyWorkerWithdrawals = (float) Withdrawal::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->where('person_type', Employee::class)
+            ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
         $netMonthlySalaries = max(0, (float) $monthlySalaries - $monthlyWorkerWithdrawals);
-
-        /* صافي الربح - في هذا النظام المبلغ المحصل هو أساس البيع */
-        $profitToday = Sale::whereIn('store_id', $storeIds)
-            ->whereDate('created_at', today())
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
+        $employeeMonthlyWithdrawals = DB::table('employee_withdrawals')
+            ->join('employees', function ($join) {
+                $join->on('employee_withdrawals.person_id', '=', 'employees.id')
+                    ->where('employee_withdrawals.person_type', '=', Employee::class);
             })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-            ->value('adjusted_profit') - $expensesToday;
+            ->join('stores', 'employee_withdrawals.store_id', '=', 'stores.id')
+            ->whereIn('employee_withdrawals.store_id', $storeIds)
+            ->whereNull('employee_withdrawals.deleted_at')
+            ->whereNull('employees.deleted_at')
+            ->whereBetween('employee_withdrawals.created_at', [$monthStart, $monthEnd])
+            ->selectRaw('employees.id, employees.name, employees.salary, stores.name as store_name, SUM(employee_withdrawals.amount) as withdrawals_total')
+            ->groupBy('employees.id', 'employees.name', 'employees.salary', 'stores.name')
+            ->orderByDesc('withdrawals_total')
+            ->get()
+            ->map(function ($employee) {
+                $employee->salary = (float) ($employee->salary ?? 0);
+                $employee->withdrawals_total = (float) $employee->withdrawals_total;
+                $employee->salary_remaining = max(0, $employee->salary - $employee->withdrawals_total);
+                return $employee;
+            });
+        $employeeSalaryRemainders = $user->employees()
+            ->with('store:id,name')
+            ->select('employees.id', 'employees.store_id', 'employees.name', 'employees.salary')
+            ->orderBy('employees.name')
+            ->get()
+            ->map(function ($employee) use ($employeeMonthlyWithdrawals) {
+                $withdrawals = (float) optional($employeeMonthlyWithdrawals->firstWhere('id', $employee->id))->withdrawals_total;
+                return (object) [
+                    'name' => $employee->name,
+                    'store_name' => $employee->store?->name,
+                    'salary' => (float) ($employee->salary ?? 0),
+                    'withdrawals_total' => $withdrawals,
+                    'salary_remaining' => max(0, (float) ($employee->salary ?? 0) - $withdrawals),
+                ];
+            });
 
-        $monthlyOwnerPurchases = Purchase::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->sum('cost');
+        $netMonthlySalaries = (float) $employeeSalaryRemainders->sum('salary_remaining');
 
-        // استهلاك المحاسب الشهري (internal_use) بعد استبعاد قيود الفواتير اليدوية
-        $monthlyAccountantConsumption = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->where('sale_type', 'internal_use')
+        $longOpenShifts = $stores->map(function ($store) {
+            $lastClosedAt = DailyBalance::where('store_id', $store->id)
+                ->whereNotNull('end_time')
+                ->latest('end_time')
+                ->value('end_time');
+            $openStart = $lastClosedAt ? Carbon::parse($lastClosedAt) : today()->startOfDay();
+            $hoursOpen = $openStart->diffInHours(now());
+            $hasOperations = Sale::where('store_id', $store->id)
+                ->where('created_at', '>=', $openStart)
+                ->where(function ($query) {
+                    $query->whereNull('description')->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->exists();
+
+            return $hoursOpen >= 12 && $hasOperations ? (object) [
+                'store_name' => $store->name,
+                'hours_open' => $hoursOpen,
+                'started_at' => $openStart,
+            ] : null;
+        })->filter()->values();
+
+        // تعرض بطاقة المخزون المنتجات المنخفضة القابلة للبيع فقط، دون المنتجات النافدة.
+        $lowStockQuery = Product::whereIn('store_id', $storeIds)
+            ->where('quantity', '>', 0)
+            ->lowStock();
+        $lowStockCount = (clone $lowStockQuery)->count();
+        $lowStockProducts = (clone $lowStockQuery)
+            ->with('store:id,name')
+            ->orderBy('quantity')
+            ->limit(8)
+            ->get(['id', 'store_id', 'name', 'quantity', 'min_stock', 'product_type', 'roll_length']);
+
+        $topSellingProductRows = DB::table('sale_items')
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->join('products', 'sale_items.product_id', '=', 'products.id')
+            ->join('stores', 'sales.store_id', '=', 'stores.id')
+            ->whereIn('sales.store_id', $storeIds)
+            ->whereBetween('sales.created_at', [$monthStart, $monthEnd])
+            ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
             ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
+                $query->whereNull('sales.description')->orWhere('sales.description', '!=', 'manual_invoice_entry');
             })
-            ->sum('total');
+            ->selectRaw('sales.store_id, products.id, products.name, stores.name as store_name, SUM(COALESCE(sale_items.quantity, 0)) as sold_quantity, SUM(COALESCE(sale_items.total, 0)) as sales_value, COUNT(DISTINCT sales.id) as operations_count')
+            ->groupBy('sales.store_id', 'products.id', 'products.name', 'stores.name')
+            ->orderBy('stores.name')
+            ->orderByDesc('sold_quantity')
+            ->get();
 
-        $monthlyPurchasesAndConsumption = (float) $monthlyOwnerPurchases + (float) $monthlyAccountantConsumption;
+        // منتج واحد متصدر لكل متجر، حتى تكون جميع المتاجر ممثلة في البطاقة.
+        $topSellingProducts = $topSellingProductRows
+            ->groupBy('store_id')
+            ->map(fn ($products) => $products->sortByDesc('sold_quantity')->first())
+            ->sortBy('store_name')
+            ->values();
 
-        // ربح المبيعات الشهري بعد تكلفة المنتجات المباعة (هامش البيع التشغيلي قبل المصروفات الثابتة/الإضافية)
-        $monthlyAdjustedSalesProfit = Sale::whereIn('store_id', $storeIds)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-            ->value('adjusted_profit');
+        $monthlyOwnerPurchases = (float) $monthlyStoreSummaries->sum('owner_purchases');
+        $monthlyAccountantConsumption = (float) $monthlyStoreSummaries->sum('internal_use');
+        $monthlyPurchasesAndConsumption = $monthlyOwnerPurchases + $monthlyAccountantConsumption;
 
-        // صافي الربح الشهري النهائي = ربح المبيعات المعدّل - المصروفات - الرواتب - المشتريات والاستهلاك
-        $profitMonth = $monthlyAdjustedSalesProfit
-            - $expensesMonth
-            - $netMonthlySalaries
-            - $monthlyPurchasesAndConsumption;
+        // نفس معادلة التقرير الشهري: الرواتب والسحوبات للتوضيح فقط ولا تُخصم من النتيجة.
+        $profitMonth = $salesMonth
+            - $productsCostMonth
+            - $monthlyAccountantConsumption
+            - $monthlyOwnerPurchases
+            - $expensesMonth;
 
         /* [تعديل آمن] تحليل المديونيات من جدول employee_credit_sales (المصدر الفعلي للآجل) */
         $creditOpen = CreditSale::whereIn('store_id', $storeIds)
@@ -160,100 +221,61 @@ class UserDashboardController extends Controller
         $chartData = $this->prepareChartData($storeIds);
 
         /* آخر العمليات */
-        $activities = Log::with('store')->whereIn('store_id', $storeIds)->latest()->limit(10)->get();
+        $activities = Log::with(['store:id,name', 'user:id,name'])
+            ->whereIn('store_id', $storeIds)
+            ->latest()
+            ->limit(12)
+            ->get();
 
         // تفاصيل كل مؤشر لكل متجر (لاستخدامها في نافذة تفاصيل البطاقات)
         $metricStoreBreakdowns = [];
         foreach ($stores as $store) {
             $storeId = $store->id;
 
-            $storeSalesToday = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('paid_amount');
+            $singleStoreIds = [$storeId];
+            $storeDailySummary = $dailyStoreSummaries->get($storeId, [
+                'sales_value' => 0,
+                'total_cost' => 0,
+                'recognized_profit' => 0,
+                'expenses' => 0,
+                'operations_count' => 0,
+                'cash_sales' => 0,
+                'card_sales' => 0,
+            ]);
+            $storeSalesToday = $storeDailySummary['sales_value'];
+            $storeProductsCostToday = $storeDailySummary['total_cost'];
+            $storeProfitToday = $storeDailySummary['recognized_profit'];
+            $storeExpensesToday = $storeDailySummary['expenses'];
 
-            $storeProductsCostToday = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
-                ->value('products_cost');
-
-            $storeExpensesToday = Expense::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->sum('amount');
-
-            $storeProfitTodayRaw = Sale::where('store_id', $storeId)
-                ->whereDate('created_at', today())
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-                ->value('adjusted_profit');
-            $storeProfitToday = (float) $storeProfitTodayRaw - (float) $storeExpensesToday;
-
-            $storeSalesMonth = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->whereIn('sale_type', $includedSaleTypes)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('paid_amount');
-
-            $storeExpensesMonth = Expense::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->sum('amount');
+            $storeMonthlySummary = $monthlyStoreSummaries->get($storeId, [
+                'total_sales' => 0,
+                'products_cost' => 0,
+                'expenses' => 0,
+                'owner_purchases' => 0,
+                'internal_use' => 0,
+            ]);
+            $storeSalesMonth = $storeMonthlySummary['total_sales'];
+            $storeProductsCostMonth = $storeMonthlySummary['products_cost'];
+            $storeExpensesMonth = $storeMonthlySummary['expenses'];
 
             $storeSalariesMonth = (float) $store->employees()->sum('salary');
             $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->where('person_type', Employee::class)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
                 ->sum('amount');
             $storeNetSalariesMonth = max(0, $storeSalariesMonth - $storeWorkerWithdrawalsMonth);
 
-            $storeOwnerPurchasesMonth = Purchase::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->sum('cost');
+            $storeOwnerPurchasesMonth = $storeMonthlySummary['owner_purchases'];
+            $storeAccountantConsumptionMonth = $storeMonthlySummary['internal_use'];
 
-            $storeAccountantConsumptionMonth = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->where('sale_type', 'internal_use')
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('total');
-
-            $storeMonthlyAdjustedProfit = Sale::where('store_id', $storeId)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->selectRaw('COALESCE(SUM(paid_amount - ((products_total + labor_total) - profit)), 0) as adjusted_profit')
-                ->value('adjusted_profit');
-
-            $storeProfitMonth = (float) $storeMonthlyAdjustedProfit
+            $storeProfitMonth = (float) $storeSalesMonth
+                - (float) $storeProductsCostMonth
                 - (float) $storeExpensesMonth
-                - (float) $storeNetSalariesMonth
                 - (float) $storeOwnerPurchasesMonth
                 - (float) $storeAccountantConsumptionMonth;
 
             $metricStoreBreakdowns[] = [
+                'store_id' => (int) $store->id,
                 'store_name' => $store->name,
                 'profit_today' => (float) $storeProfitToday,
                 'sales_today' => (float) $storeSalesToday,
@@ -262,63 +284,274 @@ class UserDashboardController extends Controller
                 'profit_month' => (float) $storeProfitMonth,
                 'sales_month' => (float) $storeSalesMonth,
                 'expenses_month' => (float) $storeExpensesMonth,
-                'salaries_month' => (float) $storeNetSalariesMonth,
+                'products_cost_month' => (float) $storeProductsCostMonth,
+                'salaries_month' => (float) $storeSalariesMonth,
                 'monthly_owner_purchases' => (float) $storeOwnerPurchasesMonth,
                 'monthly_accountant_consumption' => (float) $storeAccountantConsumptionMonth,
                 'monthly_purchases_consumption' => (float) $storeOwnerPurchasesMonth + (float) $storeAccountantConsumptionMonth,
             ];
         }
 
+        $rankedStores = collect($metricStoreBreakdowns)->sortByDesc('profit_month')->values();
+        $bestStorePerformance = $rankedStores->first();
+        $worstStorePerformance = $rankedStores->count() > 1 ? $rankedStores->last() : null;
+
         return view('dashboard.user.index', array_merge(compact(
-            'stores', 'accountantsCount', 'employeesCount', 'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
+            'stores', 'accountantsCount', 'employeesCount', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
+            'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday', 'productsCostMonth',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
+            'dailySalesOperationsCount', 'dailyCashSales', 'dailyCardSales',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
+            'employeeMonthlyWithdrawals', 'employeeSalaryRemainders',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
-            'creditClosed', 'creditLate', 'user', 'activities'
+            'creditClosed', 'creditLate', 'user', 'activities', 'selectedSummaryStore',
+            'longOpenShifts', 'lowStockProducts', 'lowStockCount', 'topSellingProducts',
+            'bestStorePerformance', 'worstStorePerformance'
         ), $chartData));
+    }
+
+    /**
+     * يعيد ملخص متجر واحد مطابقاً لبطاقات صفحة المبيعات اليومية عند عرض تاريخ اليوم.
+     */
+    private function dailyStoreFinancialSummary(int $storeId, Carbon $selectedDate): array
+    {
+        $windows = $this->dailySalesWindows($storeId, $selectedDate);
+        $saleItemsCosts = DB::table('sale_items')
+            ->leftJoin('products', 'sale_items.product_id', '=', 'products.id')
+            ->selectRaw('sale_items.sale_id, SUM(COALESCE(products.cost_price, 0) * COALESCE(sale_items.custom_consumption, sale_items.quantity, 0)) as total_cost')
+            ->groupBy('sale_items.sale_id');
+
+        $salesQuery = DB::table('sales')
+            ->leftJoinSub($saleItemsCosts, 'sale_item_costs', function ($join) {
+                $join->on('sales.id', '=', 'sale_item_costs.sale_id');
+            })
+            ->where('sales.store_id', $storeId)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            });
+        $this->applyDailyWindows($salesQuery, $windows, 'sales.created_at');
+
+        $summary = $salesQuery
+            ->selectRaw('COUNT(sales.id) as operations_count')
+            ->selectRaw('COALESCE(SUM(CASE WHEN sales.sale_type = "cash" THEN sales.paid_amount WHEN sales.sale_type = "mixed" THEN sales.cash_amount ELSE 0 END), 0) as cash_sales')
+            ->selectRaw('COALESCE(SUM(CASE WHEN sales.sale_type = "card" THEN sales.paid_amount WHEN sales.sale_type = "mixed" THEN sales.card_amount ELSE 0 END), 0) as card_sales')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN (COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)) > COALESCE(sales.paid_amount, 0)
+                THEN COALESCE(sales.cash_amount, 0) + COALESCE(sales.card_amount, 0)
+                ELSE COALESCE(sales.paid_amount, 0)
+            END), 0) as sales_value')
+            ->selectRaw('COALESCE(SUM(COALESCE(sale_item_costs.total_cost, 0)), 0) as total_cost')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN COALESCE(sales.remaining_amount, 0) > 0
+                    AND (sales.sale_type IN ("credit", "mixed") OR COALESCE(sales.has_partial_credit, 0) = 1)
+                THEN 0
+                ELSE COALESCE(sales.paid_amount, 0) - COALESCE(sale_item_costs.total_cost, 0)
+            END), 0) as recognized_profit')
+            ->first();
+
+        $expensesQuery = Expense::where('store_id', $storeId)
+            ->where('actor_type', '!=', 'owner_purchase');
+        $this->applyDailyWindows($expensesQuery, $windows, 'created_at');
+
+        return [
+            // يطابق حقل "قيمة المبيعات" في ملخص صفحة المبيعات، ولا يضيف تحصيلات الآجل المستقلة.
+            'sales_value' => (float) ($summary->sales_value ?? 0),
+            'total_cost' => (float) ($summary->total_cost ?? 0),
+            'recognized_profit' => (float) ($summary->recognized_profit ?? 0),
+            'expenses' => (float) $expensesQuery->sum('amount'),
+            'operations_count' => (int) ($summary->operations_count ?? 0),
+            'cash_sales' => (float) ($summary->cash_sales ?? 0),
+            'card_sales' => (float) ($summary->card_sales ?? 0),
+        ];
+    }
+
+    private function dailySalesWindows(int $storeId, Carbon $selectedDate)
+    {
+        $dayStart = $selectedDate->copy()->startOfDay();
+        $dayEnd = $selectedDate->copy()->endOfDay();
+
+        $windows = DailyBalance::where('store_id', $storeId)
+            ->whereNotNull('start_time')
+            ->whereNotNull('end_time')
+            ->whereDate('created_at', $selectedDate->toDateString())
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn ($balance) => [
+                'start' => Carbon::parse($balance->start_time),
+                'end' => Carbon::parse($balance->end_time),
+            ]);
+
+        $hasClosedWindows = $windows->isNotEmpty();
+
+        if ($selectedDate->isToday()) {
+            $lastClosed = DailyBalance::where('store_id', $storeId)
+                ->whereNotNull('end_time')
+                ->latest('end_time')
+                ->first();
+            $openStart = $lastClosed ? Carbon::parse($lastClosed->end_time) : $dayStart;
+
+            if ($openStart->lt(now())) {
+                $windows->push(['start' => $openStart, 'end' => now()]);
+            }
+        }
+
+        if ($windows->isEmpty()) {
+            return collect([['start' => $dayStart, 'end' => $dayEnd]]);
+        }
+
+        $windows = $windows->sortBy('start')->values();
+
+        // نفس fallback في صفحة المبيعات: إذا كانت هناك شفتات مغلقة ولكنها لم تُرجع
+        // أي عملية، تُعرض الفترة اليومية التقويمية للتاريخ المحدد.
+        if ($hasClosedWindows) {
+            $salesExist = Sale::where('store_id', $storeId)
+                ->where(function ($query) {
+                    $query->whereNull('description')
+                        ->orWhere('description', '!=', 'manual_invoice_entry');
+                });
+            $this->applyDailyWindows($salesExist, $windows, 'created_at');
+
+            if (!$salesExist->exists()) {
+                return collect([['start' => $dayStart, 'end' => $dayEnd]]);
+            }
+        }
+
+        return $windows;
+    }
+
+    private function applyDailyWindows($query, $windows, string $column): void
+    {
+        $query->where(function ($periodQuery) use ($windows, $column) {
+            foreach ($windows as $window) {
+                $periodQuery->orWhereBetween($column, [$window['start'], $window['end']]);
+            }
+        });
+    }
+
+    /**
+     * نفس مصادر التقرير الشهري في StoreController::reportsMonthly.
+     */
+    private function monthlyStoreFinancialSummary(int $storeId, Carbon $start, Carbon $end): array
+    {
+        $salesQuery = Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$start, $end])
+            ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed']);
+
+        if (Schema::hasColumn('sale_items', 'total_cost')) {
+            $productsCost = (float) DB::table('sale_items')
+                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+                ->where('sales.store_id', $storeId)
+                ->whereBetween('sales.created_at', [$start, $end])
+                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->where(function ($query) {
+                    $query->whereNull('sales.description')
+                        ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+                })
+                ->sum(DB::raw('COALESCE(sale_items.total_cost, 0)'));
+        } else {
+            $productsCost = (float) Sale::where('store_id', $storeId)
+                ->whereBetween('created_at', [$start, $end])
+                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->where(function ($query) {
+                    $query->whereNull('description')
+                        ->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->sum('products_total');
+        }
+
+        $internalUse = (float) Sale::where('store_id', $storeId)
+            ->where('sale_type', 'internal_use')
+            ->whereBetween('created_at', [$start, $end])
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->sum('total');
+
+        return [
+            'total_sales' => (float) (clone $salesQuery)->sum('paid_amount'),
+            'products_cost' => $productsCost,
+            'expenses' => (float) Expense::where('store_id', $storeId)
+                ->whereBetween('created_at', [$start, $end])
+                ->sum('amount'),
+            'owner_purchases' => (float) Purchase::where('store_id', $storeId)
+                ->whereBetween('created_at', [$start, $end])
+                ->sum('cost'),
+            'internal_use' => $internalUse,
+        ];
     }
 
     private function prepareChartData($storeIds)
     {
         $chartStart = now()->subDays(13)->startOfDay();
-        $chartEnd   = now()->endOfDay();
+        $chartEnd = now()->endOfDay();
 
-        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(paid_amount) as total, SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END) as credit')
+        // نفس تعريف التقرير الشهري: المبيعات المحصلة = paid_amount والمصروفات تشمل كل القيود.
+        $dailySales = Sale::selectRaw('DATE(created_at) as day, SUM(paid_amount) as total')
             ->whereIn('store_id', $storeIds)
+            ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
             ->whereBetween('created_at', [$chartStart, $chartEnd])
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
             ->groupBy('day')->get()->keyBy('day');
 
         $dailyExpenses = Expense::selectRaw('DATE(created_at) as day, SUM(amount) as total')
-            ->whereIn('store_id', $storeIds)->whereBetween('created_at', [$chartStart, $chartEnd])
+            ->whereIn('store_id', $storeIds)
+            ->whereBetween('created_at', [$chartStart, $chartEnd])
             ->groupBy('day')->get()->keyBy('day');
 
-        $labels = []; $sales = []; $exps = []; $credits = [];
-
-        for ($i = 0; $i < 14; $i++) {
-            $date = $chartStart->copy()->addDays($i)->toDateString();
-            $labels[]  = $date;
-            $sales[]   = $dailySales[$date]->total ?? 0;
-            $credits[] = $dailySales[$date]->credit ?? 0;
-            $exps[]    = $dailyExpenses[$date]->total ?? 0;
+        if (Schema::hasColumn('sale_items', 'total_cost')) {
+            $dailyProductCosts = DB::table('sale_items')
+                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+                ->selectRaw('DATE(sales.created_at) as day, SUM(COALESCE(sale_items.total_cost, 0)) as total')
+                ->whereIn('sales.store_id', $storeIds)
+                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->whereBetween('sales.created_at', [$chartStart, $chartEnd])
+                ->where(function ($query) {
+                    $query->whereNull('sales.description')->orWhere('sales.description', '!=', 'manual_invoice_entry');
+                })
+                ->groupBy('day')->get()->keyBy('day');
+        } else {
+            $dailyProductCosts = Sale::selectRaw('DATE(created_at) as day, SUM(products_total) as total')
+                ->whereIn('store_id', $storeIds)
+                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
+                ->whereBetween('created_at', [$chartStart, $chartEnd])
+                ->where(function ($query) {
+                    $query->whereNull('description')->orWhere('description', '!=', 'manual_invoice_entry');
+                })
+                ->groupBy('day')->get()->keyBy('day');
         }
 
-        return ['chartLabels' => $labels, 'chartSales' => $sales, 'chartExpenses' => $exps, 'chartCredit' => $credits];
+        $labels = []; $sales = []; $exps = []; $costs = [];
+        for ($i = 0; $i < 14; $i++) {
+            $date = $chartStart->copy()->addDays($i)->toDateString();
+            $labels[] = $date;
+            $sales[] = $dailySales[$date]->total ?? 0;
+            $exps[] = $dailyExpenses[$date]->total ?? 0;
+            $costs[] = $dailyProductCosts[$date]->total ?? 0;
+        }
+
+        return ['chartLabels' => $labels, 'chartSales' => $sales, 'chartExpenses' => $exps, 'chartProductCosts' => $costs];
     }
 
     private function emptyStateData($user, $stores)
     {
         return [
             'stores' => $stores, 'user' => $user, 'accountantsCount' => 0, 'employeesCount' => 0,
-            'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
-            'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0, 'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
-            'metricStoreBreakdowns' => [],
+            'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
+            'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'productsCostMonth' => 0, 'expensesToday' => 0,
+            'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
+            'dailySalesOperationsCount' => 0, 'dailyCashSales' => 0, 'dailyCardSales' => 0,
+            'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
+            'employeeMonthlyWithdrawals' => collect(), 'employeeSalaryRemainders' => collect(),
+            'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0, 'monthlyPurchasesAndConsumption' => 0,
+            'creditOpen' => 0,
+            'metricStoreBreakdowns' => [], 'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
-            'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
+            'longOpenShifts' => collect(), 'lowStockProducts' => collect(), 'lowStockCount' => 0,
+            'topSellingProducts' => collect(),
+            'bestStorePerformance' => null, 'worstStorePerformance' => null,
+            'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartProductCosts' => []
         ];
     }
 }

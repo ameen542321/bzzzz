@@ -17,7 +17,10 @@ class ProductController extends Controller
 {
     public function index(Store $store, Request $request)
     {
-        $query = $store->products()->with('category:id,name');
+        $query = $store->products()
+            ->with('category:id,name')
+            // إجمالي الكمية المباعة تاريخياً للترتيب الافتراضي، ويطبق أيضاً داخل نتائج البحث.
+            ->withSum('saleItems as sold_quantity', 'quantity');
 
         // بحث بالاسم والوصف فقط
         if ($request->filled('search')) {
@@ -34,14 +37,15 @@ class ProductController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
-        // فلترة حسب الحالة
+        // فلترة حسب حالة الظهور (نشط/مخفي).
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // ترتيب المنتجات بحيث تظهر المنتجات منخفضة المخزون أولاً
-        $query->orderByRaw("CASE WHEN product_type = 'fractional' AND roll_length > 0 THEN ((quantity / roll_length) <= min_stock) ELSE (quantity <= min_stock) END DESC")
-              ->orderBy('quantity', 'asc');
+        // الترتيب الافتراضي في القائمة ونتائج البحث: الأكثر مبيعاً أولاً.
+        // نستخدم الاسم كترتيب احتياطي عند تساوي الكمية المباعة أو عدم وجود مبيعات.
+        $query->orderByDesc('sold_quantity')
+            ->orderBy('name');
 
         // Pagination
         $products = $query->paginate(20)->withQueryString();
@@ -827,6 +831,38 @@ class ProductController extends Controller
     {
         $products = Product::onlyTrashed()->where('store_id', $store->id)->get();
         return view('user.stores.products.trash', compact('store', 'products'));
+    }
+
+    public function emptyTrash(Store $store)
+    {
+        $products = Product::onlyTrashed()
+            ->where('store_id', $store->id)
+            ->get();
+
+        if ($products->isEmpty()) {
+            return redirect()->route('user.stores.products.trash', $store->id)
+                ->with('success', 'سلة محذوفات المنتجات فارغة بالفعل.');
+        }
+
+        $deletedCount = $products->count();
+
+        DB::transaction(function () use ($products) {
+            foreach ($products as $product) {
+                // نحذف خيارات التجزئة أولاً بنفس آلية الحذف النهائي الفردي.
+                $product->fractions()->delete();
+                $product->forceDelete();
+            }
+        });
+
+        // حذف الصور بعد نجاح معاملة قاعدة البيانات حتى لا نفقدها إذا تراجع الحذف.
+        foreach ($products as $product) {
+            if ($product->image && \Storage::disk('public')->exists($product->image)) {
+                \Storage::disk('public')->delete($product->image);
+            }
+        }
+
+        return redirect()->route('user.stores.products.trash', $store->id)
+            ->with('success', "تم إفراغ السلة وحذف {$deletedCount} منتج نهائياً.");
     }
 
     public function restore(Store $store, $id)

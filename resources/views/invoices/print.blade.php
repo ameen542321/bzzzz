@@ -16,7 +16,7 @@
         /* رأس الفاتورة باستخدام الجداول لضمان التموضع */
         .header-table {
             width: 100%;
-            border-bottom: 2px solid #111827;A
+            border-bottom: 2px solid #111827;
             margin-bottom: 20px;
             padding-bottom: 10px;
         }

@@ -20,7 +20,9 @@ class QuickSaleDeductionCalculator
             }
 
             if ($fractionDeductionValue !== null) {
-                return $product->calculateFinalDeduction($fractionDeductionValue, 'default');
+                // نفس قاعدة QuickSaleController: خيارات الرول الجاهزة تُخزن كأمتار فعلية.
+                // تمرير meter يمنع ضرب القيمة في roll_length داخل calculateFinalDeduction.
+                return $product->calculateFinalDeduction($fractionDeductionValue, 'meter');
             }
 
             // نبقي هذا الفرع على السلوك الحالي للمشروع كما هو،

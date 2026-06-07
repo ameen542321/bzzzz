@@ -159,7 +159,13 @@ class DashboardController extends Controller
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
             ->selectRaw('
-                COALESCE(SUM(final_total), 0) as total_sales,
+                -- إجمالي لوحة المحاسب يجب أن يطابق المبلغ المستلم فعلياً في الشفت
+                -- وليس final_total، لأن final_total يدخل الآجل/المتبقي ويرفع الإجمالي خطأ.
+                COALESCE(SUM(CASE
+                    WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0)
+                    THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0))
+                    ELSE COALESCE(paid_amount, 0)
+                END), 0) as total_sales,
 
                 -- المبالغ النقدية: من مبيعات كاش + الجزء النقدي من المختلط
                 COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
@@ -630,16 +636,24 @@ class DashboardController extends Controller
         $salesSummary = Sale::where('store_id', $store->id)
             ->whereBetween('created_at', [$startTime, $endTime])
             ->selectRaw('
-                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN final_total ELSE 0 END), 0) as total_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN sale_type = "mixed" THEN cash_amount ELSE 0 END), 0) as cash_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "card" THEN paid_amount ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN sale_type = "mixed" THEN card_amount ELSE 0 END), 0) as card_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "credit" THEN paid_amount ELSE 0 END), 0) as credit_payments,
-                COALESCE(SUM(CASE WHEN sale_type = "credit" THEN final_total ELSE 0 END), 0) as credit_sales,
-                COALESCE(SUM(CASE WHEN sale_type = "internal_use" THEN final_total ELSE 0 END), 0) as internal_use_sales,
-                COALESCE(SUM(CASE WHEN (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NOT NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as official_credit_sales,
-                COALESCE(SUM(CASE WHEN (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as payment_gaps,
+                COALESCE(SUM(CASE
+                    WHEN (description IS NULL OR description != "manual_invoice_entry") THEN
+                        CASE
+                            WHEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0)) > COALESCE(paid_amount, 0)
+                            THEN (COALESCE(cash_amount, 0) + COALESCE(card_amount, 0))
+                            ELSE COALESCE(paid_amount, 0)
+                        END
+                    ELSE 0
+                END), 0) as total_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "mixed" THEN cash_amount ELSE 0 END), 0) as cash_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "card" THEN paid_amount ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "mixed" THEN card_amount ELSE 0 END), 0) as card_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "credit" THEN paid_amount ELSE 0 END), 0) as credit_payments,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "credit" THEN final_total ELSE 0 END), 0) as credit_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND sale_type = "internal_use" THEN final_total ELSE 0 END), 0) as internal_use_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NOT NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as official_credit_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") AND (sale_type = "credit" OR has_partial_credit = 1) AND employee_id IS NULL AND remaining_amount > 0 THEN remaining_amount ELSE 0 END), 0) as payment_gaps,
                 COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN labor_total ELSE 0 END), 0) as total_labor
             ')
             ->first();
@@ -670,6 +684,7 @@ class DashboardController extends Controller
         $netProfit = ($totalSales - $totalProductsCostValue) + $collectedFromCurrentPeriod;
 
         $expenses = Expense::where('store_id', $store->id)
+            ->where('actor_type', '!=', 'owner_purchase')
             ->whereBetween('created_at', [$startTime, $endTime])
             ->sum('amount') ?? 0;
 
@@ -699,15 +714,33 @@ class DashboardController extends Controller
             })
             ->with(['employee', 'accountant', 'items.product'])
             ->get()->map(function($s) {
-                 $productsList = [];
-        foreach ($s->items as $item) {
-            $productsList[] = [
-                'name' => $item->product->name ?? 'منتج',
-                'quantity' => $item->quantity,
-                'price' => $item->price,
-                'total' => $item->total
-            ];
-        }
+                $productsList = [];
+                $productsCost = 0.0;
+                $productsSalesValue = 0.0;
+
+                foreach ($s->items as $item) {
+                    $product = $item->product;
+                    $stockQuantity = $this->saleItemStockQuantityForReport($item, $product);
+                    $lineTotal = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
+                    $costPrice = (float) ($product->cost_price ?? 0);
+                    $lineCost = $this->saleItemCostForReport($item, $product, $stockQuantity);
+
+                    $productsSalesValue += $lineTotal;
+                    $productsCost += $lineCost;
+
+                    $productsList[] = [
+                        'name' => $product->name ?? 'منتج',
+                        'quantity' => $item->quantity,
+                        'price' => $item->price,
+                        'total' => $lineTotal,
+                        'stock_quantity' => $stockQuantity,
+                        'cost_price' => $costPrice,
+                        'cost_unit_price' => $stockQuantity > 0 ? ($lineCost / $stockQuantity) : 0,
+                        'cost_total' => $lineCost,
+                        'profit' => $lineTotal - $lineCost,
+                    ];
+                }
+
                 return [
                     'id' => $s->id,
                     'time' => $s->created_at->format('h:i A'),
@@ -716,12 +749,14 @@ class DashboardController extends Controller
                     'total' => $s->final_total,
                     'labor_total' => $s->labor_total,
                     'labor_desc' => $s->description,
-                    'cost' => $s->products_total - $s->profit,
-                    'profit' => $s->profit,
+                    // تكلفة المنتجات في التقرير تعتمد على عناصر البيع نفسها لا على ربح مخزن قديم،
+                    // حتى تظهر تكلفة الرول/الحبة/الكمية المعدلة بشكل صحيح عند إغلاق الشفت.
+                    'cost' => $productsCost,
+                    'profit' => ($productsSalesValue + (float) ($s->labor_total ?? 0)) - $productsCost,
                     'employee' => $s->employee->name ?? '---',
                     'accountant' => $s->accountant->name ?? '---',
-                      'products' => $productsList, // إضافة المنتجات
-            'products_count' => count($productsList) // عدد المنتجات
+                    'products' => $productsList,
+                    'products_count' => count($productsList)
                 ];
             });
 
@@ -865,54 +900,54 @@ class DashboardController extends Controller
     }
 }
 
-  private function calculateProductsProfit($storeId, $startTime, $endTime)
-{
-    $totalSalesValue = 0;
-    $totalCostValue = 0;
+    private function calculateProductsProfit($storeId, $startTime, $endTime)
+    {
+        $totalSalesValue = 0.0;
+        $totalCostValue = 0.0;
 
-    Sale::where('store_id', $storeId)
-        ->whereBetween('created_at', [$startTime, $endTime])
-        ->where(function ($query) {
-            $query->whereNull('description')
-                ->orWhere('description', '!=', 'manual_invoice_entry');
-        })
-        ->with(['items' => function($query) {
-            $query->select('sale_id', 'product_id', 'quantity', 'price');
-        }])
-        ->select('id')
-        ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
-            foreach ($salesChunk as $sale) {
-                foreach ($sale->items as $item) {
-                    $totalSalesValue += $item->quantity * $item->price;
+        Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$startTime, $endTime])
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->with(['items.product'])
+            ->select('id')
+            ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
+                foreach ($salesChunk as $sale) {
+                    foreach ($sale->items as $item) {
+                        // سعر البيع يجب أن يأتي من sale_items.total لأنه يمثل إجمالي السطر وقت البيع
+                        // وقد يختلف عن quantity * price في الرولات أو بعد تعديل العملية.
+                        $lineSalesValue = (float) ($item->total ?? (((float) $item->quantity) * ((float) $item->price)));
+                        $stockQuantity = $this->saleItemStockQuantityForReport($item, $item->product);
+                        $lineCostValue = $this->saleItemCostForReport($item, $item->product, $stockQuantity);
 
-                    $product = DB::table('products')
-                        ->where('id', $item->product_id)
-                        ->select('cost_price', 'is_splittable', 'items_per_unit')
-                        ->first();
-
-                    if ($product && $product->cost_price) {
-                        // إذا كان المنتج طقماً وتم بيعه بالحبة
-                        if ($product->is_splittable == 1 && $product->items_per_unit > 0) {
-                            // تكلفة الحبة = تكلفة الطقم ÷ عدد الحبات
-                            $costPerPiece = $product->cost_price / $product->items_per_unit;
-                            $itemCost = $item->quantity * $costPerPiece;
-                        } else {
-                            // منتج عادي أو طقم كامل
-                            $itemCost = $item->quantity * $product->cost_price;
-                        }
-
-                        $totalCostValue += $itemCost;
+                        $totalSalesValue += $lineSalesValue;
+                        $totalCostValue += $lineCostValue;
                     }
                 }
-            }
-        });
+            });
 
-    return [
-        'sales_value' => $totalSalesValue,
-        'cost_value' => $totalCostValue,
-        'profit' => $totalSalesValue - $totalCostValue,
-    ];
-}
+        return [
+            'sales_value' => $totalSalesValue,
+            'cost_value' => $totalCostValue,
+            'profit' => $totalSalesValue - $totalCostValue,
+        ];
+    }
+
+    private function saleItemStockQuantityForReport($item, $product): float
+    {
+        // لا نغير منطق صفحة المبيعات هنا: صفحة المبيعات تعتمد custom_consumption إن وُجد،
+        // وإلا تعتمد quantity كما هي. تقرير الشفت يجب أن يطابقها لا أن يعيد تفسير الرول/الحبة.
+        return (float) ($item->custom_consumption ?? $item->quantity ?? 0);
+    }
+
+    private function saleItemCostForReport($item, $product, float $stockQuantity): float
+    {
+        // نفس مصدر وتفسير صفحة المبيعات اليومية: cost_price الحالي للمنتج × كمية المخزون المحسوبة.
+        return (float) ($product->cost_price ?? 0) * $stockQuantity;
+    }
+
     private function generateReportAndWhatsApp($store, $accountant, $reportData)
     {
         // 1. التحقق من الحد اليومي
@@ -1014,15 +1049,12 @@ class DashboardController extends Controller
     }
     $message .= "💰 اجمالي العمليات: " . number_format($totalSales, 2) . " ريال\n";
     $message .= "🛒 قيمة المبيعات (بسعر البيع): " . number_format($productsSalesValue, 2) . " ريال\n";
-    $message .= "📦 قيمة التكلفة: " . number_format($productsCostValue, 2) . " ريال\n";
+    $message .= "📦 تكلفة المنتجات (بسعر التكلفة): " . number_format($productsCostValue, 2) . " ريال\n";
+    $message .= "📈 ربح المنتجات: " . number_format($productsSalesValue - $productsCostValue, 2) . " ريال\n";
     $message .= "💵 عمليات الكاش: " . number_format($cashSales, 2) . " ريال\n";
     $message .= "💳 عمليات الشبكة: " . number_format($cardSales, 2) . " ريال\n";
     $message .= "📤 مصاريف: " . number_format($totalOutgoing, 2) . " ريال\n";
     $message .= "🔢 عدد العمليات: " . number_format($operationsCount) . "\n\n";
-
-    if (($reportData['labor_total'] ?? 0) > 0) {
-        $message .= "👷 *أجرة اليد:* " . number_format((float) $reportData['labor_total'], 2) . " ريال\n\n";
-    }
 
     $message .= "💵 *مطابقة الصندوق:*\n";
     $message .= "💰 الكاش المتوقع: " . number_format((float) ($reportData['cash_details']['expected'] ?? 0), 2) . " ريال\n";

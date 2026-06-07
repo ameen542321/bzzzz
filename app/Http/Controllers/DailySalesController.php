@@ -9,9 +9,11 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
+use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DailySalesController extends Controller
 {
@@ -278,6 +280,19 @@ class DailySalesController extends Controller
                 'stats' => $stats,
             ];
         });
+
+        // ترتيب العرض فقط: الشفت المفتوح أولاً، ثم الشفتات المغلقة من الأحدث إلى الأقدم.
+        // نبقي $shiftWindows بترتيبه الزمني لأن حساب نطاق العمليات يعتمد على أول وآخر نافذة.
+        $shiftSummaries = $shiftSummaries->sort(function (array $left, array $right) {
+            $leftIsOpen = ($left['key'] ?? null) === 'current_open_shift';
+            $rightIsOpen = ($right['key'] ?? null) === 'current_open_shift';
+
+            if ($leftIsOpen !== $rightIsOpen) {
+                return $leftIsOpen ? -1 : 1;
+            }
+
+            return $right['start']->getTimestamp() <=> $left['start']->getTimestamp();
+        })->values();
 
         // الإحصائيات العامة عبر كل الشفتات ضمن الفترة المختارة
         $stats = [
@@ -632,6 +647,131 @@ class DailySalesController extends Controller
         return 'default_shift';
     }
 
+    private function buildSaleItemEditPlan(Sale $sale, Request $request): ?array
+    {
+        $itemIds = collect($request->input('item_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($itemIds->isEmpty()) {
+            return null;
+        }
+
+        $quantities = array_values($request->input('item_quantities', []));
+        $prices = array_values($request->input('item_prices', []));
+        $items = SaleItem::with('product')
+            ->where('sale_id', $sale->id)
+            ->whereIn('id', $itemIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($items->count() !== $itemIds->unique()->count()) {
+            abort(403, 'لا يمكن تعديل منتجات لا تنتمي لهذه العملية');
+        }
+
+        $updates = [];
+        $productsTotal = 0.0;
+        $productsCostTotal = 0.0;
+
+        foreach ($itemIds as $index => $itemId) {
+            $item = $items->get($itemId);
+            if (!$item) {
+                continue;
+            }
+
+            if (!$item->product || $item->product->store_id !== $sale->store_id) {
+                abort(403, 'أحد منتجات العملية لا ينتمي لهذا المتجر');
+            }
+
+            $oldQuantity = (float) ($item->quantity ?? 0);
+            $newQuantity = (float) ($quantities[$index] ?? $oldQuantity);
+            $newPrice = (float) ($prices[$index] ?? $item->price ?? 0);
+            $oldStockQuantity = $this->saleItemStockQuantity($item, $oldQuantity);
+            $newStockQuantity = $this->saleItemStockQuantity($item, $newQuantity);
+            $availableAfterRestore = (float) $item->product->quantity + $oldStockQuantity;
+
+            if ($newStockQuantity - $availableAfterRestore > 0.0001) {
+                session()->flash('edit_sale_modal', $sale->id);
+                $productName = $item->product->name ?? 'منتج غير معروف';
+
+                throw ValidationException::withMessages([
+                    'item_quantities.' . $index => "المخزون غير كافٍ لتعديل كمية المنتج {$productName}. المتاح بعد استرجاع الكمية القديمة: " . number_format($availableAfterRestore, 3),
+                ]);
+            }
+
+            $lineTotal = $newQuantity * $newPrice;
+            $productsTotal += $lineTotal;
+            $productsCostTotal += ((float) ($item->product->cost_price ?? 0)) * $newStockQuantity;
+
+            $updates[] = [
+                'item' => $item,
+                'quantity' => $newQuantity,
+                'price' => $newPrice,
+                'total' => $lineTotal,
+                'old_stock_quantity' => $oldStockQuantity,
+                'new_stock_quantity' => $newStockQuantity,
+            ];
+        }
+
+        return [
+            'updates' => $updates,
+            'products_total' => $productsTotal,
+            'products_cost_total' => $productsCostTotal,
+        ];
+    }
+
+    private function saleItemStockQuantity(SaleItem $item, float $quantity): float
+    {
+        $oldQuantity = (float) ($item->quantity ?? 0);
+        $oldStockQuantity = (float) ($item->custom_consumption ?? $oldQuantity);
+
+        if ($oldQuantity > 0 && abs($oldStockQuantity - $oldQuantity) > 0.0001) {
+            return ($oldStockQuantity / $oldQuantity) * $quantity;
+        }
+
+        if ($item->product && $item->product->is_splittable && $item->unit_type === 'piece') {
+            return $quantity / max(1, (float) ($item->product->items_per_unit ?? 1));
+        }
+
+        return $quantity;
+    }
+
+    private function applySaleItemEditPlan(array $plan, Store $store, Sale $sale): void
+    {
+        foreach ($plan['updates'] as $update) {
+            /** @var SaleItem $item */
+            $item = $update['item'];
+            $product = $item->product;
+            $oldStockQuantity = (float) $update['old_stock_quantity'];
+            $newStockQuantity = (float) $update['new_stock_quantity'];
+            $stockDelta = $oldStockQuantity - $newStockQuantity;
+            $beforeStock = (float) $product->quantity;
+            $afterStock = $beforeStock + $stockDelta;
+
+            $item->update([
+                'quantity' => $update['quantity'],
+                'price' => $update['price'],
+                'total' => $update['total'],
+                'custom_consumption' => $item->custom_consumption !== null ? $newStockQuantity : null,
+            ]);
+
+            if (abs($stockDelta) > 0.0001) {
+                $product->update(['quantity' => $afterStock]);
+                $product->stockMovements()->create([
+                    'store_id' => $store->id,
+                    'user_id' => auth()->id(),
+                    'product_id' => $product->id,
+                    'type' => $stockDelta > 0 ? 'increase' : 'decrease',
+                    'quantity' => abs($stockDelta),
+                    'roll_length_at_movement' => $beforeStock,
+                    'meters' => $afterStock,
+                    'note' => "تعديل منتجات عملية المبيعات اليومية #{$sale->id}",
+                ]);
+            }
+        }
+    }
+
     public function update(Store $store, Sale $sale, Request $request)
     {
         if ($sale->store_id !== $store->id) {
@@ -647,10 +787,17 @@ class DailySalesController extends Controller
             'card_amount' => 'nullable|numeric|min:0',
             'employee_id' => 'nullable|exists:employees,id',
             'debt_amount' => 'nullable|numeric|min:0',
+            'item_ids' => 'nullable|array',
+            'item_ids.*' => 'integer|exists:sale_items,id',
+            'item_quantities' => 'nullable|array',
+            'item_quantities.*' => 'nullable|numeric|min:0.01',
+            'item_prices' => 'nullable|array',
+            'item_prices.*' => 'nullable|numeric|min:0',
         ]);
 
         $originalSaleType = $sale->sale_type;
-        $productsTotal = (float) ($sale->products_total ?? 0);
+        $productEditPlan = $this->buildSaleItemEditPlan($sale, $request);
+        $productsTotal = $productEditPlan ? $productEditPlan['products_total'] : (float) ($sale->products_total ?? 0);
         $taxRate = (float) ($sale->tax_rate ?? 0);
         $laborTotal = (float) ($validated['labor_total'] ?? 0);
 
@@ -664,7 +811,7 @@ class DailySalesController extends Controller
         $cashAmount = 0.0;
         $cardAmount = 0.0;
         $storedOperationAmount = (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0));
-        $baseOperationAmount = max($finalTotal, $storedOperationAmount);
+        $baseOperationAmount = $productEditPlan ? $finalTotal : max($finalTotal, $storedOperationAmount);
         $hasCollectedCreditConversion = $originalSaleType === 'credit'
             && (float) ($sale->paid_amount ?? 0) > 0
             && (float) ($sale->remaining_amount ?? 0) > 0
@@ -771,8 +918,12 @@ class DailySalesController extends Controller
             }
         }
 
-        DB::transaction(function () use ($sale, $store, $validated, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
-            $sale->update([
+        DB::transaction(function () use ($sale, $store, $validated, $productEditPlan, $productsTotal, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
+            if ($productEditPlan) {
+                $this->applySaleItemEditPlan($productEditPlan, $store, $sale);
+            }
+
+            $saleData = [
                 'sale_type'          => $validated['sale_type'],
                 'labor_total'        => $laborTotal,
                 'description'        => $validated['description'] ?? null,
@@ -785,7 +936,15 @@ class DailySalesController extends Controller
                 'employee_id'        => ($validated['sale_type'] === 'credit' || $remainingAmount > 0)
                     ? $selectedEmployeeId
                     : null,
-            ]);
+            ];
+
+            if ($productEditPlan) {
+                $saleData['products_total'] = $productsTotal;
+                $saleData['total'] = $finalTotal;
+                $saleData['profit'] = $finalTotal - (float) $productEditPlan['products_cost_total'];
+            }
+
+            $sale->update($saleData);
 
             $creditRows = CreditSale::where('store_id', $store->id)
                 ->where('description', 'like', '%#' . $sale->id . '%')
@@ -850,83 +1009,92 @@ class DailySalesController extends Controller
     public function updateShiftDate(Store $store, Request $request)
     {
         $validated = $request->validate([
-            'shift_key' => 'required|string',
-            'shift_date' => 'required|date',
+            'shift_key' => ['required', 'string', 'regex:/^shift_\d+$/'],
+            'shift_date' => ['required', 'date_format:Y-m-d'],
+        ], [
+            'shift_key.regex' => 'لا يمكن تعديل تاريخ هذا الشفت.',
+            'shift_date.required' => 'اختر التاريخ الجديد للشفت.',
+            'shift_date.date_format' => 'تاريخ الشفت المحدد غير صالح.',
         ]);
 
-        if (!preg_match('/^shift_(\d+)$/', $validated['shift_key'], $matches)) {
-            return back()->withErrors(['shift_date' => 'لا يمكن تعديل تاريخ هذا الشفت.'])->withInput();
-        }
-
+        preg_match('/^shift_(\d+)$/', $validated['shift_key'], $matches);
         $balanceId = (int) ($matches[1] ?? 0);
-        $balance = DailyBalance::where('store_id', $store->id)->find($balanceId);
+        $targetDate = Carbon::createFromFormat('Y-m-d', $validated['shift_date'])->startOfDay();
 
-        if (!$balance || !$balance->start_time || !$balance->end_time) {
-            return back()->withErrors(['shift_date' => 'الشفت غير صالح أو غير مغلق.'])->withInput();
-        }
+        $movedRecordsCount = DB::transaction(function () use ($store, $balanceId, $targetDate) {
+            // قفل سجل الشفت يمنع تعديل أو إغلاق متزامن أثناء نقل عملياته.
+            $balance = DailyBalance::where('store_id', $store->id)
+                ->whereKey($balanceId)
+                ->lockForUpdate()
+                ->first();
 
-        $targetDate = Carbon::parse($validated['shift_date'])->startOfDay();
-        $startTime = Carbon::parse($balance->start_time);
-        $endTime = Carbon::parse($balance->end_time);
+            if (!$balance || !$balance->start_time || !$balance->end_time) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'الشفت غير صالح أو غير مغلق.',
+                ]);
+            }
 
-        $newStartTime = $targetDate->copy()->startOfDay();
-        $newEndTime = $targetDate->copy()->endOfDay();
+            $startTime = Carbon::parse($balance->start_time);
+            $endTime = Carbon::parse($balance->end_time);
 
-        $overlappingShiftExists = DailyBalance::where('store_id', $store->id)
-            ->where('id', '!=', $balance->id)
-            ->whereNotNull('start_time')
-            ->whereNotNull('end_time')
-            ->where(function ($q) use ($newStartTime, $newEndTime) {
-                $q->whereBetween('start_time', [$newStartTime, $newEndTime])
-                    ->orWhereBetween('end_time', [$newStartTime, $newEndTime])
-                    ->orWhere(function ($q2) use ($newStartTime, $newEndTime) {
-                        $q2->where('start_time', '<', $newStartTime)
-                            ->where('end_time', '>', $newEndTime);
-                    });
-            })
-            ->exists();
+            if ($startTime->isSameDay($targetDate)) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'التاريخ المختار هو تاريخ الشفت الحالي بالفعل.',
+                ]);
+            }
 
-        if ($overlappingShiftExists) {
-            return back()->withErrors(['shift_date' => 'لا يمكن نقل الشفت لهذا التاريخ لأنه سيتداخل مع شفت مغلق آخر.'])->withInput();
-        }
+            // ننقل الفترة بنفس مقدار فرق الأيام للمحافظة على وقت البداية والنهاية،
+            // وكذلك المحافظة على الشفتات التي تمتد بعد منتصف الليل.
+            $dateOffsetSeconds = $targetDate->getTimestamp() - $startTime->copy()->startOfDay()->getTimestamp();
+            $newStartTime = $startTime->copy()->addSeconds($dateOffsetSeconds);
+            $newEndTime = $endTime->copy()->addSeconds($dateOffsetSeconds);
 
-        DB::transaction(function () use ($store, $startTime, $endTime, $targetDate, $balance) {
-            $newShiftStart = null;
-            $newShiftEnd = null;
+            $overlappingShiftExists = DailyBalance::where('store_id', $store->id)
+                ->where('id', '!=', $balance->id)
+                ->whereNotNull('start_time')
+                ->whereNotNull('end_time')
+                ->where('start_time', '<', $newEndTime)
+                ->where('end_time', '>', $newStartTime)
+                ->exists();
 
-            $moveByDayShift = function ($query, callable $afterSet = null) use ($targetDate, &$newShiftStart, &$newShiftEnd) {
-                $query->orderBy('id')->get()->each(function ($row) use ($targetDate, $afterSet) {
-                    $original = Carbon::parse($row->created_at);
-                    $row->created_at = $original->copy()->setDateFrom($targetDate);
+            if ($overlappingShiftExists) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'تعذر النقل: وقت هذا الشفت يتداخل مع شفت مغلق موجود في التاريخ المختار.',
+                ]);
+            }
 
-                    $rowTime = Carbon::parse($row->created_at);
-                    $newShiftStart = $newShiftStart ? $newShiftStart->copy()->min($rowTime) : $rowTime->copy();
-                    $newShiftEnd = $newShiftEnd ? $newShiftEnd->copy()->max($rowTime) : $rowTime->copy();
+            $movedRecordsCount = 0;
+            $moveShiftRecords = function ($query, callable $afterSet = null) use ($dateOffsetSeconds, &$movedRecordsCount) {
+                $query->orderBy('id')->get()->each(function ($row) use ($dateOffsetSeconds, $afterSet, &$movedRecordsCount) {
+                    // تحريك كل سجل بنفس فرق التاريخ يحافظ على تسلسل العمليات بعد منتصف الليل.
+                    $row->created_at = Carbon::parse($row->created_at)->addSeconds($dateOffsetSeconds);
 
                     if ($afterSet) {
                         $afterSet($row);
                     }
-                    $row->save();
+
+                    $row->saveOrFail();
+                    $movedRecordsCount++;
                 });
             };
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 Sale::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
-                \App\Models\Expense::where('store_id', $store->id)
+            $moveShiftRecords(
+                Expense::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
+            $moveShiftRecords(
                 \App\Models\Purchase::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime])
             );
 
-            $moveByDayShift(
-                \App\Models\Withdrawal::where('store_id', $store->id)
+            $moveShiftRecords(
+                Withdrawal::where('store_id', $store->id)
                     ->whereBetween('created_at', [$startTime, $endTime]),
                 function ($row) {
                     if (isset($row->date)) {
@@ -935,15 +1103,28 @@ class DailySalesController extends Controller
                 }
             );
 
-            $balance->start_time = $newShiftStart ? $newShiftStart->copy() : $targetDate->copy()->startOfDay();
-            $balance->end_time = $newShiftEnd ? $newShiftEnd->copy() : $targetDate->copy()->endOfDay();
-            // مهم: حتى لا يظهر الشفت في يوم إغلاقه القديم بقيم صفر بعد النقل.
+            $balance->start_time = $newStartTime;
+            $balance->end_time = $newEndTime;
+            // يعتمد عرض الشفتات المغلقة على created_at، لذلك يجب نقله إلى اليوم المختار أيضاً.
             $balance->created_at = Carbon::parse($balance->created_at)->setDateFrom($targetDate);
-            $balance->updated_at = now();
-            $balance->save();
+            $balance->saveOrFail();
+
+            // تحقق صريح يمنع إظهار رسالة نجاح إذا لم تُحفظ التواريخ فعلياً.
+            $balance->refresh();
+            if (!Carbon::parse($balance->start_time)->equalTo($newStartTime)
+                || !Carbon::parse($balance->end_time)->equalTo($newEndTime)
+                || !Carbon::parse($balance->created_at)->isSameDay($targetDate)) {
+                throw ValidationException::withMessages([
+                    'shift_date' => 'تعذر حفظ تاريخ الشفت الجديد. لم يتم اعتماد أي تغيير.',
+                ]);
+            }
+
+            return $movedRecordsCount;
         });
 
-        return back()->with('success', 'تم تعديل تاريخ الشفت والعمليات المرتبطة به بنجاح.');
+        return redirect()
+            ->route('user.stores.daily', ['store' => $store->id, 'date' => $targetDate->toDateString()])
+            ->with('success', "تم نقل الشفت إلى {$targetDate->format('Y-m-d')} وتحديث {$movedRecordsCount} عملية مرتبطة به.");
     }
 
     public function destroy(Store $store, Sale $sale)

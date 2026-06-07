@@ -1066,27 +1066,12 @@ class StoreController extends Controller
             ->whereBetween('created_at', [$start, $end])
             ->sum('cost');
 
-        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
-            $monthlySoldProductsCost = (float) \DB::table('sale_items')
-                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
-                ->where('sales.store_id', $store->id)
-                ->whereBetween('sales.created_at', [$start, $end])
-                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
-                ->where(function ($query) {
-                    $query->whereNull('sales.description')
-                        ->orWhere('sales.description', '!=', 'manual_invoice_entry');
-                })
-                ->sum(\DB::raw('COALESCE(sale_items.total_cost, 0)'));
-        } else {
-            $monthlySoldProductsCost = (float) Sale::where('store_id', $store->id)
-                ->whereBetween('created_at', [$start, $end])
-                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('products_total');
-        }
+        $monthlySoldProductsCost = $this->calculateSoldProductsCostForPeriod(
+            $store->id,
+            $start,
+            $end,
+            ['cash', 'card', 'credit', 'mixed']
+        );
 
         $profitDeductionTotal = $monthlySoldProductsCost;
         $totalConsumption = $internalUseSales + $ownerPurchases;
@@ -1171,27 +1156,12 @@ class StoreController extends Controller
             'withdrawalsTotal' => (float) \App\Models\Withdrawal::where('store_id', $store->id)->whereBetween('created_at', [$start, $end])->sum('amount'),
             'monthlySalaries' => (float) $store->employees()->sum('salary'),
         ];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
-            $data['monthlySoldProductsCost'] = (float) \DB::table('sale_items')
-                ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
-                ->where('sales.store_id', $store->id)
-                ->whereBetween('sales.created_at', [$start, $end])
-                ->whereIn('sales.sale_type', ['cash', 'card', 'credit', 'mixed'])
-                ->where(function ($query) {
-                    $query->whereNull('sales.description')
-                        ->orWhere('sales.description', '!=', 'manual_invoice_entry');
-                })
-                ->sum(\DB::raw('COALESCE(sale_items.total_cost, 0)'));
-        } else {
-            $data['monthlySoldProductsCost'] = (float) Sale::where('store_id', $store->id)
-                ->whereBetween('created_at', [$start, $end])
-                ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
-                ->where(function ($query) {
-                    $query->whereNull('description')
-                        ->orWhere('description', '!=', 'manual_invoice_entry');
-                })
-                ->sum('products_total');
-        }
+        $data['monthlySoldProductsCost'] = $this->calculateSoldProductsCostForPeriod(
+            $store->id,
+            $start,
+            $end,
+            ['cash', 'card', 'credit', 'mixed']
+        );
         $data['profitDeductionTotal'] = $data['monthlySoldProductsCost'];
         $data['totalConsumption'] = $data['internalUseSales'] + $data['ownerPurchases'];
         $data['netAfterCosts'] = $data['totalSales'] - ($data['profitDeductionTotal'] + $data['totalConsumption'] + $data['expensesTotal']);
@@ -1200,6 +1170,52 @@ class StoreController extends Controller
             ->setOption('encoding', 'utf-8');
 
         return $pdf->download("monthly-report-{$store->id}-{$month}.pdf");
+    }
+
+    /**
+     * يحسب تكلفة المنتجات المباعة مع دعم العمليات القديمة قبل حقول sale_items.total_cost.
+     */
+    private function calculateSoldProductsCostForPeriod(int $storeId, $start, $end, array $saleTypes): float
+    {
+        $legacySalesQuery = Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$start, $end])
+            ->whereIn('sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            });
+
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
+            return (float) $legacySalesQuery
+                ->selectRaw('COALESCE(SUM(products_total), 0) as products_cost')
+                ->value('products_cost');
+        }
+
+        // أي عملية بتاريخ عمل قبل يونيو 2026 تبقى على طريقة الحساب القديمة حتى لو عُبئت أعمدة sale_items لاحقاً.
+        $costTrackingStart = \Carbon\Carbon::create(2026, 6, 1)->startOfDay()->toDateTimeString();
+
+        $salesCosts = DB::table('sales')
+            ->leftJoin('sale_items', 'sales.id', '=', 'sale_items.sale_id')
+            ->where('sales.store_id', $storeId)
+            ->whereBetween('sales.created_at', [$start, $end])
+            ->whereIn('sales.sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
+            ->groupBy('sales.id', 'sales.products_total', 'sales.created_at')
+            ->selectRaw('sales.id')
+            ->selectRaw('CASE WHEN sales.created_at < ? THEN 1 ELSE 0 END as use_legacy_cost', [$costTrackingStart])
+            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(sale_items.total_cost, 0) > 0 THEN sale_items.total_cost ELSE 0 END), 0) as item_total_cost')
+            ->selectRaw('COUNT(sale_items.id) as items_count')
+            ->selectRaw('SUM(CASE WHEN COALESCE(sale_items.total_cost, 0) > 0 THEN 1 ELSE 0 END) as costed_items_count')
+            ->selectRaw('COALESCE(sales.products_total, 0) as legacy_products_cost');
+
+        return (float) DB::query()
+            ->fromSub($salesCosts, 'sales_costs')
+            // عمليات ما قبل يونيو 2026 تبقى قديمة، وبعدها نستخدم تكلفة الأسطر فقط إذا كانت مكتملة.
+            ->selectRaw('COALESCE(SUM(CASE WHEN use_legacy_cost = 1 THEN legacy_products_cost WHEN items_count > 0 AND items_count = costed_items_count THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
+            ->value('total_cost');
     }
 
     /**
