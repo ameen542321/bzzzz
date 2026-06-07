@@ -32,15 +32,9 @@ class Employee extends Model
         'name',
         'phone',
         'salary',
-        'status',       // active / suspended
-        'suspended_at', // تاريخ بدء الإيقاف؛ يوم الإيقاف نفسه مستحق الراتب
+        'status',       // active / inactive / suspended
         'notes',
         'added_by',     // من قام بإضافة الموظف (user أو accountant)
-    ];
-
-    protected $casts = [
-        'suspended_at' => 'datetime',
-        'salary' => 'decimal:2',
     ];
 
     /*
@@ -112,26 +106,6 @@ public function sales()
     /**
      * سكوب لجلب الموظفين للمتجر الحالي
      */
-    public function isActive(): bool
-    {
-        return $this->status === 'active';
-    }
-
-    public function canReceiveFinancialOperationOn($date): bool
-    {
-        $operationDate = \Illuminate\Support\Carbon::parse($date)->toDateString();
-
-        if ($this->status === 'suspended' && $this->suspended_at
-            && $operationDate >= $this->suspended_at->toDateString()) {
-            return false;
-        }
-
-        return !$this->absences()
-            ->whereDate('date', $operationDate)
-            ->where('description', \App\Services\EmployeeEmploymentService::SUSPENSION_ABSENCE_DESCRIPTION)
-            ->exists();
-    }
-
     public function scopeForCurrentStore($query)
     {
         $storeId = auth()->check()

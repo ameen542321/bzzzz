@@ -2,9 +2,6 @@
 
 namespace App\Http\Controllers\Employees;
 
-use App\Services\EmployeeEmploymentService;
-use App\Services\EmployeeLogService;
-
 use App\Models\Store;
 use App\Models\Employee;
 use Illuminate\Http\Request;
@@ -109,34 +106,6 @@ class EmployeeController extends Controller
     public function trash()
     {
         return EmployeeTrash::list();
-    }
-
-    public function suspend(Employee $employee, EmployeeEmploymentService $employmentService)
-    {
-        EmployeeActions::authorizeEmployeeAccess($employee);
-
-        if ($employee->status === 'suspended') {
-            return back()->with('info', 'الموظف موقوف بالفعل.');
-        }
-
-        $employmentService->suspend($employee);
-        EmployeeLogService::add($employee, 'employee_suspended', "تم إيقاف الموظف {$employee->name} بتاريخ " . now()->toDateString());
-
-        return back()->with('success', 'تم إيقاف الموظف. سيبقى يوم الإيقاف ضمن أيام استحقاق الراتب.');
-    }
-
-    public function activate(Employee $employee, EmployeeEmploymentService $employmentService)
-    {
-        EmployeeActions::authorizeEmployeeAccess($employee);
-
-        if ($employee->status === 'active') {
-            return back()->with('info', 'الموظف نشط بالفعل.');
-        }
-
-        $absenceCount = $employmentService->activate($employee, now(), auth()->id());
-        EmployeeLogService::add($employee, 'employee_activated', "تم تفعيل الموظف {$employee->name} وتسجيل {$absenceCount} يوم غياب عن فترة الإيقاف");
-
-        return back()->with('success', "تم تفعيل الموظف وتسجيل {$absenceCount} يوم غياب عن مدة الإيقاف.");
     }
 
     public function restore($id)

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Log;
 use App\Services\LogService;
-use App\Services\EmployeeEmploymentService;
 use App\Models\Store;
 use App\Models\Sale;
 use App\Models\Purchase;
@@ -371,7 +370,7 @@ class StoreController extends Controller
      * @param int $storeId
      * @return \Illuminate\View\View
      */
-    public function details($storeId, EmployeeEmploymentService $employmentService)
+    public function details($storeId)
     {
         $store = auth()->user()->stores()->findOrFail($storeId);
         $now = now();
@@ -401,9 +400,7 @@ class StoreController extends Controller
         // ===== 2. إحصائيات الموظفين والديون =====
         $totalEmployees = $store->employees()->count();
         $totalAccountants = $store->accountants()->count();
-        $totalMonthlySalaries = (float) $store->employees()->get()->sum(
-            fn ($employee) => $employmentService->earnedSalaryForMonth($employee, $now)
-        );
+        $totalMonthlySalaries = $store->employees()->sum('salary') ?? 0;
 
         $monthlyWithdrawals = \App\Models\Withdrawal::where('store_id', $store->id)->where('month', $currentMonthText)->where('status', 'pending')->sum('amount') ?? 0;
         $monthlyDebts = \App\Models\Debt::where('store_id', $store->id)->where('month', $currentMonthText)->where('status', 'pending')->sum('amount') ?? 0;
@@ -1039,7 +1036,7 @@ class StoreController extends Controller
     /**
      * التقرير الشهري للمتجر (واجهة)
      */
-    public function reportsMonthly(Store $store, Request $request, EmployeeEmploymentService $employmentService)
+    public function reportsMonthly(Store $store, Request $request)
     {
         $this->authorizeStoreAccess($store);
 
@@ -1102,9 +1099,7 @@ class StoreController extends Controller
             ->whereBetween('created_at', [$start, $end])
             ->sum('amount');
 
-        $monthlySalaries = (float) $store->employees()->get()->sum(
-            fn ($employee) => $employmentService->earnedSalaryForMonth($employee, $start)
-        );
+        $monthlySalaries = (float) $store->employees()->sum('salary');
 
         $netAfterCosts = $totalSales - ($profitDeductionTotal + $totalConsumption + $expensesTotal);
 
@@ -1144,7 +1139,7 @@ class StoreController extends Controller
     /**
      * تصدير PDF للتقرير الشهري
      */
-    public function reportsMonthlyPdf(Store $store, Request $request, EmployeeEmploymentService $employmentService)
+    public function reportsMonthlyPdf(Store $store, Request $request)
     {
         $this->authorizeStoreAccess($store);
 
@@ -1174,9 +1169,7 @@ class StoreController extends Controller
             'ownerPurchases' => (float) \App\Models\Purchase::where('store_id', $store->id)->whereBetween('created_at', [$start, $end])->sum('cost'),
             'expensesTotal' => (float) \App\Models\Expense::where('store_id', $store->id)->whereBetween('created_at', [$start, $end])->sum('amount'),
             'withdrawalsTotal' => (float) \App\Models\Withdrawal::where('store_id', $store->id)->whereBetween('created_at', [$start, $end])->sum('amount'),
-            'monthlySalaries' => (float) $store->employees()->get()->sum(
-                fn ($employee) => $employmentService->earnedSalaryForMonth($employee, $start)
-            ),
+            'monthlySalaries' => (float) $store->employees()->sum('salary'),
         ];
         if (\Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
             $data['monthlySoldProductsCost'] = (float) \DB::table('sale_items')

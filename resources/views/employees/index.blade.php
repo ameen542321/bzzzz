@@ -75,12 +75,14 @@
                         <div class="col-span-2 text-gray-300 text-sm truncate">{{ $person->store->name }}</div>
 
                         <div class="col-span-2">
-                            @if($person->status === 'suspended')
-                                <span class="px-3 py-1 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full font-bold">موقوف منذ {{ $person->suspended_at?->format('Y-m-d') ?? '—' }}</span>
-                            @elseif($person->accountant)
-                                <span class="px-3 py-1 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-full font-bold">محاسب فعّال</span>
+                            @if($person->accountant)
+                                @if($person->accountant->status === 'active')
+                                    <span class="px-3 py-1 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-full font-bold">محاسب فعّال</span>
+                                @else
+                                    <span class="px-3 py-1 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full font-bold">محاسب موقوف</span>
+                                @endif
                             @else
-                                <span class="px-3 py-1 text-xs bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-full font-bold">موظف فعّال</span>
+                                <span class="px-3 py-1 text-xs bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-full font-bold">موظف</span>
                             @endif
                         </div>
 
@@ -93,12 +95,17 @@
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
 
-                                <form action="{{ $person->status === 'active' ? route('user.employees.suspend', $person) : route('user.employees.activate', $person) }}" method="POST" onsubmit="return confirm('{{ $person->status === 'active' ? 'سيُوقف احتساب الراتب بعد اليوم ويُمنع تسجيل عمليات مالية جديدة. هل تريد المتابعة؟' : 'سيتم تسجيل أيام التوقف كغياب ثم تفعيل الموظف. هل تريد المتابعة؟' }}')">
-                                    @csrf
-                                    <button class="action-pill {{ $person->status === 'active' ? 'text-red-300' : 'text-emerald-300' }}" title="{{ $person->status === 'active' ? 'إيقاف الموظف' : 'تفعيل الموظف' }}">
-                                        <i class="fa-solid {{ $person->status === 'active' ? 'fa-pause' : 'fa-play' }}"></i>
-                                    </button>
-                                </form>
+                                @if($person->accountant)
+                                    @if($person->accountant->status === 'active')
+                                        <a href="{{ route('user.accountants.suspend', $person->accountant->id) }}" class="action-pill text-red-300" title="إيقاف">
+                                            <i class="fa-solid fa-pause"></i>
+                                        </a>
+                                    @else
+                                        <a href="{{ route('user.accountants.activate', $person->accountant->id) }}" class="action-pill text-emerald-300" title="تفعيل">
+                                            <i class="fa-solid fa-play"></i>
+                                        </a>
+                                    @endif
+                                @endif
 
                                 <form action="{{ route('user.employees.destroy', $person->id) }}?return_to={{ urlencode(url()->current()) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف؟')">
                                     @csrf
@@ -118,21 +125,26 @@
                         </div>
                         <p class="text-sm text-gray-400">{{ $person->phone ?? '—' }}</p>
                         <div class="flex items-center gap-2">
-                            @if($person->status === 'suspended')
-                                <span class="px-2.5 py-1 text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full font-bold">موقوف منذ {{ $person->suspended_at?->format('Y-m-d') ?? '—' }}</span>
-                            @elseif($person->accountant)
-                                <span class="px-2.5 py-1 text-[11px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-full font-bold">محاسب فعّال</span>
+                            @if($person->accountant)
+                                @if($person->accountant->status === 'active')
+                                    <span class="px-2.5 py-1 text-[11px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-full font-bold">محاسب فعّال</span>
+                                @else
+                                    <span class="px-2.5 py-1 text-[11px] bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full font-bold">محاسب موقوف</span>
+                                @endif
                             @else
-                                <span class="px-2.5 py-1 text-[11px] bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-full font-bold">موظف فعّال</span>
+                                <span class="px-2.5 py-1 text-[11px] bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-full font-bold">موظف</span>
                             @endif
                         </div>
                         <div class="flex items-center gap-2 pt-1">
                             <a href="{{ route('user.employees.show', ['employee' => $person->id, 'return_to' => url()->current()]) }}" class="mobile-action text-blue-300">عرض</a>
                             <a href="{{ route('user.employees.edit', ['employee' => $person->id, 'return_to' => url()->current()]) }}" class="mobile-action text-amber-300">تعديل</a>
-                            <form action="{{ $person->status === 'active' ? route('user.employees.suspend', $person) : route('user.employees.activate', $person) }}" method="POST" onsubmit="return confirm('{{ $person->status === 'active' ? 'إيقاف الموظف واحتساب راتبه حتى اليوم؟' : 'تفعيل الموظف وتسجيل مدة الإيقاف كغياب؟' }}')">
-                                @csrf
-                                <button class="mobile-action {{ $person->status === 'active' ? 'text-red-300' : 'text-emerald-300' }}">{{ $person->status === 'active' ? 'إيقاف' : 'تفعيل' }}</button>
-                            </form>
+                            @if($person->accountant)
+                                @if($person->accountant->status === 'active')
+                                    <a href="{{ route('user.accountants.suspend', $person->accountant->id) }}" class="mobile-action text-red-300">إيقاف</a>
+                                @else
+                                    <a href="{{ route('user.accountants.activate', $person->accountant->id) }}" class="mobile-action text-emerald-300">تفعيل</a>
+                                @endif
+                            @endif
                             <form action="{{ route('user.employees.destroy', $person->id) }}?return_to={{ urlencode(url()->current()) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف؟')">
                                 @csrf
                                 @method('DELETE')

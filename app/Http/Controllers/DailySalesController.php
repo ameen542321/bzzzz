@@ -183,7 +183,7 @@ class DailySalesController extends Controller
             ->sortByDesc(fn ($entry) => $entry->display_time ?? $entry->created_at ?? now())
             ->values();
 
-        $employees = $store->employees()->active()->select('id', 'name')->orderBy('name')->get();
+        $employees = $store->employees()->select('id', 'name')->orderBy('name')->get();
 
         $shiftSummaries = $shiftWindows->map(function ($window) use ($sales, $store) {
             $shiftSales = $sales->filter(fn($sale) => ($sale->shift_key ?? 'default_shift') === $window['key']);

@@ -511,9 +511,9 @@ document.addEventListener('DOMContentLoaded', function () {
         sales_month: { title: 'مبيعات الشهر', value: '{{ number_format($salesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         products_cost_month: { title: 'تكلفة المنتجات المباعة (شهري)', value: '{{ number_format($productsCostMonth ?? 0, 2) }} ر.س', details: 'تكلفة البضاعة المباعة خلال الشهر، وهي أحد البنود المخصومة للوصول إلى المتبقي بعد التكاليف.' },
-        salaries_month: { title: 'الرواتب الشهرية (للتوضيح)', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'تعرض الراتب المستحق بعد إيقافات الموظفين وغياباتهم، ولا تُخصم من صافي النتيجة مثل التقرير الشهري. السحوبات المسجلة: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
+        salaries_month: { title: 'الرواتب الشهرية (للتوضيح)', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'تعرض للمراجعة فقط ولا تُخصم من صافي النتيجة، مثل التقرير الشهري. السحوبات المسجلة: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
         withdrawals_month: { title: 'سحوبات الموظفين (شهري)', value: '{{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س', details: 'تفصيل السحوبات حسب الموظفين.' },
-        salary_remaining_month: { title: 'المتبقي من الرواتب بعد السحوبات', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'الراتب المستحق لكل موظف بعد خصم أيام الإيقاف/الغياب، ثم طرح سحوباته المسجلة خلال الشهر.' },
+        salary_remaining_month: { title: 'المتبقي من الرواتب بعد السحوبات', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'راتب كل موظف مطروحاً منه سحوباته المسجلة خلال الشهر.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };
 
@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (key === 'salary_remaining_month') {
                 rows = employeeSalaryRemainders.map((employee) => `<li class="border-b border-gray-800 py-2">
                     <div class="flex justify-between"><span class="text-gray-200">${employee.name} - ${employee.store_name || ''}</span><span class="text-emerald-300 font-bold">${Number(employee.salary_remaining).toLocaleString('en-US', {minimumFractionDigits: 2})} ر.س</span></div>
-                    <div class="text-[11px] text-gray-500 mt-1">الراتب المستحق ${Number(employee.salary).toLocaleString('en-US')} - السحوبات ${Number(employee.withdrawals_total).toLocaleString('en-US')}</div>
+                    <div class="text-[11px] text-gray-500 mt-1">الراتب ${Number(employee.salary).toLocaleString('en-US')} - السحوبات ${Number(employee.withdrawals_total).toLocaleString('en-US')}</div>
                 </li>`).join('');
             } else {
                 const dailyMetrics = ['profit_today', 'sales_today', 'expenses_today', 'products_cost_today'];

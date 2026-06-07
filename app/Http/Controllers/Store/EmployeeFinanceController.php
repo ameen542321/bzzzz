@@ -45,7 +45,6 @@ class EmployeeFinanceController extends Controller
 {
     $person = $this->findPerson($id);
     $this->authorizePerson($person);
-    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $request->validate([
         'amount'      => 'required|numeric|min:0.01',
@@ -230,7 +229,6 @@ class EmployeeFinanceController extends Controller
 {
     $person = $this->findPerson($id);
     $this->authorizePerson($person);
-    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $request->validate([
         'amount'      => 'required|numeric|min:0.01',
@@ -422,7 +420,6 @@ public function storeCollection(Request $request, $saleId)
 {
     $person = $this->findPerson($id);
     $this->authorizePerson($person);
-    $this->ensureFinancialOperationAllowed($person, $request->input('date'));
 
     $request->validate([
         'amount'      => 'required|numeric|min:0.01',
@@ -690,7 +687,7 @@ public function withdrawalPage()
 {
     $storeId = auth('accountant')->user()->store_id;
 
-    $people = Employee::where('store_id', $storeId)->active()->get();
+    $people = Employee::where('store_id', $storeId)->get();
 
     $lastWithdrawals = Withdrawal::where('store_id', $storeId)
         ->whereDate('created_at', today())   // 👈 عمليات اليوم فقط
@@ -703,7 +700,7 @@ public function withdrawalPage()
 {
     $storeId = auth('accountant')->user()->store_id;
 
-    $people = Employee::where('store_id', $storeId)->active()->get();
+    $people = Employee::where('store_id', $storeId)->get();
 
     $lastAbsences = Absence::where('store_id', $storeId)
         ->whereDate('created_at', today())   // 👈 عمليات اليوم فقط
@@ -718,7 +715,7 @@ public function withdrawalPage()
 {
     $storeId = auth('accountant')->user()->store_id;
 
-    $people = Employee::where('store_id', $storeId)->active()->get();
+    $people = Employee::where('store_id', $storeId)->get();
 
     $lastDebts = Debt::where('store_id', $storeId)
         ->whereDate('created_at', today())   // 👈 عمليات اليوم فقط
@@ -733,7 +730,7 @@ public function withdrawalPage()
 {
     $storeId = auth('accountant')->user()->store_id;
 
-    $people = Employee::where('store_id', $storeId)->active()->get();
+    $people = Employee::where('store_id', $storeId)->get();
 
     $lastCreditSales = CreditSale::where('store_id', $storeId)
         ->whereDate('created_at', today())   // 👈 عمليات اليوم فقط
@@ -784,23 +781,4 @@ public function collectionPage()
 
 
 
-
-    private function ensureFinancialOperationAllowed(Employee $employee, ?string $date): void
-    {
-        if (!$date) {
-            return;
-        }
-
-        try {
-            $operationDate = \Illuminate\Support\Carbon::parse($date);
-        } catch (\Throwable) {
-            return;
-        }
-
-        if (!$employee->canReceiveFinancialOperationOn($operationDate)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'employee' => 'لا يمكن إضافة سحب أو مديونية أو آجل للموظف خلال فترة إيقافه.',
-            ]);
-        }
-    }
 }

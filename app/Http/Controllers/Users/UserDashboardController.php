@@ -16,11 +16,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
-use App\Services\EmployeeEmploymentService;
 
 class UserDashboardController extends Controller
 {
-    public function index(Request $request, EmployeeEmploymentService $employmentService)
+    public function index(Request $request)
     {
         $user = auth('web')->user();
 
@@ -91,14 +90,8 @@ class UserDashboardController extends Controller
         $productsCostMonth = (float) $monthlyStoreSummaries->sum('products_cost');
         $expensesMonth = (float) $monthlyStoreSummaries->sum('expenses');
 
-        // الراتب المستحق فعليًا: يوم الإيقاف مستحق، وفترة الإيقاف تخصم حتى إعادة التفعيل.
-        $salaryEmployees = $user->employees()
-            ->with('store:id,name')
-            ->select('employees.id', 'employees.user_id', 'employees.store_id', 'employees.name', 'employees.salary', 'employees.status', 'employees.suspended_at')
-            ->get();
-        $monthlySalaries = (float) $salaryEmployees->sum(
-            fn ($employee) => $employmentService->earnedSalaryForMonth($employee, $monthStart)
-        );
+        // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
+        $monthlySalaries = $user->employees()->sum('salary') ?? 0;
         $monthlyWorkerWithdrawals = (float) Withdrawal::whereIn('store_id', $storeIds)
             ->where('person_type', Employee::class)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
@@ -124,18 +117,19 @@ class UserDashboardController extends Controller
                 $employee->salary_remaining = max(0, $employee->salary - $employee->withdrawals_total);
                 return $employee;
             });
-        $employeeSalaryRemainders = $salaryEmployees
-            ->sortBy('name')
-            ->map(function ($employee) use ($employeeMonthlyWithdrawals, $employmentService, $monthStart) {
+        $employeeSalaryRemainders = $user->employees()
+            ->with('store:id,name')
+            ->select('employees.id', 'employees.store_id', 'employees.name', 'employees.salary')
+            ->orderBy('employees.name')
+            ->get()
+            ->map(function ($employee) use ($employeeMonthlyWithdrawals) {
                 $withdrawals = (float) optional($employeeMonthlyWithdrawals->firstWhere('id', $employee->id))->withdrawals_total;
-                $earnedSalary = $employmentService->earnedSalaryForMonth($employee, $monthStart);
-
                 return (object) [
                     'name' => $employee->name,
                     'store_name' => $employee->store?->name,
-                    'salary' => $earnedSalary,
+                    'salary' => (float) ($employee->salary ?? 0),
                     'withdrawals_total' => $withdrawals,
-                    'salary_remaining' => max(0, $earnedSalary - $withdrawals),
+                    'salary_remaining' => max(0, (float) ($employee->salary ?? 0) - $withdrawals),
                 ];
             });
 
@@ -264,9 +258,7 @@ class UserDashboardController extends Controller
             $storeProductsCostMonth = $storeMonthlySummary['products_cost'];
             $storeExpensesMonth = $storeMonthlySummary['expenses'];
 
-            $storeSalariesMonth = (float) $salaryEmployees->where('store_id', $storeId)->sum(
-                fn ($employee) => $employmentService->earnedSalaryForMonth($employee, $monthStart)
-            );
+$storeSalariesMonth = (float) $store->employees()->sum('salary');
             $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
                 ->where('person_type', Employee::class)
                 ->whereBetween('created_at', [$monthStart, $monthEnd])
