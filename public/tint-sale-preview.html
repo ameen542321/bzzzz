@@ -63,6 +63,10 @@
         .choice b,.choice span { display:block; }
         .choice span { margin-top:6px; color:#8795ab; font-size:10px; font-weight:400; line-height:1.6; }
         .choice.active { color:#fff; background:#1d4ed8; border-color:#60a5fa; box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+        .choice.add-choice { border-style:dashed; border-color:#8b5cf6; background:#21183a; }
+        .window-counter { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
+        .window-counter button { width:30px; height:30px; padding:0; color:#fff; background:#0f172a; border:1px solid #60a5fa; border-radius:8px; font-weight:900; }
+        .window-counter strong { min-width:22px; text-align:center; font-size:16px; }
         .option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
         .fraction-option { position:relative; padding:14px; color:#fff; text-align:right; background:#151f31; border:1px solid #334155; border-radius:15px; }
         .fraction-option:hover { border-color:#38bdf8; background:#10283d; }
@@ -156,13 +160,13 @@
             </div>
 
             <div class="step hidden" id="workStep">
-                <span class="label">2 — اختر نوع العمل المطلوب</span>
+                <span class="label">2 — اختر نوع العمل المطلوب (يمكن اختيار أكثر من خيار)</span>
                 <div class="choice-grid" id="workChoices"></div>
             </div>
 
             <div class="step hidden" id="fractionStep">
                 <div class="section-head">
-                    <div><span class="label" style="margin:0 0 5px">3 — خيارات التجزئة المسجلة سابقًا</span><b id="selectionTitle"></b></div>
+                    <div><span class="label" style="margin:0 0 5px">3 — خيارات التجزئة المطابقة للأعمال المختارة</span><b id="selectionTitle"></b></div>
                     <span id="optionCount" style="color:#94a3b8;font-size:11px"></span>
                 </div>
                 <div class="option-grid" id="fractionOptions"></div>
@@ -205,52 +209,46 @@ const categories = [
     { id: 'other', label: 'أخرى', description: 'للفئات والمنتجات الأخرى المتوفرة في المتجر' },
 ];
 const works = [
-    { id: 'full', label: 'كامل السيارة', description: 'خيارات التجزئة المسجلة لتضليل السيارة كاملة' },
-    { id: 'front', label: 'أمامي', description: 'الزجاج الأمامي فقط' },
-    { id: 'rear', label: 'خلفي', description: 'الزجاج الخلفي فقط' },
-    { id: 'window', label: 'دريشة', description: 'دريشة واحدة أو أكثر حسب العدد' },
-    { id: 'sides', label: 'الجوانب', description: 'خيارات الجوانب المسجلة في المنتجات' },
-    { id: 'front-rear', label: 'أمامي وخلفي', description: 'إضافة الأمامي والخلفي معًا' },
+    { id: 'full', label: 'كامل', description: 'تضليل السيارة كاملة حسب الخيارات المسجلة' },
+    { id: 'front', label: 'أمامي', description: 'الزجاج الأمامي' },
+    { id: 'rear', label: 'خلفي', description: 'الزجاج الخلفي' },
+    { id: 'window', label: 'دريشة', description: 'حدد عدد الدرايش من 1 إلى 4' },
 ];
 const previewProducts = [
     { id:'kr-01-big', category:'korean', name:'كوري 01 رول كبير', cost:170, length:30, stock:27, fractions:[
         { id:11, work:'front', label:'أمامي 01', meters:1.5, price:120 },
         { id:12, work:'rear', label:'خلفي 01', meters:1.5, price:120 },
-        { id:13, work:'front-rear', label:'أمامي وخلفي 01', meters:3, price:230 },
         { id:14, work:'full', label:'كامل كوري 01 — الجزء الكبير', meters:3, price:230 },
     ]},
     { id:'kr-01-small', category:'korean', name:'كوري 01 رول صغير', cost:70, length:30, stock:24.5, fractions:[
         { id:21, work:'window', label:'دريشة 01', meters:.5, price:45 },
-        { id:22, work:'sides', label:'جوانب 01', meters:2, price:150 },
         { id:23, work:'full', label:'كامل كوري 01 — الجزء الصغير', meters:2, price:150 },
     ]},
     { id:'kr-02-big', category:'korean', name:'كوري 02 رول كبير', cost:180, length:30, stock:30, fractions:[
         { id:31, work:'front', label:'أمامي 02', meters:1.5, price:135 },
         { id:32, work:'rear', label:'خلفي 02', meters:1.5, price:135 },
-        { id:33, work:'front-rear', label:'أمامي وخلفي 02', meters:3, price:260 },
     ]},
     { id:'kr-02-small', category:'korean', name:'كوري 02 رول صغير', cost:75, length:30, stock:22, fractions:[
         { id:41, work:'window', label:'دريشة 02', meters:.5, price:50 },
-        { id:42, work:'sides', label:'جوانب 02', meters:2, price:165 },
     ]},
     { id:'us-premium-big', category:'american', name:'أمريكي بريميوم كبير', cost:210, length:30, stock:16, fractions:[
         { id:51, work:'front', label:'أمامي أمريكي', meters:1.7, price:175 },
         { id:52, work:'rear', label:'خلفي أمريكي', meters:1.7, price:175 },
-        { id:53, work:'front-rear', label:'أمامي وخلفي أمريكي', meters:3.4, price:340 },
+        { id:53, work:'full', label:'كامل أمريكي — الجزء الكبير', meters:3.4, price:340 },
     ]},
     { id:'us-premium-small', category:'american', name:'أمريكي بريميوم صغير', cost:95, length:30, stock:19, fractions:[
         { id:61, work:'window', label:'دريشة أمريكي', meters:.6, price:65 },
-        { id:62, work:'sides', label:'جوانب أمريكي', meters:2.4, price:220 },
+        { id:63, work:'full', label:'كامل أمريكي — الجزء الصغير', meters:2.4, price:220 },
     ]},
     { id:'other-nickel', category:'other', name:'نيكل رول كبير', cost:195, length:30, stock:18, fractions:[
         { id:71, work:'front', label:'أمامي نيكل', meters:1.6, price:160 },
         { id:72, work:'rear', label:'خلفي نيكل', meters:1.6, price:160 },
-        { id:73, work:'front-rear', label:'أمامي وخلفي نيكل', meters:3.2, price:310 },
     ]},
 ];
 
 let selectedCategory = null;
-let selectedWork = null;
+let selectedWorks = new Set();
+let windowCount = 1;
 let selectedParts = [];
 let cart = [];
 const modal = document.getElementById('tintModal');
@@ -274,17 +272,26 @@ function renderCategories() {
 function renderWorks() {
     const box = document.getElementById('workChoices');
     box.innerHTML = works.map(work => `
-        <button class="choice ${selectedWork === work.id ? 'active' : ''}" data-work="${work.id}">
+        <div class="choice ${selectedWorks.has(work.id) ? 'active' : ''}" data-work="${work.id}" role="button" tabindex="0">
             <b>${work.label}</b><span>${work.description}</span>
-        </button>
-    `).join('');
-    box.querySelectorAll('[data-work]').forEach(button => button.onclick = () => selectWork(button.dataset.work));
+            ${work.id === 'window' ? `<span class="window-counter" data-counter><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
+        </div>
+    `).join('') + `
+        <button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>إضافة عمل جديد غير موجود ضمن الخيارات السابقة</span></button>
+    `;
+    box.querySelectorAll('[data-work]').forEach(button => button.onclick = () => toggleWork(button.dataset.work));
+    box.querySelectorAll('[data-window-change]').forEach(button => button.onclick = event => {
+        event.stopPropagation();
+        changeWindowCount(Number(button.dataset.windowChange));
+    });
+    document.getElementById('openAdditional').onclick = openCustomPanel;
 }
 
 function selectCategory(id) {
     selectedCategory = id;
-    selectedWork = null;
+    selectedWorks = new Set();
     selectedParts = [];
+    windowCount = 1;
     document.getElementById('workStep').classList.remove('hidden');
     document.getElementById('fractionStep').classList.add('hidden');
     closeCustomPanel();
@@ -294,65 +301,88 @@ function selectCategory(id) {
     updateFlow(2);
 }
 
-function selectWork(id) {
-    selectedWork = id;
-    selectedParts = [];
-    document.getElementById('fractionStep').classList.remove('hidden');
-    closeCustomPanel();
+function toggleWork(id) {
+    if (id === 'full') {
+        selectedWorks = selectedWorks.has('full') ? new Set() : new Set(['full']);
+    } else {
+        selectedWorks.delete('full');
+        selectedWorks.has(id) ? selectedWorks.delete(id) : selectedWorks.add(id);
+    }
+    selectedParts = selectedParts.filter(part => part.custom || selectedWorks.has(part.work));
     renderWorks();
-    renderFractionOptions();
+    refreshFractionStep();
     renderSelectedParts();
-    updateFlow(3);
+}
+
+function changeWindowCount(change) {
+    windowCount = Math.min(4, Math.max(1, windowCount + change));
+    selectedWorks.add('window');
+    selectedWorks.delete('full');
+    selectedParts = selectedParts.filter(part => part.custom || part.work !== 'window');
+    renderWorks();
+    refreshFractionStep();
+    renderSelectedParts();
+}
+
+function refreshFractionStep() {
+    const hasWorks = selectedWorks.size > 0;
+    document.getElementById('fractionStep').classList.toggle('hidden', !hasWorks);
+    if (hasWorks) {
+        renderFractionOptions();
+        updateFlow(3);
+    } else {
+        closeCustomPanel();
+        updateFlow(2);
+    }
 }
 
 function matchingOptions() {
     return productsForCategory().flatMap(product => product.fractions
-        .filter(option => option.work === selectedWork)
+        .filter(option => selectedWorks.has(option.work))
         .map(option => ({ product, option }))
     );
 }
 
 function renderFractionOptions() {
     const matches = matchingOptions();
-    const category = categoryById(selectedCategory);
-    const work = workById(selectedWork);
+    const workLabels = [...selectedWorks].map(id => workById(id).label);
     const box = document.getElementById('fractionOptions');
-    document.getElementById('selectionTitle').textContent = `${category.label} — ${work.label}`;
+    document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — ${workLabels.join(' + ')}`;
     document.getElementById('optionCount').textContent = `${matches.length} خيارات مسجلة`;
 
-    box.innerHTML = matches.map(({ product, option }) => `
-        <button class="fraction-option" data-product="${product.id}" data-option="${option.id}">
-            <div class="option-head"><b>${option.label}</b><span class="source-tag">من بيانات المنتج</span></div>
-            <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
-            <div class="option-meta">
-                <span>الاستهلاك<b>${option.meters} متر</b></span>
-                <span>السعر الافتراضي<b>${money(option.price)}</b></span>
-                <span>المتوفر<b>${product.stock} متر</b></span>
-            </div>
-        </button>
-    `).join('') + `
-        <button class="fraction-option custom" id="openCustom">
-            <div class="option-head"><b>خيار مخصص +</b><span class="source-tag" style="border-color:#8b5cf6;background:#3b2170">جديد</span></div>
-            <div style="color:#c4b5fd;font-size:11px;line-height:1.7">استخدمه إذا كان العمل المطلوب غير موجود ضمن خيارات التجزئة المسجلة.</div>
-        </button>
-    `;
+    box.innerHTML = matches.map(({ product, option }) => {
+        const qty = option.work === 'window' ? windowCount : 1;
+        return `
+            <button class="fraction-option" data-product="${product.id}" data-option="${option.id}">
+                <div class="option-head"><b>${option.label}${qty > 1 ? ` × ${qty}` : ''}</b><span class="source-tag">من بيانات المنتج</span></div>
+                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
+                <div class="option-meta">
+                    <span>الاستهلاك<b>${option.meters}م × ${qty} = ${(option.meters * qty).toFixed(2)}م</b></span>
+                    <span>السعر الافتراضي<b>${money(option.price * qty)}</b></span>
+                    <span>المتوفر<b>${product.stock} متر</b></span>
+                </div>
+            </button>
+        `;
+    }).join('');
 
     if (!matches.length) {
-        box.insertAdjacentHTML('afterbegin', '<div class="empty-options">لا توجد خيارات تجزئة مسجلة لهذا الاختيار حاليًا. يمكنك استخدام الخيار المخصص.</div>');
+        box.innerHTML = '<div class="empty-options">لا توجد خيارات تجزئة مسجلة للأعمال المختارة حاليًا. استخدم زر «إضافة» لتسجيل عمل مخصص.</div>';
     }
     box.querySelectorAll('[data-option]').forEach(button => button.onclick = () => addRegisteredOption(button.dataset.product, Number(button.dataset.option)));
-    document.getElementById('openCustom').onclick = openCustomPanel;
 }
 
 function addRegisteredOption(productId, optionId) {
     const product = productById(productId);
     const option = product.fractions.find(fraction => fraction.id === optionId);
+    const qty = option.work === 'window' ? windowCount : 1;
+    selectedParts = selectedParts.filter(part => part.custom || part.work !== option.work);
     selectedParts.push({
         key: Date.now() + Math.random(),
         name: option.label,
         product,
+        work: option.work,
         meters: option.meters,
-        qty: 1,
+        qty,
         unitPrice: option.price,
         custom: false,
     });
@@ -360,25 +390,30 @@ function addRegisteredOption(productId, optionId) {
 }
 
 function openCustomPanel() {
-    const products = productsForCategory();
-    document.getElementById('customProduct').innerHTML = products.map(product => `<option value="${product.id}">${product.name}</option>`).join('');
-    document.getElementById('customName').value = workById(selectedWork)?.label || 'عمل مخصص';
+    if (!selectedCategory) {
+        alert('اختر فئة المركبة أولًا');
+        return;
+    }
+    document.getElementById('fractionStep').classList.remove('hidden');
+    document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${product.name}</option>`).join('');
+    document.getElementById('customName').value = '';
     document.getElementById('customPanel').classList.remove('hidden');
     document.getElementById('customName').focus();
+    updateFlow(3);
 }
 
 function closeCustomPanel() { document.getElementById('customPanel').classList.add('hidden'); }
 
 function addCustomPart() {
     const product = productById(document.getElementById('customProduct').value);
-    const name = document.getElementById('customName').value.trim() || 'عمل مخصص';
+    const name = document.getElementById('customName').value.trim() || 'إضافة مخصصة';
     const meters = Number(document.getElementById('customMeters').value);
     const qty = Number(document.getElementById('customQty').value);
     if (!product || meters <= 0 || qty <= 0) {
         alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين');
         return;
     }
-    selectedParts.push({ key:Date.now() + Math.random(), name, product, meters, qty, unitPrice:0, custom:true });
+    selectedParts.push({ key:Date.now() + Math.random(), name, product, work:'additional', meters, qty, unitPrice:0, custom:true });
     closeCustomPanel();
     renderSelectedParts();
 }
@@ -392,10 +427,10 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'خيار مخصص' : 'خيار تجزئة مسجل'}</small></div>
+            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : 'خيار تجزئة مسجل'}</small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
-    `).join('') : '<div class="cart-empty" style="padding:20px">ابدأ باختيار الفئة، ثم نوع العمل، ثم أحد خيارات التجزئة.</div>';
+    `).join('') : '<div class="cart-empty" style="padding:20px">اختر الفئة، ثم حدد عملًا أو أكثر، ثم اختر نظام التجزئة المناسب لكل عمل.</div>';
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
 
     const meters = selectedParts.reduce((sum, part) => sum + part.meters * part.qty, 0);
@@ -409,8 +444,7 @@ function renderSelectedParts() {
 }
 
 function updateFlow(step) {
-    const flowSteps = document.querySelectorAll('#flowIndicator span');
-    flowSteps.forEach((item, index) => {
+    document.querySelectorAll('#flowIndicator span').forEach((item, index) => {
         item.classList.toggle('done', index + 1 < step);
         item.classList.toggle('current', index + 1 === step);
     });
@@ -418,8 +452,9 @@ function updateFlow(step) {
 
 function resetBuilder() {
     selectedCategory = null;
-    selectedWork = null;
+    selectedWorks = new Set();
     selectedParts = [];
+    windowCount = 1;
     document.getElementById('workStep').classList.add('hidden');
     document.getElementById('fractionStep').classList.add('hidden');
     closeCustomPanel();
@@ -434,7 +469,7 @@ function renderCart() {
     box.innerHTML = cart.length ? cart.map((item, index) => `
         <div class="cart-item">
             <div class="cart-item-top">
-                <div><b>تضليل ${item.category} — ${item.work}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div>
+                <div><b>تضليل ${item.category} — ${item.works}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div>
                 <div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div>
             </div>
         </div>
@@ -454,12 +489,14 @@ document.getElementById('addCustomPart').onclick = addCustomPart;
 document.getElementById('resetTint').onclick = resetBuilder;
 document.getElementById('addTint').onclick = () => {
     const price = Number(document.getElementById('salePrice').value);
-    if (!selectedCategory || !selectedWork) { alert('اختر الفئة ونوع العمل أولًا'); return; }
-    if (!selectedParts.length) { alert('أضف خيار تجزئة واحدًا على الأقل'); return; }
+    if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
+    if (!selectedParts.length) { alert('اختر نظام تجزئة أو أضف عملًا مخصصًا'); return; }
     if (price <= 0) { alert('أدخل السعر النهائي'); return; }
+    const workLabels = [...selectedWorks].map(id => id === 'window' ? `دريشة (${windowCount})` : workById(id).label);
+    if (selectedParts.some(part => part.custom)) workLabels.push('إضافة');
     cart.push({
         category: categoryById(selectedCategory).label,
-        work: workById(selectedWork).label,
+        works: workLabels.join(' + '),
         parts: selectedParts.map(part => ({ ...part })),
         price,
     });
