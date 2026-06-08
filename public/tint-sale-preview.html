@@ -59,22 +59,31 @@
         .step { margin-top:18px; padding-top:18px; border-top:1px solid #223047; }
         .step:first-of-type { margin-top:0; padding-top:0; border-top:0; }
         .choice-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+        .work-choice-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
         .choice { min-height:76px; padding:14px; color:#cbd5e1; text-align:right; background:#172238; border:1px solid #334155; border-radius:14px; font-weight:900; }
         .choice b,.choice span { display:block; }
         .choice span { margin-top:6px; color:#8795ab; font-size:10px; font-weight:400; line-height:1.6; }
         .choice.active { color:#fff; background:#1d4ed8; border-color:#60a5fa; box-shadow:0 0 0 3px rgba(59,130,246,.12); }
         .choice.add-choice { border-style:dashed; border-color:#8b5cf6; background:#21183a; }
+        .work-card { min-height:210px; padding:18px; border-radius:17px; }
+        .work-card-head { display:flex!important; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:13px!important; }
+        .work-card-title { color:#fff; font-size:20px; font-weight:900; }
+        .work-card-description { margin-top:4px!important; color:#aab6ca!important; font-size:12px!important; }
+        .work-card-state { min-width:62px; padding:6px 8px; color:#94a3b8!important; text-align:center; background:#0f172a; border:1px solid #334155; border-radius:999px; font-size:10px!important; }
+        .work-card.active .work-card-state { color:#d1fae5!important; background:#065f46; border-color:#34d399; }
+        .control-label { margin:11px 0 7px!important; color:#cbd5e1!important; font-size:12px!important; font-weight:900!important; }
+        .exclusive-note { margin-top:10px!important; padding:8px 10px; color:#bfdbfe!important; background:#172554; border:1px solid #1d4ed8; border-radius:9px; font-size:10px!important; }
         .window-counter { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
         .window-counter button { width:30px; height:30px; padding:0; color:#fff; background:#0f172a; border:1px solid #60a5fa; border-radius:8px; font-weight:900; }
         .window-counter strong { min-width:22px; text-align:center; font-size:16px; }
         .size-selector { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
-        .size-selector button { padding:8px; color:#cbd5e1; background:#0f172a; border:1px solid #475569; border-radius:9px; font-weight:900; }
+        .size-selector button { min-height:42px; padding:10px; color:#cbd5e1; background:#0f172a; border:1px solid #475569; border-radius:9px; font-weight:900; }
         .size-selector button.active { color:#fff; background:#059669; border-color:#6ee7b7; }
         .grade-selector { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:8px; }
-        .grade-selector button { padding:7px 3px; color:#cbd5e1; background:#111827; border:1px solid #475569; border-radius:8px; font-size:10px; font-weight:900; }
+        .grade-selector button { min-height:38px; padding:9px 4px; color:#cbd5e1; background:#111827; border:1px solid #475569; border-radius:8px; font-size:13px; font-weight:900; }
         .grade-selector button.active { color:#111827; background:#fbbf24; border-color:#fde68a; }
-        .size-grade-block { margin-top:8px; padding:8px; background:rgba(2,6,23,.3); border:1px solid rgba(148,163,184,.2); border-radius:10px; }
-        .size-grade-title { display:flex!important; justify-content:space-between; color:#cbd5e1!important; font-size:10px!important; }
+        .size-grade-block { margin-top:10px; padding:11px; background:rgba(2,6,23,.3); border:1px solid rgba(148,163,184,.2); border-radius:10px; }
+        .size-grade-title { display:flex!important; justify-content:space-between; color:#cbd5e1!important; font-size:12px!important; }
         .grade-badge { padding:4px 8px; color:#fef3c7; background:#78350f; border:1px solid #d97706; border-radius:7px; font-size:10px; white-space:nowrap; }
         .option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
         .fraction-option { position:relative; padding:14px; color:#fff; text-align:right; background:#151f31; border:1px solid #334155; border-radius:15px; }
@@ -103,7 +112,7 @@
         .hidden { display:none!important; }
         @media(max-width:850px) {
             .layout { grid-template-columns:1fr; }
-            .products,.option-grid { grid-template-columns:1fr; }
+            .products,.option-grid,.work-choice-grid { grid-template-columns:1fr; }
             .choice-grid { grid-template-columns:1fr 1fr; }
             .custom-grid { grid-template-columns:1fr 1fr; }
             .preview-grid { grid-template-columns:1fr; }
@@ -171,7 +180,7 @@
 
             <div class="step hidden" id="workStep">
                 <span class="label">2 — اختر نوع العمل المطلوب (يمكن اختيار أكثر من خيار)</span>
-                <div class="choice-grid" id="workChoices"></div>
+                <div class="choice-grid work-choice-grid" id="workChoices"></div>
             </div>
 
             <div class="step hidden" id="fractionStep">
@@ -306,15 +315,20 @@ function renderWorks() {
         const selections = workSelections[work.id] || {};
         const activeSizes = Object.keys(selections);
         return `
-            <div class="choice ${activeSizes.length ? 'active' : ''}">
-                <b>${work.label}</b><span>${work.description}</span>
-                ${work.id === 'window' ? `<span class="window-counter"><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
+            <div class="choice work-card ${activeSizes.length ? 'active' : ''}">
+                <span class="work-card-head">
+                    <span><b class="work-card-title">${work.label}</b><span class="work-card-description">${work.description}</span></span>
+                    <span class="work-card-state">${activeSizes.length ? 'محدد' : 'غير محدد'}</span>
+                </span>
+                ${work.id === 'full' ? '<span class="exclusive-note">اختيار «كامل» يلغي تلقائيًا أي عمل آخر محدد.</span>' : ''}
+                ${work.id === 'window' ? `<span class="control-label">عدد الدرايش</span><span class="window-counter"><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
+                <span class="control-label">1 — اختر حجم الرول</span>
                 <span class="size-selector">
                     ${sizes.map(size => `<button type="button" class="${selections[size.id] !== undefined ? 'active' : ''}" data-work-size="${work.id}:${size.id}">${size.label}</button>`).join('')}
                 </span>
                 ${activeSizes.map(size => `
                     <span class="size-grade-block">
-                        <span class="size-grade-title"><b>درجة ${sizeById(size).label}</b><em>${selections[size] || 'اختر الدرجة'}</em></span>
+                        <span class="size-grade-title"><b>2 — درجة الرول ${sizeById(size).label}</b><em>${selections[size] || 'لم تحدد'}</em></span>
                         <span class="grade-selector">
                             ${grades.map(grade => `<button type="button" class="${selections[size] === grade ? 'active' : ''}" data-grade="${work.id}:${size}:${grade}">${grade}</button>`).join('')}
                         </span>
@@ -352,8 +366,18 @@ function selectCategory(id) {
 }
 
 function toggleWorkSize(work, size) {
+    const isAlreadySelected = workSelections[work]?.[size] !== undefined;
+
+    if (!isAlreadySelected && work === 'full') {
+        workSelections = { full: workSelections.full || {} };
+        selectedParts = selectedParts.filter(part => part.custom || part.work === 'full');
+    } else if (!isAlreadySelected && work !== 'full' && workSelections.full) {
+        delete workSelections.full;
+        selectedParts = selectedParts.filter(part => part.custom || part.work !== 'full');
+    }
+
     workSelections[work] ||= {};
-    if (workSelections[work][size] !== undefined) {
+    if (isAlreadySelected) {
         delete workSelections[work][size];
         selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey(work, size));
     } else {
@@ -366,6 +390,13 @@ function toggleWorkSize(work, size) {
 }
 
 function selectGrade(work, size, grade) {
+    if (work === 'full') {
+        workSelections = { full: workSelections.full || {} };
+        selectedParts = selectedParts.filter(part => part.custom || part.work === 'full');
+    } else if (workSelections.full) {
+        delete workSelections.full;
+        selectedParts = selectedParts.filter(part => part.custom || part.work !== 'full');
+    }
     workSelections[work] ||= {};
     workSelections[work][size] = grade;
     selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey(work, size));
