@@ -5,13 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>معاينة البيع السريع للتضليل</title>
     <style>
-        :root { color-scheme: dark; --bg:#060b16; --panel:#101827; --panel2:#172033; --line:#28344a; --blue:#2563eb; --muted:#94a3b8; --green:#34d399; --amber:#fbbf24; }
-        * { box-sizing:border-box } body { margin:0; font-family:Tahoma,Arial,sans-serif; background:radial-gradient(circle at top,#15203a 0,#080d19 38%,#050913 100%); color:#fff; min-height:100vh }
-        button,input,select { font:inherit } button { cursor:pointer }.page{max-width:1180px;margin:auto;padding:28px 18px 70px}.topbar,.card{background:rgba(15,23,42,.94);border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.24)}
-        .topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;margin-bottom:22px}.title{font-size:22px;font-weight:900}.badge{background:#192235;border:1px solid #334155;border-radius:11px;padding:10px 15px;color:#cbd5e1}.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:20px}.stack{display:grid;gap:18px}.card{padding:18px}.label{display:block;color:#aab6ca;font-size:12px;font-weight:800;margin-bottom:8px}.input{width:100%;background:#1a2436;border:1px solid #334155;border-radius:12px;color:white;padding:13px 14px;outline:none}.input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
-        .search-row{display:grid;grid-template-columns:1fr auto;gap:10px}.primary,.secondary,.danger,.ghost{border:0;border-radius:12px;padding:12px 16px;font-weight:900;color:#fff}.primary{background:linear-gradient(135deg,#2563eb,#1d4ed8)}.secondary{background:linear-gradient(135deg,#059669,#047857)}.ghost{background:#202b3f;border:1px solid #3a4861}.danger{background:#7f1d1d}.products{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}.product{background:#172033;border:1px solid #334155;border-radius:14px;padding:13px;display:flex;justify-content:space-between;gap:10px}.product b{display:block;margin-bottom:5px}.stock{font-size:11px;color:var(--green)}.price{color:#60a5fa;font-weight:900;white-space:nowrap}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.section-head h2{font-size:17px;margin:0}.cart-empty{text-align:center;color:#64748b;padding:34px 10px;border:1px dashed #334155;border-radius:14px}.cart-item{background:#151f31;border:1px solid #334155;border-radius:15px;padding:14px;margin-top:10px}.cart-item-top{display:flex;justify-content:space-between;gap:10px}.cart-meta{font-size:12px;color:#94a3b8;margin-top:7px;line-height:1.8}.cart-price{font-weight:900;color:#60a5fa}.summary{display:grid;gap:11px}.sum-row{display:flex;justify-content:space-between;color:#cbd5e1}.sum-row.total{border-top:1px solid #334155;padding-top:13px;font-size:19px;font-weight:900;color:white}.pay-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.pay{background:#172033;border:1px solid #334155;border-radius:12px;padding:12px;color:#cbd5e1;font-weight:800}.pay.active{border-color:#3b82f6;background:#172554;color:white}.confirm{width:100%;margin-top:16px;padding:16px;font-size:18px}
-        .modal-wrap{position:fixed;inset:0;background:rgba(2,6,23,.82);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:18px;z-index:20}.modal-wrap.open{display:flex}.modal{width:min(850px,100%);max-height:94vh;overflow:auto;background:#0e1728;border:1px solid #34435e;border-radius:22px;box-shadow:0 30px 100px rgba(0,0,0,.6)}.modal-head{position:sticky;top:0;background:#111b2e;border-bottom:1px solid #2b3951;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;z-index:2}.modal-head h2{margin:0;font-size:20px}.modal-body{padding:20px}.choice-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.choice{background:#172238;border:1px solid #334155;border-radius:12px;padding:13px 8px;color:#cbd5e1;font-weight:900}.choice.active{background:#1d4ed8;border-color:#60a5fa;color:#fff}.components{display:grid;gap:12px;margin-top:18px}.component{display:grid;grid-template-columns:130px 1fr 1fr 90px;gap:10px;align-items:end;background:#141e31;border:1px solid #2c3a52;border-radius:15px;padding:13px}.component-name{font-weight:900;padding-bottom:13px}.component small{display:block;color:#64748b;margin-top:5px}.preview-box{margin-top:16px;background:#071426;border:1px solid #1e3a5f;border-radius:15px;padding:15px}.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:#111d30;border:1px solid #263650;border-radius:12px;padding:12px}.metric span{display:block;color:#94a3b8;font-size:11px;margin-bottom:6px}.metric b{font-size:16px}.modal-actions{display:flex;gap:10px;margin-top:18px}.modal-actions .primary{flex:1}.note{font-size:11px;color:#93c5fd;background:#172554;border:1px solid #1d4ed8;border-radius:10px;padding:10px;margin-top:13px;line-height:1.7}.hidden{display:none!important}.step{margin-top:18px}.product-choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.product-choice{background:#151f31;border:1px solid #334155;border-radius:14px;padding:13px;color:white;text-align:right}.product-choice.active{border-color:#38bdf8;background:#0c4a6e}.product-choice span{display:block;color:#94a3b8;font-size:10px;margin-top:5px}.fraction-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.fraction-choice{background:#172238;border:1px solid #334155;border-radius:12px;padding:12px;color:white;text-align:right}.fraction-choice b,.fraction-choice span{display:block}.fraction-choice span{color:#94a3b8;font-size:10px;margin-top:5px}.builder-list{display:grid;gap:9px;margin-top:12px}.builder-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#111d30;border:1px solid #2b3a53;border-radius:12px;padding:12px}.builder-row small{display:block;color:#94a3b8;margin-top:5px}.custom-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-        @media(max-width:850px){.layout{grid-template-columns:1fr}.products{grid-template-columns:1fr}.choice-grid{grid-template-columns:repeat(2,1fr)}.product-choice-grid,.fraction-grid{grid-template-columns:1fr 1fr}.custom-grid{grid-template-columns:1fr}.component{grid-template-columns:1fr 1fr}.component-name{grid-column:1/-1;padding-bottom:0}.preview-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;gap:12px;flex-direction:column}.badge{width:100%;text-align:center}}
+        :root { color-scheme: dark; --panel:#0f172a; --panel2:#172033; --line:#2a3850; --blue:#2563eb; --muted:#94a3b8; --green:#34d399; --amber:#fbbf24; }
+        * { box-sizing:border-box }
+        body { margin:0; min-height:100vh; font-family:Tahoma,Arial,sans-serif; color:#fff; background:radial-gradient(circle at top,#15203a 0,#080d19 38%,#050913 100%); }
+        button,input,select { font:inherit }
+        button { cursor:pointer }
+        .page { max-width:1180px; margin:auto; padding:28px 18px 70px; }
+        .topbar,.card { background:rgba(15,23,42,.94); border:1px solid var(--line); border-radius:20px; box-shadow:0 18px 50px rgba(0,0,0,.24); }
+        .topbar { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; margin-bottom:22px; }
+        .title { font-size:22px; font-weight:900; }
+        .badge { background:#192235; border:1px solid #334155; border-radius:11px; padding:10px 15px; color:#cbd5e1; }
+        .layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(300px,1fr); gap:20px; }
+        .stack { display:grid; gap:18px; }
+        .card { padding:18px; }
+        .label { display:block; color:#aab6ca; font-size:12px; font-weight:800; margin-bottom:8px; }
+        .input { width:100%; color:white; background:#1a2436; border:1px solid #334155; border-radius:12px; padding:13px 14px; outline:none; }
+        .input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+        .search-row { display:grid; grid-template-columns:1fr auto; gap:10px; }
+        .primary,.secondary,.danger,.ghost { border:0; border-radius:12px; padding:12px 16px; font-weight:900; color:#fff; }
+        .primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); }
+        .secondary { background:linear-gradient(135deg,#059669,#047857); }
+        .ghost { background:#202b3f; border:1px solid #3a4861; }
+        .danger { background:#7f1d1d; }
+        .products { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:14px; }
+        .product { display:flex; justify-content:space-between; gap:10px; padding:13px; background:#172033; border:1px solid #334155; border-radius:14px; }
+        .product b { display:block; margin-bottom:5px; }
+        .stock { color:var(--green); font-size:11px; }
+        .price { color:#60a5fa; font-weight:900; white-space:nowrap; }
+        .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+        .section-head h2 { margin:0; font-size:17px; }
+        .cart-empty { padding:34px 10px; text-align:center; color:#64748b; border:1px dashed #334155; border-radius:14px; }
+        .cart-item { margin-top:10px; padding:14px; background:#151f31; border:1px solid #334155; border-radius:15px; }
+        .cart-item-top { display:flex; justify-content:space-between; gap:10px; }
+        .cart-meta { margin-top:7px; color:#94a3b8; font-size:12px; line-height:1.8; }
+        .cart-price { color:#60a5fa; font-weight:900; }
+        .summary { display:grid; gap:11px; }
+        .sum-row { display:flex; justify-content:space-between; color:#cbd5e1; }
+        .sum-row.total { padding-top:13px; color:white; border-top:1px solid #334155; font-size:19px; font-weight:900; }
+        .pay-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; }
+        .pay { padding:12px; color:#cbd5e1; background:#172033; border:1px solid #334155; border-radius:12px; font-weight:800; }
+        .pay.active { color:white; background:#172554; border-color:#3b82f6; }
+        .confirm { width:100%; margin-top:16px; padding:16px; font-size:18px; }
+        .modal-wrap { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(2,6,23,.82); backdrop-filter:blur(5px); }
+        .modal-wrap.open { display:flex; }
+        .modal { width:min(920px,100%); max-height:94vh; overflow:auto; background:#0e1728; border:1px solid #34435e; border-radius:22px; box-shadow:0 30px 100px rgba(0,0,0,.6); }
+        .modal-head { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:18px 20px; background:#111b2e; border-bottom:1px solid #2b3951; }
+        .modal-head h2 { margin:0; font-size:20px; }
+        .modal-body { padding:20px; }
+        .flow { display:flex; align-items:center; gap:8px; margin-bottom:18px; color:#64748b; font-size:11px; }
+        .flow span { padding:7px 10px; background:#111d30; border:1px solid #263650; border-radius:999px; }
+        .flow span.done { color:#bfdbfe; border-color:#2563eb; }
+        .flow span.current { color:white; background:#1d4ed8; border-color:#60a5fa; }
+        .step { margin-top:18px; padding-top:18px; border-top:1px solid #223047; }
+        .step:first-of-type { margin-top:0; padding-top:0; border-top:0; }
+        .choice-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+        .choice { min-height:76px; padding:14px; color:#cbd5e1; text-align:right; background:#172238; border:1px solid #334155; border-radius:14px; font-weight:900; }
+        .choice b,.choice span { display:block; }
+        .choice span { margin-top:6px; color:#8795ab; font-size:10px; font-weight:400; line-height:1.6; }
+        .choice.active { color:#fff; background:#1d4ed8; border-color:#60a5fa; box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+        .option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+        .fraction-option { position:relative; padding:14px; color:#fff; text-align:right; background:#151f31; border:1px solid #334155; border-radius:15px; }
+        .fraction-option:hover { border-color:#38bdf8; background:#10283d; }
+        .fraction-option.custom { border-style:dashed; border-color:#8b5cf6; background:#21183a; }
+        .option-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:9px; }
+        .source-tag { padding:4px 7px; color:#bfdbfe; background:#172554; border:1px solid #1d4ed8; border-radius:7px; font-size:9px; white-space:nowrap; }
+        .option-meta { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+        .option-meta span { padding:8px; color:#94a3b8; background:#0f1829; border-radius:9px; font-size:10px; }
+        .option-meta b { display:block; margin-top:4px; color:#fff; font-size:11px; }
+        .empty-options { grid-column:1/-1; padding:25px; color:#94a3b8; text-align:center; background:#101a2c; border:1px dashed #334155; border-radius:14px; }
+        .custom-panel { margin-top:12px; padding:14px; background:#18152d; border:1px solid #6d4bc3; border-radius:15px; }
+        .custom-grid { display:grid; grid-template-columns:1.2fr 1fr 1fr .7fr; gap:10px; }
+        .builder-list { display:grid; gap:8px; }
+        .builder-row { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:12px; background:#141e31; border:1px solid #2c3a52; border-radius:13px; }
+        .builder-row small { display:block; margin-top:5px; color:#94a3b8; line-height:1.6; }
+        .preview-box { margin-top:16px; padding:15px; background:#071426; border:1px solid #1e3a5f; border-radius:15px; }
+        .preview-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+        .metric { padding:12px; background:#111d30; border:1px solid #263650; border-radius:12px; }
+        .metric span { display:block; margin-bottom:6px; color:#94a3b8; font-size:11px; }
+        .metric b { font-size:16px; }
+        .note { margin-top:13px; padding:10px; color:#93c5fd; background:#172554; border:1px solid #1d4ed8; border-radius:10px; font-size:11px; line-height:1.7; }
+        .modal-actions { display:flex; gap:10px; margin-top:18px; }
+        .modal-actions .primary { flex:1; }
+        .hidden { display:none!important; }
+        @media(max-width:850px) {
+            .layout { grid-template-columns:1fr; }
+            .products,.option-grid { grid-template-columns:1fr; }
+            .choice-grid { grid-template-columns:1fr 1fr; }
+            .custom-grid { grid-template-columns:1fr 1fr; }
+            .preview-grid { grid-template-columns:1fr; }
+            .topbar { align-items:flex-start; flex-direction:column; gap:12px; }
+            .badge { width:100%; text-align:center; }
+        }
+        @media(max-width:520px) {
+            .choice-grid,.custom-grid { grid-template-columns:1fr; }
+            .option-meta { grid-template-columns:1fr; }
+            .modal-actions { flex-direction:column; }
+        }
     </style>
 </head>
 <body>
@@ -34,7 +123,7 @@
             </div>
             <div class="card">
                 <div class="section-head"><h2>سلة البيع</h2><span id="cartCount" style="color:#94a3b8;font-size:12px">0 عناصر</span></div>
-                <div id="cart"><div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div></div>
+                <div id="cart"></div>
             </div>
         </section>
         <aside class="stack">
@@ -52,98 +141,340 @@
 
 <div class="modal-wrap" id="tintModal">
     <div class="modal">
-        <div class="modal-head"><div><h2>إضافة تضليل سريع</h2><div style="color:#64748b;font-size:11px;margin-top:4px">اختر منتج التضليل ثم أحد خيارات التجزئة المعدة له</div></div><button class="danger" id="closeTint">إغلاق</button></div>
+        <div class="modal-head">
+            <div><h2>إضافة تضليل سريع</h2><div style="color:#64748b;font-size:11px;margin-top:4px">حدد الفئة والعمل، ثم اختر من خيارات التجزئة المسجلة أو أضف خيارًا مخصصًا</div></div>
+            <button class="danger" id="closeTint">إغلاق</button>
+        </div>
         <div class="modal-body">
-            <div class="step">
-                <span class="label">1 — اختر منتج التضليل</span>
-                <div class="product-choice-grid" id="tintProducts"></div>
+            <div class="flow" id="flowIndicator">
+                <span class="current">1 الفئة</span><b>←</b><span>2 العمل</span><b>←</b><span>3 خيار التجزئة</span>
             </div>
+
+            <div class="step">
+                <span class="label">1 — اختر فئة المركبة</span>
+                <div class="choice-grid" id="categoryChoices"></div>
+            </div>
+
+            <div class="step hidden" id="workStep">
+                <span class="label">2 — اختر نوع العمل المطلوب</span>
+                <div class="choice-grid" id="workChoices"></div>
+            </div>
+
             <div class="step hidden" id="fractionStep">
-                <span class="label">2 — اختر خيار التجزئة المسجل في المنتج</span>
-                <div class="fraction-grid" id="fractionOptions"></div>
-            </div>
-            <div class="step hidden" id="customStep">
-                <span class="label">2 — بيانات القص المخصص</span>
-                <div class="custom-grid">
-                    <div><span class="label">الرول المستخدم</span><select class="input" id="customProduct"></select></div>
-                    <div><span class="label">اسم القطعة</span><input class="input" id="customName" value="قص مخصص" placeholder="مثال: ربع دريشة"></div>
-                    <div><span class="label">الاستهلاك بالمتر</span><input class="input" id="customMeters" type="number" min="0.1" step="0.1" value="0.5"></div>
-                    <div><span class="label">العدد</span><input class="input" id="customQty" type="number" min="1" value="1"></div>
+                <div class="section-head">
+                    <div><span class="label" style="margin:0 0 5px">3 — خيارات التجزئة المسجلة سابقًا</span><b id="selectionTitle"></b></div>
+                    <span id="optionCount" style="color:#94a3b8;font-size:11px"></span>
                 </div>
-                <button class="secondary" style="margin-top:10px" id="addCustomPart">إضافة الجزء المخصص</button>
+                <div class="option-grid" id="fractionOptions"></div>
+                <div class="custom-panel hidden" id="customPanel">
+                    <div class="section-head"><b>تسجيل عمل مخصص</b><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
+                    <div class="custom-grid">
+                        <div><span class="label">منتج التضليل المستخدم</span><select class="input" id="customProduct"></select></div>
+                        <div><span class="label">وصف العمل</span><input class="input" id="customName" placeholder="مثال: جزء من دريشة"></div>
+                        <div><span class="label">الاستهلاك بالمتر</span><input class="input" id="customMeters" type="number" min="0.1" step="0.1" value="0.5"></div>
+                        <div><span class="label">العدد</span><input class="input" id="customQty" type="number" min="1" value="1"></div>
+                    </div>
+                    <button class="secondary" style="margin-top:10px" id="addCustomPart">إضافة المخصص إلى التركيبة</button>
+                </div>
             </div>
+
             <div class="step">
-                <div class="section-head"><span class="label" style="margin:0">تركيبة عملية التضليل</span><span id="partsHint" style="color:#64748b;font-size:11px">لم تتم إضافة أجزاء</span></div>
+                <div class="section-head"><span class="label" style="margin:0">تركيبة عملية التضليل</span><span id="partsHint" style="color:#64748b;font-size:11px">لم تتم إضافة خيارات</span></div>
                 <div class="builder-list" id="selectedParts"></div>
             </div>
-            <div style="margin-top:16px"><span class="label">السعر النهائي للعميل</span><input class="input" id="salePrice" type="number" value="450" min="1"></div>
+
+            <div style="margin-top:16px"><span class="label">السعر النهائي للعميل</span><input class="input" id="salePrice" type="number" value="0" min="1"></div>
             <div class="preview-box">
-                <div class="preview-grid"><div class="metric"><span>عدد الأجزاء</span><b id="componentCount">0</b></div><div class="metric"><span>الاستهلاك الكلي</span><b id="metersTotal">0 متر</b></div><div class="metric"><span>التكلفة التقديرية</span><b id="costTotal" style="color:#fbbf24">0 ر.س</b></div></div>
-                <div class="note">بيانات المنتجات والخيارات هنا تجريبية، لكنها بنفس الشكل المتوقع من بيانات المنتجات وخيارات التجزئة عند الربط الفعلي. الاستهلاك والسعر الافتراضي يأتيان من خيار التجزئة المختار.</div>
+                <div class="preview-grid">
+                    <div class="metric"><span>عدد الخيارات</span><b id="componentCount">0</b></div>
+                    <div class="metric"><span>الاستهلاك الكلي</span><b id="metersTotal">0 متر</b></div>
+                    <div class="metric"><span>التكلفة التقديرية</span><b id="costTotal" style="color:#fbbf24">0 ر.س</b></div>
+                </div>
+                <div class="note">هذه صفحة معاينة فقط. في الربط الفعلي ستأتي أسماء المنتجات وخيارات التجزئة والاستهلاك والسعر من البيانات المسجلة عند إضافة أو تعديل المنتج، بينما يظل الخيار المخصص متاحًا للحالات الجديدة.</div>
             </div>
-            <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
+            <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة كسطر واحد</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
         </div>
     </div>
 </div>
 
 <script>
-// بيانات تجريبية تحاكي المنتجات وخيارات التجزئة القادمة من النظام عند الربط الفعلي.
-const previewProducts=[
- {id:'01-big',name:'01 رول كبير',cost:170,length:30,stock:27,fractions:[{id:11,label:'أمامي',meters:1.5,price:120},{id:12,label:'خلفي',meters:1.5,price:120},{id:13,label:'كامل كبير',meters:3,price:230}]},
- {id:'01-small',name:'01 رول صغير',cost:70,length:30,stock:24.5,fractions:[{id:21,label:'دريشة',meters:.5,price:45},{id:22,label:'جوانب',meters:2,price:150}]},
- {id:'02-big',name:'02 رول كبير',cost:180,length:30,stock:30,fractions:[{id:31,label:'أمامي',meters:1.5,price:135},{id:32,label:'خلفي',meters:1.5,price:135}]},
- {id:'02-small',name:'02 رول صغير',cost:75,length:30,stock:22,fractions:[{id:41,label:'دريشة',meters:.5,price:50},{id:42,label:'جوانب',meters:2,price:165}]},
- {id:'nickel-big',name:'نيكل رول كبير',cost:195,length:30,stock:18,fractions:[{id:51,label:'أمامي',meters:1.6,price:160},{id:52,label:'خلفي',meters:1.6,price:160}]}
+// بيانات تجريبية تحاكي المنتجات وخيارات التجزئة المسجلة في النظام.
+const categories = [
+    { id: 'korean', label: 'كوري', description: 'عرض المنتجات وخيارات التجزئة المخصصة للمركبات الكورية' },
+    { id: 'american', label: 'أمريكي', description: 'عرض المنتجات وخيارات التجزئة المخصصة للمركبات الأمريكية' },
+    { id: 'other', label: 'أخرى', description: 'للفئات والمنتجات الأخرى المتوفرة في المتجر' },
 ];
-let selectedProduct=null, selectedParts=[], cart=[];
-const modal=document.getElementById('tintModal');
-function money(value){return Number(value||0).toFixed(2)+' ر.س'}
-function productById(id){return previewProducts.find(product=>product.id===id)}
-function renderProducts(){
- const box=document.getElementById('tintProducts');
- box.innerHTML=previewProducts.map(product=>`<button class="product-choice ${selectedProduct?.id===product.id?'active':''}" data-product="${product.id}"><b>${product.name}</b><span>المتوفر ${product.stock}م — تكلفة الرول ${money(product.cost)}</span></button>`).join('')+`<button class="product-choice ${selectedProduct==='custom'?'active':''}" data-product="custom"><b>مخصص</b><span>إدخال المنتج والاستهلاك يدويًا</span></button>`;
- box.querySelectorAll('button').forEach(button=>button.onclick=()=>selectProduct(button.dataset.product));
+const works = [
+    { id: 'full', label: 'كامل السيارة', description: 'خيارات التجزئة المسجلة لتضليل السيارة كاملة' },
+    { id: 'front', label: 'أمامي', description: 'الزجاج الأمامي فقط' },
+    { id: 'rear', label: 'خلفي', description: 'الزجاج الخلفي فقط' },
+    { id: 'window', label: 'دريشة', description: 'دريشة واحدة أو أكثر حسب العدد' },
+    { id: 'sides', label: 'الجوانب', description: 'خيارات الجوانب المسجلة في المنتجات' },
+    { id: 'front-rear', label: 'أمامي وخلفي', description: 'إضافة الأمامي والخلفي معًا' },
+];
+const previewProducts = [
+    { id:'kr-01-big', category:'korean', name:'كوري 01 رول كبير', cost:170, length:30, stock:27, fractions:[
+        { id:11, work:'front', label:'أمامي 01', meters:1.5, price:120 },
+        { id:12, work:'rear', label:'خلفي 01', meters:1.5, price:120 },
+        { id:13, work:'front-rear', label:'أمامي وخلفي 01', meters:3, price:230 },
+        { id:14, work:'full', label:'كامل كوري 01 — الجزء الكبير', meters:3, price:230 },
+    ]},
+    { id:'kr-01-small', category:'korean', name:'كوري 01 رول صغير', cost:70, length:30, stock:24.5, fractions:[
+        { id:21, work:'window', label:'دريشة 01', meters:.5, price:45 },
+        { id:22, work:'sides', label:'جوانب 01', meters:2, price:150 },
+        { id:23, work:'full', label:'كامل كوري 01 — الجزء الصغير', meters:2, price:150 },
+    ]},
+    { id:'kr-02-big', category:'korean', name:'كوري 02 رول كبير', cost:180, length:30, stock:30, fractions:[
+        { id:31, work:'front', label:'أمامي 02', meters:1.5, price:135 },
+        { id:32, work:'rear', label:'خلفي 02', meters:1.5, price:135 },
+        { id:33, work:'front-rear', label:'أمامي وخلفي 02', meters:3, price:260 },
+    ]},
+    { id:'kr-02-small', category:'korean', name:'كوري 02 رول صغير', cost:75, length:30, stock:22, fractions:[
+        { id:41, work:'window', label:'دريشة 02', meters:.5, price:50 },
+        { id:42, work:'sides', label:'جوانب 02', meters:2, price:165 },
+    ]},
+    { id:'us-premium-big', category:'american', name:'أمريكي بريميوم كبير', cost:210, length:30, stock:16, fractions:[
+        { id:51, work:'front', label:'أمامي أمريكي', meters:1.7, price:175 },
+        { id:52, work:'rear', label:'خلفي أمريكي', meters:1.7, price:175 },
+        { id:53, work:'front-rear', label:'أمامي وخلفي أمريكي', meters:3.4, price:340 },
+    ]},
+    { id:'us-premium-small', category:'american', name:'أمريكي بريميوم صغير', cost:95, length:30, stock:19, fractions:[
+        { id:61, work:'window', label:'دريشة أمريكي', meters:.6, price:65 },
+        { id:62, work:'sides', label:'جوانب أمريكي', meters:2.4, price:220 },
+    ]},
+    { id:'other-nickel', category:'other', name:'نيكل رول كبير', cost:195, length:30, stock:18, fractions:[
+        { id:71, work:'front', label:'أمامي نيكل', meters:1.6, price:160 },
+        { id:72, work:'rear', label:'خلفي نيكل', meters:1.6, price:160 },
+        { id:73, work:'front-rear', label:'أمامي وخلفي نيكل', meters:3.2, price:310 },
+    ]},
+];
+
+let selectedCategory = null;
+let selectedWork = null;
+let selectedParts = [];
+let cart = [];
+const modal = document.getElementById('tintModal');
+
+function money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; }
+function categoryById(id) { return categories.find(category => category.id === id); }
+function workById(id) { return works.find(work => work.id === id); }
+function productById(id) { return previewProducts.find(product => product.id === id); }
+function productsForCategory() { return previewProducts.filter(product => product.category === selectedCategory); }
+
+function renderCategories() {
+    const box = document.getElementById('categoryChoices');
+    box.innerHTML = categories.map(category => `
+        <button class="choice ${selectedCategory === category.id ? 'active' : ''}" data-category="${category.id}">
+            <b>${category.label}</b><span>${category.description}</span>
+        </button>
+    `).join('');
+    box.querySelectorAll('[data-category]').forEach(button => button.onclick = () => selectCategory(button.dataset.category));
 }
-function selectProduct(id){
- selectedProduct=id==='custom'?'custom':productById(id);renderProducts();
- document.getElementById('fractionStep').classList.toggle('hidden',id==='custom');
- document.getElementById('customStep').classList.toggle('hidden',id!=='custom');
- if(id==='custom'){renderCustomProducts();document.getElementById('fractionOptions').innerHTML='';return}
- document.getElementById('fractionOptions').innerHTML=selectedProduct.fractions.map(option=>`<button class="fraction-choice" data-fraction="${option.id}"><b>${option.label}</b><span>${option.meters}م — السعر الافتراضي ${money(option.price)}</span></button>`).join('');
- document.querySelectorAll('.fraction-choice').forEach(button=>button.onclick=()=>addFraction(Number(button.dataset.fraction)));
+
+function renderWorks() {
+    const box = document.getElementById('workChoices');
+    box.innerHTML = works.map(work => `
+        <button class="choice ${selectedWork === work.id ? 'active' : ''}" data-work="${work.id}">
+            <b>${work.label}</b><span>${work.description}</span>
+        </button>
+    `).join('');
+    box.querySelectorAll('[data-work]').forEach(button => button.onclick = () => selectWork(button.dataset.work));
 }
-function renderCustomProducts(){document.getElementById('customProduct').innerHTML=previewProducts.map(product=>`<option value="${product.id}">${product.name}</option>`).join('')}
-function addFraction(fractionId){
- const option=selectedProduct.fractions.find(item=>item.id===fractionId);
- selectedParts.push({key:Date.now()+Math.random(),name:option.label,product:selectedProduct,meters:option.meters,qty:1,unitPrice:option.price,fractionId:option.id,custom:false});
- renderSelectedParts();
+
+function selectCategory(id) {
+    selectedCategory = id;
+    selectedWork = null;
+    selectedParts = [];
+    document.getElementById('workStep').classList.remove('hidden');
+    document.getElementById('fractionStep').classList.add('hidden');
+    closeCustomPanel();
+    renderCategories();
+    renderWorks();
+    renderSelectedParts();
+    updateFlow(2);
 }
-function addCustomPart(){
- const product=productById(document.getElementById('customProduct').value),name=document.getElementById('customName').value.trim()||'قص مخصص',meters=Number(document.getElementById('customMeters').value),qty=Number(document.getElementById('customQty').value);
- if(!product||meters<=0||qty<=0){alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين');return}
- selectedParts.push({key:Date.now()+Math.random(),name,product,meters,qty,unitPrice:0,fractionId:null,custom:true});renderSelectedParts();
+
+function selectWork(id) {
+    selectedWork = id;
+    selectedParts = [];
+    document.getElementById('fractionStep').classList.remove('hidden');
+    closeCustomPanel();
+    renderWorks();
+    renderFractionOptions();
+    renderSelectedParts();
+    updateFlow(3);
 }
-function removePart(key){selectedParts=selectedParts.filter(part=>String(part.key)!==String(key));renderSelectedParts()}
-function renderSelectedParts(){
- const box=document.getElementById('selectedParts');
- box.innerHTML=selectedParts.length?selectedParts.map(part=>`<div class="builder-row"><div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters*part.qty).toFixed(2)}م${part.custom?' — مخصص':' — من خيار التجزئة'}</small></div><button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button></div>`).join(''):'<div class="cart-empty" style="padding:20px">اختر منتجًا ثم اضغط على أحد خياراته لإضافته.</div>';
- box.querySelectorAll('[data-remove]').forEach(button=>button.onclick=()=>removePart(button.dataset.remove));
- const meters=selectedParts.reduce((sum,part)=>sum+part.meters*part.qty,0),cost=selectedParts.reduce((sum,part)=>sum+(part.product.cost/part.product.length)*part.meters*part.qty,0),defaultPrice=selectedParts.reduce((sum,part)=>sum+part.unitPrice*part.qty,0);
- document.getElementById('componentCount').textContent=selectedParts.length;document.getElementById('metersTotal').textContent=meters.toFixed(2)+' متر';document.getElementById('costTotal').textContent=money(cost);document.getElementById('partsHint').textContent=selectedParts.length?selectedParts.length+' أجزاء مضافة':'لم تتم إضافة أجزاء';
- if(defaultPrice>0)document.getElementById('salePrice').value=defaultPrice.toFixed(2);
+
+function matchingOptions() {
+    return productsForCategory().flatMap(product => product.fractions
+        .filter(option => option.work === selectedWork)
+        .map(option => ({ product, option }))
+    );
 }
-function resetBuilder(){selectedProduct=null;selectedParts=[];document.getElementById('fractionStep').classList.add('hidden');document.getElementById('customStep').classList.add('hidden');document.getElementById('salePrice').value=450;renderProducts();renderSelectedParts()}
-function renderCart(){
- const box=document.getElementById('cart');
- box.innerHTML=cart.length?cart.map((item,index)=>`<div class="cart-item"><div class="cart-item-top"><div><b>عملية تضليل مركبة</b><div class="cart-meta">${item.parts.map(part=>`${part.name}: ${part.product.name} — ${(part.meters*part.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div></div></div>`).join(''):'<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
- const total=cart.reduce((sum,item)=>sum+item.price,0);document.getElementById('cartCount').textContent=cart.length+' عناصر';document.getElementById('productsTotal').textContent=money(total);document.getElementById('finalTotal').textContent=money(total);
+
+function renderFractionOptions() {
+    const matches = matchingOptions();
+    const category = categoryById(selectedCategory);
+    const work = workById(selectedWork);
+    const box = document.getElementById('fractionOptions');
+    document.getElementById('selectionTitle').textContent = `${category.label} — ${work.label}`;
+    document.getElementById('optionCount').textContent = `${matches.length} خيارات مسجلة`;
+
+    box.innerHTML = matches.map(({ product, option }) => `
+        <button class="fraction-option" data-product="${product.id}" data-option="${option.id}">
+            <div class="option-head"><b>${option.label}</b><span class="source-tag">من بيانات المنتج</span></div>
+            <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
+            <div class="option-meta">
+                <span>الاستهلاك<b>${option.meters} متر</b></span>
+                <span>السعر الافتراضي<b>${money(option.price)}</b></span>
+                <span>المتوفر<b>${product.stock} متر</b></span>
+            </div>
+        </button>
+    `).join('') + `
+        <button class="fraction-option custom" id="openCustom">
+            <div class="option-head"><b>خيار مخصص +</b><span class="source-tag" style="border-color:#8b5cf6;background:#3b2170">جديد</span></div>
+            <div style="color:#c4b5fd;font-size:11px;line-height:1.7">استخدمه إذا كان العمل المطلوب غير موجود ضمن خيارات التجزئة المسجلة.</div>
+        </button>
+    `;
+
+    if (!matches.length) {
+        box.insertAdjacentHTML('afterbegin', '<div class="empty-options">لا توجد خيارات تجزئة مسجلة لهذا الاختيار حاليًا. يمكنك استخدام الخيار المخصص.</div>');
+    }
+    box.querySelectorAll('[data-option]').forEach(button => button.onclick = () => addRegisteredOption(button.dataset.product, Number(button.dataset.option)));
+    document.getElementById('openCustom').onclick = openCustomPanel;
 }
-window.removeCartItem=index=>{cart.splice(index,1);renderCart()};
-document.getElementById('openTint').onclick=()=>{modal.classList.add('open');resetBuilder()};document.getElementById('closeTint').onclick=()=>modal.classList.remove('open');modal.onclick=event=>{if(event.target===modal)modal.classList.remove('open')};
-document.getElementById('addCustomPart').onclick=addCustomPart;document.getElementById('resetTint').onclick=resetBuilder;
-document.getElementById('addTint').onclick=()=>{const price=Number(document.getElementById('salePrice').value);if(!selectedParts.length){alert('أضف خيار تضليل واحدًا على الأقل');return}if(price<=0){alert('أدخل السعر النهائي');return}cart.push({parts:selectedParts.map(part=>({...part})),price});renderCart();modal.classList.remove('open')};
-document.querySelectorAll('.pay').forEach(button=>button.onclick=()=>{document.querySelectorAll('.pay').forEach(item=>item.classList.remove('active'));button.classList.add('active')});
-renderProducts();renderSelectedParts();renderCart();
+
+function addRegisteredOption(productId, optionId) {
+    const product = productById(productId);
+    const option = product.fractions.find(fraction => fraction.id === optionId);
+    selectedParts.push({
+        key: Date.now() + Math.random(),
+        name: option.label,
+        product,
+        meters: option.meters,
+        qty: 1,
+        unitPrice: option.price,
+        custom: false,
+    });
+    renderSelectedParts();
+}
+
+function openCustomPanel() {
+    const products = productsForCategory();
+    document.getElementById('customProduct').innerHTML = products.map(product => `<option value="${product.id}">${product.name}</option>`).join('');
+    document.getElementById('customName').value = workById(selectedWork)?.label || 'عمل مخصص';
+    document.getElementById('customPanel').classList.remove('hidden');
+    document.getElementById('customName').focus();
+}
+
+function closeCustomPanel() { document.getElementById('customPanel').classList.add('hidden'); }
+
+function addCustomPart() {
+    const product = productById(document.getElementById('customProduct').value);
+    const name = document.getElementById('customName').value.trim() || 'عمل مخصص';
+    const meters = Number(document.getElementById('customMeters').value);
+    const qty = Number(document.getElementById('customQty').value);
+    if (!product || meters <= 0 || qty <= 0) {
+        alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين');
+        return;
+    }
+    selectedParts.push({ key:Date.now() + Math.random(), name, product, meters, qty, unitPrice:0, custom:true });
+    closeCustomPanel();
+    renderSelectedParts();
+}
+
+function removePart(key) {
+    selectedParts = selectedParts.filter(part => String(part.key) !== String(key));
+    renderSelectedParts();
+}
+
+function renderSelectedParts() {
+    const box = document.getElementById('selectedParts');
+    box.innerHTML = selectedParts.length ? selectedParts.map(part => `
+        <div class="builder-row">
+            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'خيار مخصص' : 'خيار تجزئة مسجل'}</small></div>
+            <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
+        </div>
+    `).join('') : '<div class="cart-empty" style="padding:20px">ابدأ باختيار الفئة، ثم نوع العمل، ثم أحد خيارات التجزئة.</div>';
+    box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
+
+    const meters = selectedParts.reduce((sum, part) => sum + part.meters * part.qty, 0);
+    const cost = selectedParts.reduce((sum, part) => sum + (part.product.cost / part.product.length) * part.meters * part.qty, 0);
+    const defaultPrice = selectedParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0);
+    document.getElementById('componentCount').textContent = selectedParts.length;
+    document.getElementById('metersTotal').textContent = meters.toFixed(2) + ' متر';
+    document.getElementById('costTotal').textContent = money(cost);
+    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} خيارات مضافة` : 'لم تتم إضافة خيارات';
+    document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
+}
+
+function updateFlow(step) {
+    const flowSteps = document.querySelectorAll('#flowIndicator span');
+    flowSteps.forEach((item, index) => {
+        item.classList.toggle('done', index + 1 < step);
+        item.classList.toggle('current', index + 1 === step);
+    });
+}
+
+function resetBuilder() {
+    selectedCategory = null;
+    selectedWork = null;
+    selectedParts = [];
+    document.getElementById('workStep').classList.add('hidden');
+    document.getElementById('fractionStep').classList.add('hidden');
+    closeCustomPanel();
+    renderCategories();
+    renderWorks();
+    renderSelectedParts();
+    updateFlow(1);
+}
+
+function renderCart() {
+    const box = document.getElementById('cart');
+    box.innerHTML = cart.length ? cart.map((item, index) => `
+        <div class="cart-item">
+            <div class="cart-item-top">
+                <div><b>تضليل ${item.category} — ${item.work}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div>
+                <div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div>
+            </div>
+        </div>
+    `).join('') : '<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
+    const total = cart.reduce((sum, item) => sum + item.price, 0);
+    document.getElementById('cartCount').textContent = `${cart.length} عناصر`;
+    document.getElementById('productsTotal').textContent = money(total);
+    document.getElementById('finalTotal').textContent = money(total);
+}
+
+window.removeCartItem = index => { cart.splice(index, 1); renderCart(); };
+document.getElementById('openTint').onclick = () => { modal.classList.add('open'); resetBuilder(); };
+document.getElementById('closeTint').onclick = () => modal.classList.remove('open');
+modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
+document.getElementById('closeCustom').onclick = closeCustomPanel;
+document.getElementById('addCustomPart').onclick = addCustomPart;
+document.getElementById('resetTint').onclick = resetBuilder;
+document.getElementById('addTint').onclick = () => {
+    const price = Number(document.getElementById('salePrice').value);
+    if (!selectedCategory || !selectedWork) { alert('اختر الفئة ونوع العمل أولًا'); return; }
+    if (!selectedParts.length) { alert('أضف خيار تجزئة واحدًا على الأقل'); return; }
+    if (price <= 0) { alert('أدخل السعر النهائي'); return; }
+    cart.push({
+        category: categoryById(selectedCategory).label,
+        work: workById(selectedWork).label,
+        parts: selectedParts.map(part => ({ ...part })),
+        price,
+    });
+    renderCart();
+    modal.classList.remove('open');
+};
+document.querySelectorAll('.pay').forEach(button => button.onclick = () => {
+    document.querySelectorAll('.pay').forEach(item => item.classList.remove('active'));
+    button.classList.add('active');
+});
+
+renderCategories();
+renderWorks();
+renderSelectedParts();
+renderCart();
 </script>
 </body>
 </html>
