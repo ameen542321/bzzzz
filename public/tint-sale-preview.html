@@ -202,14 +202,6 @@
             </div>
 
             <div style="margin-top:16px"><span class="label">السعر النهائي للعميل</span><input class="input" id="salePrice" type="number" value="0" min="1"></div>
-            <div class="preview-box">
-                <div class="preview-grid">
-                    <div class="metric"><span>عدد الأعمال</span><b id="componentCount">0</b></div>
-                    <div class="metric"><span>الاستهلاك الكلي</span><b id="metersTotal">0 متر</b></div>
-                    <div class="metric"><span>التكلفة التقديرية</span><b id="costTotal" style="color:#fbbf24">0 ر.س</b></div>
-                </div>
-                <div class="note">اختيار الدرجة يطبق التسعيرة المسجلة تلقائيًا دون خطوة اختيار إضافية. في الربط الفعلي ستأتي التسعيرة والاستهلاك من بيانات المنتج وخيارات التجزئة المسجلة.</div>
-            </div>
             <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة كسطر واحد</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
         </div>
     </div>
@@ -478,12 +470,7 @@ function renderSelectedParts() {
         </div>
     `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
-    const meters = selectedParts.reduce((sum, part) => sum + part.meters * part.qty, 0);
-    const cost = selectedParts.reduce((sum, part) => sum + (part.product.cost / part.product.length) * part.meters * part.qty, 0);
     const defaultPrice = selectedParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0);
-    document.getElementById('componentCount').textContent = selectedParts.length;
-    document.getElementById('metersTotal').textContent = meters.toFixed(2) + ' متر';
-    document.getElementById('costTotal').textContent = money(cost);
     document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} أعمال مضافة` : 'لم يتم اختيار أي عمل';
     document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
 }
