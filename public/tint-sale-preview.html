@@ -170,7 +170,7 @@
         </div>
         <div class="modal-body">
             <div class="flow" id="flowIndicator">
-                <span class="current">1 الفئة</span><b>←</b><span>2 العمل</span><b>←</b><span>3 خيار التجزئة</span>
+                <span class="current">1 الفئة</span><b>←</b><span>2 العمل والحجم والدرجة</span>
             </div>
 
             <div class="step">
@@ -183,14 +183,9 @@
                 <div class="choice-grid work-choice-grid" id="workChoices"></div>
             </div>
 
-            <div class="step hidden" id="fractionStep">
-                <div class="section-head">
-                    <div><span class="label" style="margin:0 0 5px">3 — التسعيرات المطابقة للحجم والدرجة المختارين</span><b id="selectionTitle"></b></div>
-                    <span id="optionCount" style="color:#94a3b8;font-size:11px"></span>
-                </div>
-                <div class="option-grid" id="fractionOptions"></div>
-                <div class="custom-panel hidden" id="customPanel">
-                    <div class="section-head"><b>تسجيل عمل مخصص</b><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
+            <div class="step hidden" id="customStep">
+                <div class="custom-panel" id="customPanel">
+                    <div class="section-head"><div><span class="label" style="margin:0 0 5px">إضافة اختيار غير مسجل</span><b>تسجيل عمل مخصص</b></div><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
                     <div class="custom-grid">
                         <div><span class="label">منتج التضليل المستخدم</span><select class="input" id="customProduct"></select></div>
                         <div><span class="label">وصف العمل</span><input class="input" id="customName" placeholder="مثال: جزء من دريشة"></div>
@@ -202,18 +197,18 @@
             </div>
 
             <div class="step">
-                <div class="section-head"><span class="label" style="margin:0">تركيبة عملية التضليل</span><span id="partsHint" style="color:#64748b;font-size:11px">لم تتم إضافة خيارات</span></div>
+                <div class="section-head"><span class="label" style="margin:0">ملخص عملية التضليل</span><span id="partsHint" style="color:#64748b;font-size:11px">لم يتم اختيار أي عمل</span></div>
                 <div class="builder-list" id="selectedParts"></div>
             </div>
 
             <div style="margin-top:16px"><span class="label">السعر النهائي للعميل</span><input class="input" id="salePrice" type="number" value="0" min="1"></div>
             <div class="preview-box">
                 <div class="preview-grid">
-                    <div class="metric"><span>عدد الخيارات</span><b id="componentCount">0</b></div>
+                    <div class="metric"><span>عدد الأعمال</span><b id="componentCount">0</b></div>
                     <div class="metric"><span>الاستهلاك الكلي</span><b id="metersTotal">0 متر</b></div>
                     <div class="metric"><span>التكلفة التقديرية</span><b id="costTotal" style="color:#fbbf24">0 ر.س</b></div>
                 </div>
-                <div class="note">هذه صفحة معاينة فقط. في الربط الفعلي ستأتي أسماء المنتجات وخيارات التجزئة والاستهلاك والسعر من البيانات المسجلة عند إضافة أو تعديل المنتج، بينما يظل الخيار المخصص متاحًا للحالات الجديدة.</div>
+                <div class="note">اختيار الدرجة يطبق التسعيرة المسجلة تلقائيًا دون خطوة اختيار إضافية. في الربط الفعلي ستأتي التسعيرة والاستهلاك من بيانات المنتج وخيارات التجزئة المسجلة.</div>
             </div>
             <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة كسطر واحد</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
         </div>
@@ -355,8 +350,6 @@ function selectCategory(id) {
     selectedParts = [];
     windowCount = 1;
     document.getElementById('workStep').classList.remove('hidden');
-    document.getElementById('fractionStep').classList.add('hidden');
-    document.getElementById('fractionOptions').innerHTML = '';
     closeCustomPanel();
     renderCategories();
     renderWorks();
@@ -383,7 +376,7 @@ function toggleWorkSize(work, size) {
     }
     selectedParts = selectedParts.filter(part => part.custom || part.work !== work);
     renderWorks();
-    refreshPricingStep();
+    syncAutomaticPricing();
     renderSelectedParts();
 }
 
@@ -401,7 +394,7 @@ function selectGrade(work, grade) {
     workSelections[work].grade = grade;
     selectedParts = selectedParts.filter(part => part.custom || part.work !== work);
     renderWorks();
-    refreshPricingStep();
+    syncAutomaticPricing();
     renderSelectedParts();
 }
 
@@ -409,85 +402,50 @@ function changeWindowCount(change) {
     windowCount = Math.min(4, Math.max(1, windowCount + change));
     selectedParts = selectedParts.map(part => part.work === 'window' && !part.custom ? { ...part, qty:windowCount } : part);
     renderWorks();
-    refreshPricingStep();
+    syncAutomaticPricing();
     renderSelectedParts();
 }
 
-function matchingPrices() {
-    return selectedConfigurations().flatMap(configuration => productsForCategory()
-        .filter(product => product.size === configuration.size && product.grade === configuration.grade)
-        .flatMap(product => product.fractions
-            .filter(option => option.work === configuration.work)
-            .map(option => ({ ...configuration, product, option }))
-        )
-    );
-}
-
-function refreshPricingStep() {
-    const configurations = selectedConfigurations();
-    document.getElementById('fractionStep').classList.toggle('hidden', !configurations.length);
-    if (configurations.length) {
-        renderPricingOptions();
-        updateFlow(3);
-    } else {
-        updateFlow(Object.keys(workSelections).length ? 2 : 2);
+function findAutomaticPrice(configuration) {
+    for (const product of productsForCategory()) {
+        if (product.size !== configuration.size || product.grade !== configuration.grade) continue;
+        const option = product.fractions.find(item => item.work === configuration.work);
+        if (option) return { ...configuration, product, option };
     }
+    return null;
 }
 
-function renderPricingOptions() {
-    const matches = matchingPrices();
-    const box = document.getElementById('fractionOptions');
-    document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — اختر التسعيرة المناسبة`;
-    document.getElementById('optionCount').textContent = `${matches.length} تسعيرات متاحة`;
-    box.innerHTML = matches.map(({ work, size, grade, product, option }) => {
-        const qty = work === 'window' ? windowCount : 1;
-        const key = selectionKey(work);
-        const selected = selectedParts.some(part => !part.custom && part.selectionKey === key && part.product.id === product.id);
-        return `
-            <button class="fraction-option ${selected ? 'selected-price' : ''}" data-product="${product.id}" data-option="${option.id}" data-key="${key}">
-                <div class="option-head"><b>${workById(work).label} — ${sizeById(size).label}</b><span class="grade-badge">${grade}</span></div>
-                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
-                <div class="option-meta">
-                    <span>الاستهلاك<b>${option.meters}م × ${qty} = ${(option.meters * qty).toFixed(2)}م</b></span>
-                    <span>التسعيرة<b>${money(option.price * qty)}</b></span>
-                    <span>المتوفر<b>${product.stock} متر</b></span>
-                </div>
-            </button>
-        `;
-    }).join('') || '<div class="empty-options">لا توجد تسعيرة مسجلة لهذا الحجم والدرجة.</div>';
-    box.querySelectorAll('[data-option]').forEach(button => button.onclick = () => addPricedOption(button.dataset.product, Number(button.dataset.option), button.dataset.key));
-}
-
-function addPricedOption(productId, optionId, key) {
-    const product = productById(productId);
-    const option = product.fractions.find(fraction => fraction.id === optionId);
-    const qty = option.work === 'window' ? windowCount : 1;
-    selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== key);
-    selectedParts.push({
-        key:Date.now() + Math.random(), name:option.label, product, work:option.work,
-        size:product.size, selectionKey:key, meters:option.meters, qty,
-        unitPrice:option.price, custom:false,
-    });
-    renderPricingOptions();
-    renderSelectedParts();
+function syncAutomaticPricing() {
+    const customParts = selectedParts.filter(part => part.custom);
+    const automaticParts = selectedConfigurations().map(configuration => {
+        const match = findAutomaticPrice(configuration);
+        if (!match) return null;
+        const { work, product, option } = match;
+        return {
+            key:`automatic-${work}`,
+            name:option.label,
+            product,
+            work,
+            size:product.size,
+            selectionKey:selectionKey(work),
+            meters:option.meters,
+            qty:work === 'window' ? windowCount : 1,
+            unitPrice:option.price,
+            custom:false,
+        };
+    }).filter(Boolean);
+    selectedParts = [...customParts, ...automaticParts];
 }
 
 function openCustomPanel() {
     if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
-    document.getElementById('fractionStep').classList.remove('hidden');
-    if (!selectedConfigurations().length) {
-        document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — إضافة مخصصة`;
-        document.getElementById('optionCount').textContent = '';
-        document.getElementById('fractionOptions').innerHTML = '<div class="empty-options">يمكن إضافة عمل مخصص دون اختيار تسعيرة جاهزة.</div>';
-    }
     document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${product.name}</option>`).join('');
     document.getElementById('customName').value = '';
-    document.getElementById('customPanel').classList.remove('hidden');
+    document.getElementById('customStep').classList.remove('hidden');
     document.getElementById('customName').focus();
-    updateFlow(3);
 }
 
-function closeCustomPanel() { document.getElementById('customPanel').classList.add('hidden'); }
+function closeCustomPanel() { document.getElementById('customStep').classList.add('hidden'); }
 function addCustomPart() {
     const product = productById(document.getElementById('customProduct').value);
     const name = document.getElementById('customName').value.trim() || 'إضافة مخصصة';
@@ -500,8 +458,14 @@ function addCustomPart() {
 }
 
 function removePart(key) {
-    selectedParts = selectedParts.filter(part => String(part.key) !== String(key));
-    renderPricingOptions();
+    const part = selectedParts.find(item => String(item.key) === String(key));
+    if (part && !part.custom) {
+        delete workSelections[part.work];
+        syncAutomaticPricing();
+        renderWorks();
+    } else {
+        selectedParts = selectedParts.filter(item => String(item.key) !== String(key));
+    }
     renderSelectedParts();
 }
 
@@ -509,10 +473,10 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : 'تسعيرة مختارة'}</small></div>
+            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
-    `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل، ثم الدرجة، ثم اضغط على التسعيرة الظاهرة.</div>';
+    `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
     const meters = selectedParts.reduce((sum, part) => sum + part.meters * part.qty, 0);
     const cost = selectedParts.reduce((sum, part) => sum + (part.product.cost / part.product.length) * part.meters * part.qty, 0);
@@ -520,7 +484,7 @@ function renderSelectedParts() {
     document.getElementById('componentCount').textContent = selectedParts.length;
     document.getElementById('metersTotal').textContent = meters.toFixed(2) + ' متر';
     document.getElementById('costTotal').textContent = money(cost);
-    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} تسعيرات مختارة` : 'لم تتم إضافة تسعيرات';
+    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} أعمال مضافة` : 'لم يتم اختيار أي عمل';
     document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
 }
 
@@ -533,7 +497,6 @@ function updateFlow(step) {
 function resetBuilder() {
     selectedCategory = null; workSelections = {}; selectedParts = []; windowCount = 1;
     document.getElementById('workStep').classList.add('hidden');
-    document.getElementById('fractionStep').classList.add('hidden');
     closeCustomPanel(); renderCategories(); renderWorks(); renderSelectedParts(); updateFlow(1);
 }
 function renderCart() {
