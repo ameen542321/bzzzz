@@ -67,6 +67,10 @@
         .window-counter { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
         .window-counter button { width:30px; height:30px; padding:0; color:#fff; background:#0f172a; border:1px solid #60a5fa; border-radius:8px; font-weight:900; }
         .window-counter strong { min-width:22px; text-align:center; font-size:16px; }
+        .size-selector { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
+        .size-selector button { padding:8px; color:#cbd5e1; background:#0f172a; border:1px solid #475569; border-radius:9px; font-weight:900; }
+        .size-selector button.active { color:#fff; background:#059669; border-color:#6ee7b7; }
+        .grade-badge { padding:4px 8px; color:#fef3c7; background:#78350f; border:1px solid #d97706; border-radius:7px; font-size:10px; white-space:nowrap; }
         .option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
         .fraction-option { position:relative; padding:14px; color:#fff; text-align:right; background:#151f31; border:1px solid #334155; border-radius:15px; }
         .fraction-option:hover { border-color:#38bdf8; background:#10283d; }
@@ -214,40 +218,47 @@ const works = [
     { id: 'rear', label: 'خلفي', description: 'الزجاج الخلفي' },
     { id: 'window', label: 'دريشة', description: 'حدد عدد الدرايش من 1 إلى 4' },
 ];
-const previewProducts = [
-    { id:'kr-01-big', category:'korean', name:'كوري 01 رول كبير', cost:170, length:30, stock:27, fractions:[
-        { id:11, work:'front', label:'أمامي 01', meters:1.5, price:120 },
-        { id:12, work:'rear', label:'خلفي 01', meters:1.5, price:120 },
-        { id:14, work:'full', label:'كامل كوري 01 — الجزء الكبير', meters:3, price:230 },
-    ]},
-    { id:'kr-01-small', category:'korean', name:'كوري 01 رول صغير', cost:70, length:30, stock:24.5, fractions:[
-        { id:21, work:'window', label:'دريشة 01', meters:.5, price:45 },
-        { id:23, work:'full', label:'كامل كوري 01 — الجزء الصغير', meters:2, price:150 },
-    ]},
-    { id:'kr-02-big', category:'korean', name:'كوري 02 رول كبير', cost:180, length:30, stock:30, fractions:[
-        { id:31, work:'front', label:'أمامي 02', meters:1.5, price:135 },
-        { id:32, work:'rear', label:'خلفي 02', meters:1.5, price:135 },
-    ]},
-    { id:'kr-02-small', category:'korean', name:'كوري 02 رول صغير', cost:75, length:30, stock:22, fractions:[
-        { id:41, work:'window', label:'دريشة 02', meters:.5, price:50 },
-    ]},
-    { id:'us-premium-big', category:'american', name:'أمريكي بريميوم كبير', cost:210, length:30, stock:16, fractions:[
-        { id:51, work:'front', label:'أمامي أمريكي', meters:1.7, price:175 },
-        { id:52, work:'rear', label:'خلفي أمريكي', meters:1.7, price:175 },
-        { id:53, work:'full', label:'كامل أمريكي — الجزء الكبير', meters:3.4, price:340 },
-    ]},
-    { id:'us-premium-small', category:'american', name:'أمريكي بريميوم صغير', cost:95, length:30, stock:19, fractions:[
-        { id:61, work:'window', label:'دريشة أمريكي', meters:.6, price:65 },
-        { id:63, work:'full', label:'كامل أمريكي — الجزء الصغير', meters:2.4, price:220 },
-    ]},
-    { id:'other-nickel', category:'other', name:'نيكل رول كبير', cost:195, length:30, stock:18, fractions:[
-        { id:71, work:'front', label:'أمامي نيكل', meters:1.6, price:160 },
-        { id:72, work:'rear', label:'خلفي نيكل', meters:1.6, price:160 },
-    ]},
+let optionSequence = 1;
+const tintFamilies = [
+    { category:'korean', family:'كوري', grades:['01','02','03','شفاف'], bigCost:170, smallCost:70, bigStock:27, smallStock:24.5 },
+    { category:'american', family:'أمريكي', grades:['01','02','03','شفاف'], bigCost:210, smallCost:95, bigStock:16, smallStock:19 },
+    { category:'other', family:'نيكل', grades:['01','02','03'], bigCost:195, smallCost:85, bigStock:18, smallStock:17 },
+    { category:'other', family:'مخلوط', grades:['01','02','03'], bigCost:185, smallCost:80, bigStock:20, smallStock:18 },
 ];
+
+const previewProducts = tintFamilies.flatMap((family, familyIndex) =>
+    family.grades.flatMap((grade, gradeIndex) => ['big', 'small'].map(size => {
+        const isBig = size === 'big';
+        const sizeLabel = isBig ? 'كبير' : 'صغير';
+        const meters = isBig ? 3 : 2;
+        const basePrice = (isBig ? 230 : 150) + (familyIndex * 20) + (gradeIndex * 10);
+        const fractions = isBig ? [
+            { id:optionSequence++, work:'front', label:`أمامي ${grade}`, meters:1.5, price:Math.round(basePrice * .52) },
+            { id:optionSequence++, work:'rear', label:`خلفي ${grade}`, meters:1.5, price:Math.round(basePrice * .52) },
+            { id:optionSequence++, work:'full', label:`كامل ${family.family} ${grade} — كبير`, meters, price:basePrice },
+        ] : [
+            { id:optionSequence++, work:'window', label:`دريشة ${grade}`, meters:.5, price:Math.round(basePrice * .3) },
+            { id:optionSequence++, work:'full', label:`كامل ${family.family} ${grade} — صغير`, meters, price:basePrice },
+        ];
+
+        return {
+            id:`${family.category}-${family.family}-${grade}-${size}`,
+            category:family.category,
+            family:family.family,
+            grade,
+            size,
+            name:`${family.family} ${grade} رول ${sizeLabel}`,
+            cost:(isBig ? family.bigCost : family.smallCost) + (gradeIndex * 5),
+            length:30,
+            stock:isBig ? family.bigStock : family.smallStock,
+            fractions,
+        };
+    }))
+);
 
 let selectedCategory = null;
 let selectedWorks = new Set();
+let fullSizes = new Set();
 let windowCount = 1;
 let selectedParts = [];
 let cart = [];
@@ -274,12 +285,17 @@ function renderWorks() {
     box.innerHTML = works.map(work => `
         <div class="choice ${selectedWorks.has(work.id) ? 'active' : ''}" data-work="${work.id}" role="button" tabindex="0">
             <b>${work.label}</b><span>${work.description}</span>
+            ${work.id === 'full' ? `<span class="size-selector"><button type="button" class="${fullSizes.has('big') ? 'active' : ''}" data-full-size="big">كبير</button><button type="button" class="${fullSizes.has('small') ? 'active' : ''}" data-full-size="small">صغير</button></span>` : ''}
             ${work.id === 'window' ? `<span class="window-counter" data-counter><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
         </div>
     `).join('') + `
         <button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>إضافة عمل جديد غير موجود ضمن الخيارات السابقة</span></button>
     `;
     box.querySelectorAll('[data-work]').forEach(button => button.onclick = () => toggleWork(button.dataset.work));
+    box.querySelectorAll('[data-full-size]').forEach(button => button.onclick = event => {
+        event.stopPropagation();
+        toggleFullSize(button.dataset.fullSize);
+    });
     box.querySelectorAll('[data-window-change]').forEach(button => button.onclick = event => {
         event.stopPropagation();
         changeWindowCount(Number(button.dataset.windowChange));
@@ -290,6 +306,7 @@ function renderWorks() {
 function selectCategory(id) {
     selectedCategory = id;
     selectedWorks = new Set();
+    fullSizes = new Set();
     selectedParts = [];
     windowCount = 1;
     document.getElementById('workStep').classList.remove('hidden');
@@ -303,12 +320,29 @@ function selectCategory(id) {
 
 function toggleWork(id) {
     if (id === 'full') {
-        selectedWorks = selectedWorks.has('full') ? new Set() : new Set(['full']);
+        if (selectedWorks.has('full')) {
+            selectedWorks.delete('full');
+            fullSizes = new Set();
+        } else {
+            selectedWorks = new Set(['full']);
+            fullSizes = new Set(['big', 'small']);
+        }
     } else {
         selectedWorks.delete('full');
+        fullSizes = new Set();
         selectedWorks.has(id) ? selectedWorks.delete(id) : selectedWorks.add(id);
     }
     selectedParts = selectedParts.filter(part => part.custom || selectedWorks.has(part.work));
+    renderWorks();
+    refreshFractionStep();
+    renderSelectedParts();
+}
+
+function toggleFullSize(size) {
+    selectedWorks = new Set(['full']);
+    fullSizes.has(size) ? fullSizes.delete(size) : fullSizes.add(size);
+    if (!fullSizes.size) selectedWorks.delete('full');
+    selectedParts = selectedParts.filter(part => part.custom || (part.work === 'full' && fullSizes.has(part.size)));
     renderWorks();
     refreshFractionStep();
     renderSelectedParts();
@@ -318,6 +352,7 @@ function changeWindowCount(change) {
     windowCount = Math.min(4, Math.max(1, windowCount + change));
     selectedWorks.add('window');
     selectedWorks.delete('full');
+    fullSizes = new Set();
     selectedParts = selectedParts.filter(part => part.custom || part.work !== 'window');
     renderWorks();
     refreshFractionStep();
@@ -338,14 +373,14 @@ function refreshFractionStep() {
 
 function matchingOptions() {
     return productsForCategory().flatMap(product => product.fractions
-        .filter(option => selectedWorks.has(option.work))
+        .filter(option => selectedWorks.has(option.work) && (option.work !== 'full' || fullSizes.has(product.size)))
         .map(option => ({ product, option }))
     );
 }
 
 function renderFractionOptions() {
     const matches = matchingOptions();
-    const workLabels = [...selectedWorks].map(id => workById(id).label);
+    const workLabels = [...selectedWorks].map(id => id === 'full' ? `كامل (${[...fullSizes].map(size => size === 'big' ? 'كبير' : 'صغير').join(' + ')})` : workById(id).label);
     const box = document.getElementById('fractionOptions');
     document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — ${workLabels.join(' + ')}`;
     document.getElementById('optionCount').textContent = `${matches.length} خيارات مسجلة`;
@@ -354,8 +389,8 @@ function renderFractionOptions() {
         const qty = option.work === 'window' ? windowCount : 1;
         return `
             <button class="fraction-option" data-product="${product.id}" data-option="${option.id}">
-                <div class="option-head"><b>${option.label}${qty > 1 ? ` × ${qty}` : ''}</b><span class="source-tag">من بيانات المنتج</span></div>
-                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
+                <div class="option-head"><b>${option.label}${qty > 1 ? ` × ${qty}` : ''}</b><span class="grade-badge">درجة ${product.grade}</span></div>
+                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name} — ${product.family}</div>
                 <div class="option-meta">
                     <span>الاستهلاك<b>${option.meters}م × ${qty} = ${(option.meters * qty).toFixed(2)}م</b></span>
                     <span>السعر الافتراضي<b>${money(option.price * qty)}</b></span>
@@ -375,12 +410,15 @@ function addRegisteredOption(productId, optionId) {
     const product = productById(productId);
     const option = product.fractions.find(fraction => fraction.id === optionId);
     const qty = option.work === 'window' ? windowCount : 1;
-    selectedParts = selectedParts.filter(part => part.custom || part.work !== option.work);
+    const selectionKey = option.work === 'full' ? `full-${product.size}` : option.work;
+    selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey);
     selectedParts.push({
         key: Date.now() + Math.random(),
         name: option.label,
         product,
         work: option.work,
+        size: product.size,
+        selectionKey,
         meters: option.meters,
         qty,
         unitPrice: option.price,
@@ -453,6 +491,7 @@ function updateFlow(step) {
 function resetBuilder() {
     selectedCategory = null;
     selectedWorks = new Set();
+    fullSizes = new Set();
     selectedParts = [];
     windowCount = 1;
     document.getElementById('workStep').classList.add('hidden');
@@ -492,7 +531,11 @@ document.getElementById('addTint').onclick = () => {
     if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
     if (!selectedParts.length) { alert('اختر نظام تجزئة أو أضف عملًا مخصصًا'); return; }
     if (price <= 0) { alert('أدخل السعر النهائي'); return; }
-    const workLabels = [...selectedWorks].map(id => id === 'window' ? `دريشة (${windowCount})` : workById(id).label);
+    const workLabels = [...selectedWorks].map(id => {
+        if (id === 'window') return `دريشة (${windowCount})`;
+        if (id === 'full') return `كامل (${[...fullSizes].map(size => size === 'big' ? 'كبير' : 'صغير').join(' + ')})`;
+        return workById(id).label;
+    });
     if (selectedParts.some(part => part.custom)) workLabels.push('إضافة');
     cart.push({
         category: categoryById(selectedCategory).label,
