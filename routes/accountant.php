@@ -93,6 +93,8 @@ Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->nam
             ->name('debt.collect.partial');
          Route::get('/quick-sale', [QuickSaleController::class, 'index'])
             ->name('quick-sale.index');
+         Route::get('/quick-sale/tint-preview-products', [QuickSaleController::class, 'tintPreviewProducts'])
+            ->name('quick-sale.tint-preview-products');
          Route::post('/balance/store', [DashboardController::class, 'storeBalance'])
          ->name('balance.store');
 

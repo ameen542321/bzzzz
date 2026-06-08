@@ -25,6 +25,54 @@ class QuickSaleController extends Controller
         return view('cashier.quick-sale.index');
     }
 
+    /**
+     * يعيد بيانات منتجات الرول وخيارات التجزئة للمعاينة فقط.
+     * لا ينشئ بيعًا ولا يغيّر المخزون أو أي بيانات في قاعدة البيانات.
+     */
+    public function tintPreviewProducts()
+    {
+        $storeId = auth('accountant')->user()->store_id;
+
+        $products = Product::query()
+            ->with(['fractions' => function ($query) {
+                $query->select('id', 'product_id', 'option_label', 'deduction_value', 'price')
+                    ->orderBy('id');
+            }])
+            ->where('store_id', $storeId)
+            ->where('product_type', 'fractional')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'price',
+                'quantity',
+                'roll_length',
+                'waste_percentage',
+            ]);
+
+        return response()->json([
+            'products' => $products->map(function (Product $product) {
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'price' => (float) $product->price,
+                    'quantity' => (float) $product->quantity,
+                    'roll_length' => (float) $product->roll_length,
+                    'waste_percentage' => (float) $product->waste_percentage,
+                    'fractions' => $product->fractions->map(function ($fraction) {
+                        return [
+                            'id' => $fraction->id,
+                            'option_label' => $fraction->option_label,
+                            'deduction_value' => (float) $fraction->deduction_value,
+                            'price' => (float) $fraction->price,
+                        ];
+                    })->values(),
+                ];
+            })->values(),
+        ]);
+    }
+
     public function creditPersons()
     {
         $storeId = auth('accountant')->user()->store_id;

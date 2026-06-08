@@ -10,6 +10,7 @@
         body { margin:0; min-height:100vh; font-family:Tahoma,Arial,sans-serif; color:#fff; background:radial-gradient(circle at top,#15203a 0,#080d19 38%,#050913 100%); }
         button,input,select { font:inherit }
         button { cursor:pointer }
+        button:disabled { cursor:not-allowed; opacity:.55; }
         .page { max-width:1180px; margin:auto; padding:28px 18px 70px; }
         .topbar,.card { background:rgba(15,23,42,.94); border:1px solid var(--line); border-radius:20px; box-shadow:0 18px 50px rgba(0,0,0,.24); }
         .topbar { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; margin-bottom:22px; }
@@ -129,20 +130,15 @@
 <body>
 <div class="page">
     <header class="topbar">
-        <div><div class="title">تسجيل بيع جديد</div><div style="color:#64748b;font-size:12px;margin-top:5px">معاينة مستقلة — لا تحفظ أي بيانات</div></div>
-        <div class="badge">المحاسب: <b style="color:#60a5fa">مستخدم المعاينة</b></div>
+        <div><div class="title">تسجيل بيع جديد</div><div style="color:#64748b;font-size:12px;margin-top:5px">معاينة مرتبطة ببيانات المتجر — لا تحفظ أي بيانات</div></div>
+        <div class="badge">البيانات: <b id="dataStatus" style="color:#fbbf24">جارٍ التحميل...</b></div>
     </header>
     <main class="layout">
         <section class="stack">
             <div class="card">
-                <div class="section-head"><div><span class="label">ابحث عن منتج</span><b>المنتجات السريعة</b></div><button class="secondary" id="openTint">+ تضليل سريع</button></div>
-                <div class="search-row"><input class="input" placeholder="اكتب اسم المنتج..."><button class="ghost">بحث</button></div>
-                <div class="products">
-                    <div class="product"><div><b>01 رول كبير</b><span class="stock">المتوفر: 27 متر</span></div><span class="price">170 ر.س</span></div>
-                    <div class="product"><div><b>01 رول صغير</b><span class="stock">المتوفر: 24.5 متر</span></div><span class="price">70 ر.س</span></div>
-                    <div class="product"><div><b>02 رول كبير</b><span class="stock">المتوفر: 30 متر</span></div><span class="price">180 ر.س</span></div>
-                    <div class="product"><div><b>02 رول صغير</b><span class="stock">المتوفر: 22 متر</span></div><span class="price">75 ر.س</span></div>
-                </div>
+                <div class="section-head"><div><span class="label">ابحث عن منتج</span><b>المنتجات السريعة</b></div><button class="secondary" id="openTint" disabled>+ تضليل سريع</button></div>
+                <div class="search-row"><input class="input" id="productSearch" placeholder="اكتب اسم المنتج..."><button class="ghost" id="productSearchButton">بحث</button></div>
+                <div class="products" id="realProducts"><div class="cart-empty" style="grid-column:1/-1">جارٍ تحميل منتجات الرول...</div></div>
             </div>
             <div class="card">
                 <div class="section-head"><h2>سلة البيع</h2><span id="cartCount" style="color:#94a3b8;font-size:12px">0 عناصر</span></div>
@@ -208,11 +204,13 @@
 </div>
 
 <script>
-// بيانات تجريبية تحاكي المنتجات وخيارات التجزئة المسجلة في النظام.
+// تقرأ المعاينة منتجات الرول الحقيقية وخيارات التجزئة من المتجر الحالي.
+// التصنيف حسب النوع/الحجم/الدرجة مؤقت ويُستنتج من الاسم إلى أن نعتمد طريقة تصنيف نهائية.
+const previewProductsUrl = new URL('accountant/quick-sale/tint-preview-products', document.baseURI).toString();
 const categories = [
     { id:'korean', label:'كوري', description:'منتجات التضليل الكوري المتوفرة' },
     { id:'american', label:'أمريكي', description:'منتجات التضليل الأمريكي المتوفرة' },
-    { id:'other', label:'أخرى', description:'مثل النيكل والمخلوط' },
+    { id:'other', label:'أخرى', description:'المنتجات الأخرى أو غير المصنفة' },
 ];
 const works = [
     { id:'full', label:'كامل', description:'تضليل السيارة كاملة' },
@@ -224,45 +222,71 @@ const sizes = [
     { id:'big', label:'كبير' },
     { id:'small', label:'صغير' },
 ];
-let optionSequence = 1;
-const tintFamilies = [
-    { category:'korean', family:'كوري', grades:['01','02','03','شفاف'], bigCost:170, smallCost:70, bigStock:27, smallStock:24.5 },
-    { category:'american', family:'أمريكي', grades:['01','02','03','شفاف'], bigCost:210, smallCost:95, bigStock:16, smallStock:19 },
-    { category:'other', family:'نيكل', grades:['01','02','03'], bigCost:195, smallCost:85, bigStock:18, smallStock:17 },
-    { category:'other', family:'مخلوط', grades:['01','02','03'], bigCost:185, smallCost:80, bigStock:20, smallStock:18 },
-];
-const workUsage = {
-    full: { big:3, small:2 },
-    front: { big:1.5, small:1 },
-    rear: { big:1.5, small:1 },
-    window: { big:1, small:.5 },
-};
-const workPriceFactor = { full:1, front:.52, rear:.52, window:.3 };
+let previewProducts = [];
 
-const previewProducts = tintFamilies.flatMap((family, familyIndex) =>
-    family.grades.flatMap((grade, gradeIndex) => sizes.map(size => {
-        const isBig = size.id === 'big';
-        const basePrice = (isBig ? 230 : 150) + (familyIndex * 20) + (gradeIndex * 10);
-        return {
-            id:`${family.category}-${family.family}-${grade}-${size.id}`,
-            category:family.category,
-            family:family.family,
-            grade,
-            size:size.id,
-            name:`${family.family} ${grade} رول ${size.label}`,
-            cost:(isBig ? family.bigCost : family.smallCost) + (gradeIndex * 5),
-            length:30,
-            stock:isBig ? family.bigStock : family.smallStock,
-            fractions:works.map(work => ({
-                id:optionSequence++,
-                work:work.id,
-                label:`${work.label} ${grade} — ${size.label}`,
-                meters:workUsage[work.id][size.id],
-                price:Math.round(basePrice * workPriceFactor[work.id]),
-            })),
-        };
-    }))
-);
+function normalizeArabic(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[أإآ]/g, 'ا')
+        .replace(/ى/g, 'ي')
+        .replace(/ة/g, 'ه')
+        .replace(/\s+/g, ' ');
+}
+
+function inferCategory(name) {
+    const normalized = normalizeArabic(name);
+    if (normalized.includes('كوري')) return 'korean';
+    if (normalized.includes('امريكي')) return 'american';
+    return 'other';
+}
+
+function inferSize(name) {
+    const normalized = normalizeArabic(name);
+    if (normalized.includes('نصف متر') || normalized.includes('نص متر') || normalized.includes('صغير') || normalized.includes('0.5')) return 'small';
+    if (normalized.includes('كبير') || normalized.includes('رول متر') || normalized.includes('مقاس متر')) return 'big';
+    return null;
+}
+
+function inferGrade(name) {
+    const normalized = normalizeArabic(name);
+    if (normalized.includes('شفاف')) return 'شفاف';
+    for (const grade of ['01', '02', '03']) {
+        const pattern = new RegExp(`(^|[^0-9])${grade}([^0-9]|$)`);
+        if (pattern.test(normalized)) return grade;
+    }
+    return null;
+}
+
+function inferWork(label) {
+    const normalized = normalizeArabic(label);
+    if (normalized.includes('كامل')) return 'full';
+    if (normalized.includes('امامي')) return 'front';
+    if (normalized.includes('خلفي')) return 'rear';
+    if (normalized.includes('دريش')) return 'window';
+    return null;
+}
+
+function mapProduct(product) {
+    return {
+        id:String(product.id),
+        name:product.name,
+        category:inferCategory(product.name),
+        size:inferSize(product.name),
+        grade:inferGrade(product.name),
+        price:Number(product.price || 0),
+        length:Number(product.roll_length || 0),
+        stock:Number(product.quantity || 0),
+        waste:Number(product.waste_percentage || 0),
+        fractions:(product.fractions || []).map(option => ({
+            id:option.id,
+            work:inferWork(option.option_label),
+            label:option.option_label,
+            meters:Number(option.deduction_value || 0),
+            price:Number(option.price || 0),
+        })),
+    };
+}
 
 let selectedCategory = null;
 let workSelections = {};
@@ -272,6 +296,14 @@ let cart = [];
 const modal = document.getElementById('tintModal');
 
 function money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; }
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 function categoryById(id) { return categories.find(category => category.id === id); }
 function workById(id) { return works.find(work => work.id === id); }
 function sizeById(id) { return sizes.find(size => size.id === id); }
@@ -431,7 +463,7 @@ function syncAutomaticPricing() {
 
 function openCustomPanel() {
     if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
-    document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${product.name}</option>`).join('');
+    document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${escapeHtml(product.name)}</option>`).join('');
     document.getElementById('customName').value = '';
     document.getElementById('customStep').classList.remove('hidden');
     document.getElementById('customName').focus();
@@ -465,7 +497,7 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
+            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
     `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
@@ -489,7 +521,7 @@ function resetBuilder() {
 function renderCart() {
     const box = document.getElementById('cart');
     box.innerHTML = cart.length ? cart.map((item, index) => `
-        <div class="cart-item"><div class="cart-item-top"><div><b>تضليل ${item.category}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div></div></div>
+        <div class="cart-item"><div class="cart-item-top"><div><b>تضليل ${escapeHtml(item.category)}</b><div class="cart-meta">${item.parts.map(part => `${escapeHtml(part.name)}: ${escapeHtml(part.product.name)} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div></div></div>
     `).join('') : '<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
     const total = cart.reduce((sum, item) => sum + item.price, 0);
     document.getElementById('cartCount').textContent = `${cart.length} عناصر`;
@@ -516,7 +548,51 @@ document.querySelectorAll('.pay').forEach(button => button.onclick = () => {
     document.querySelectorAll('.pay').forEach(item => item.classList.remove('active'));
     button.classList.add('active');
 });
-renderCategories(); renderWorks(); renderSelectedParts(); renderCart();
+function renderRealProducts(search = '') {
+    const box = document.getElementById('realProducts');
+    const term = normalizeArabic(search);
+    const products = previewProducts.filter(product => !term || normalizeArabic(product.name).includes(term));
+    box.innerHTML = products.length ? products.map(product => `
+        <div class="product">
+            <div><b>${escapeHtml(product.name)}</b><span class="stock">المتوفر: ${product.stock.toFixed(2)} متر — ${product.fractions.length} خيارات تجزئة${product.size && product.grade ? '' : ' — يحتاج تصنيف اسم'}</span></div>
+            <span class="price">${money(product.price)}</span>
+        </div>
+    `).join('') : '<div class="cart-empty" style="grid-column:1/-1">لا توجد منتجات رول مطابقة.</div>';
+}
+
+async function loadPreviewProducts() {
+    const status = document.getElementById('dataStatus');
+    try {
+        const response = await fetch(previewProductsUrl, {
+            headers:{ 'Accept':'application/json' },
+            credentials:'same-origin',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        previewProducts = (payload.products || []).map(mapProduct);
+        const mappedProducts = previewProducts.filter(product => product.size && product.grade).length;
+        status.textContent = `${previewProducts.length} منتج رول حقيقي — ${mappedProducts} جاهز للبطاقات`;
+        status.style.color = '#34d399';
+        document.getElementById('openTint').disabled = previewProducts.length === 0;
+        renderRealProducts();
+        renderCategories();
+        renderWorks();
+        renderSelectedParts();
+        renderCart();
+    } catch (error) {
+        console.error('تعذر تحميل منتجات المعاينة', error);
+        status.textContent = 'تعذر تحميل البيانات — سجل دخول المحاسب أولًا';
+        status.style.color = '#f87171';
+        document.getElementById('openTint').disabled = true;
+        document.getElementById('realProducts').innerHTML = '<div class="cart-empty" style="grid-column:1/-1">تعذر تحميل منتجات المتجر. افتح الصفحة بعد تسجيل الدخول بحساب المحاسب.</div>';
+    }
+}
+
+const productSearch = document.getElementById('productSearch');
+document.getElementById('productSearchButton').onclick = () => renderRealProducts(productSearch.value);
+productSearch.addEventListener('input', () => renderRealProducts(productSearch.value));
+
+renderCategories(); renderWorks(); renderSelectedParts(); renderCart(); loadPreviewProducts();
 </script>
 </body>
 </html>
