@@ -70,10 +70,16 @@
         .size-selector { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
         .size-selector button { padding:8px; color:#cbd5e1; background:#0f172a; border:1px solid #475569; border-radius:9px; font-weight:900; }
         .size-selector button.active { color:#fff; background:#059669; border-color:#6ee7b7; }
+        .grade-selector { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:8px; }
+        .grade-selector button { padding:7px 3px; color:#cbd5e1; background:#111827; border:1px solid #475569; border-radius:8px; font-size:10px; font-weight:900; }
+        .grade-selector button.active { color:#111827; background:#fbbf24; border-color:#fde68a; }
+        .size-grade-block { margin-top:8px; padding:8px; background:rgba(2,6,23,.3); border:1px solid rgba(148,163,184,.2); border-radius:10px; }
+        .size-grade-title { display:flex!important; justify-content:space-between; color:#cbd5e1!important; font-size:10px!important; }
         .grade-badge { padding:4px 8px; color:#fef3c7; background:#78350f; border:1px solid #d97706; border-radius:7px; font-size:10px; white-space:nowrap; }
         .option-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
         .fraction-option { position:relative; padding:14px; color:#fff; text-align:right; background:#151f31; border:1px solid #334155; border-radius:15px; }
         .fraction-option:hover { border-color:#38bdf8; background:#10283d; }
+        .fraction-option.selected-price { border-color:#34d399; background:#064e3b; box-shadow:0 0 0 3px rgba(52,211,153,.12); }
         .fraction-option.custom { border-style:dashed; border-color:#8b5cf6; background:#21183a; }
         .option-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:9px; }
         .source-tag { padding:4px 7px; color:#bfdbfe; background:#172554; border:1px solid #1d4ed8; border-radius:7px; font-size:9px; white-space:nowrap; }
@@ -170,7 +176,7 @@
 
             <div class="step hidden" id="fractionStep">
                 <div class="section-head">
-                    <div><span class="label" style="margin:0 0 5px">3 — خيارات التجزئة المطابقة للأعمال المختارة</span><b id="selectionTitle"></b></div>
+                    <div><span class="label" style="margin:0 0 5px">3 — التسعيرات المطابقة للحجم والدرجة المختارين</span><b id="selectionTitle"></b></div>
                     <span id="optionCount" style="color:#94a3b8;font-size:11px"></span>
                 </div>
                 <div class="option-grid" id="fractionOptions"></div>
@@ -208,15 +214,19 @@
 <script>
 // بيانات تجريبية تحاكي المنتجات وخيارات التجزئة المسجلة في النظام.
 const categories = [
-    { id: 'korean', label: 'كوري', description: 'عرض المنتجات وخيارات التجزئة المخصصة للمركبات الكورية' },
-    { id: 'american', label: 'أمريكي', description: 'عرض المنتجات وخيارات التجزئة المخصصة للمركبات الأمريكية' },
-    { id: 'other', label: 'أخرى', description: 'للفئات والمنتجات الأخرى المتوفرة في المتجر' },
+    { id:'korean', label:'كوري', description:'منتجات التضليل الكوري المتوفرة' },
+    { id:'american', label:'أمريكي', description:'منتجات التضليل الأمريكي المتوفرة' },
+    { id:'other', label:'أخرى', description:'مثل النيكل والمخلوط' },
 ];
 const works = [
-    { id: 'full', label: 'كامل', description: 'تضليل السيارة كاملة حسب الخيارات المسجلة' },
-    { id: 'front', label: 'أمامي', description: 'الزجاج الأمامي' },
-    { id: 'rear', label: 'خلفي', description: 'الزجاج الخلفي' },
-    { id: 'window', label: 'دريشة', description: 'حدد عدد الدرايش من 1 إلى 4' },
+    { id:'full', label:'كامل', description:'تضليل السيارة كاملة' },
+    { id:'front', label:'أمامي', description:'الزجاج الأمامي' },
+    { id:'rear', label:'خلفي', description:'الزجاج الخلفي' },
+    { id:'window', label:'دريشة', description:'حدد عدد الدرايش من 1 إلى 4' },
+];
+const sizes = [
+    { id:'big', label:'كبير' },
+    { id:'small', label:'صغير' },
 ];
 let optionSequence = 1;
 const tintFamilies = [
@@ -225,40 +235,41 @@ const tintFamilies = [
     { category:'other', family:'نيكل', grades:['01','02','03'], bigCost:195, smallCost:85, bigStock:18, smallStock:17 },
     { category:'other', family:'مخلوط', grades:['01','02','03'], bigCost:185, smallCost:80, bigStock:20, smallStock:18 },
 ];
+const workUsage = {
+    full: { big:3, small:2 },
+    front: { big:1.5, small:1 },
+    rear: { big:1.5, small:1 },
+    window: { big:1, small:.5 },
+};
+const workPriceFactor = { full:1, front:.52, rear:.52, window:.3 };
 
 const previewProducts = tintFamilies.flatMap((family, familyIndex) =>
-    family.grades.flatMap((grade, gradeIndex) => ['big', 'small'].map(size => {
-        const isBig = size === 'big';
-        const sizeLabel = isBig ? 'كبير' : 'صغير';
-        const meters = isBig ? 3 : 2;
+    family.grades.flatMap((grade, gradeIndex) => sizes.map(size => {
+        const isBig = size.id === 'big';
         const basePrice = (isBig ? 230 : 150) + (familyIndex * 20) + (gradeIndex * 10);
-        const fractions = isBig ? [
-            { id:optionSequence++, work:'front', label:`أمامي ${grade}`, meters:1.5, price:Math.round(basePrice * .52) },
-            { id:optionSequence++, work:'rear', label:`خلفي ${grade}`, meters:1.5, price:Math.round(basePrice * .52) },
-            { id:optionSequence++, work:'full', label:`كامل ${family.family} ${grade} — كبير`, meters, price:basePrice },
-        ] : [
-            { id:optionSequence++, work:'window', label:`دريشة ${grade}`, meters:.5, price:Math.round(basePrice * .3) },
-            { id:optionSequence++, work:'full', label:`كامل ${family.family} ${grade} — صغير`, meters, price:basePrice },
-        ];
-
         return {
-            id:`${family.category}-${family.family}-${grade}-${size}`,
+            id:`${family.category}-${family.family}-${grade}-${size.id}`,
             category:family.category,
             family:family.family,
             grade,
-            size,
-            name:`${family.family} ${grade} رول ${sizeLabel}`,
+            size:size.id,
+            name:`${family.family} ${grade} رول ${size.label}`,
             cost:(isBig ? family.bigCost : family.smallCost) + (gradeIndex * 5),
             length:30,
             stock:isBig ? family.bigStock : family.smallStock,
-            fractions,
+            fractions:works.map(work => ({
+                id:optionSequence++,
+                work:work.id,
+                label:`${work.label} ${grade} — ${size.label}`,
+                meters:workUsage[work.id][size.id],
+                price:Math.round(basePrice * workPriceFactor[work.id]),
+            })),
         };
     }))
 );
 
 let selectedCategory = null;
-let selectedWorks = new Set();
-let fullSizes = new Set();
+let workSelections = {};
 let windowCount = 1;
 let selectedParts = [];
 let cart = [];
@@ -267,8 +278,16 @@ const modal = document.getElementById('tintModal');
 function money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; }
 function categoryById(id) { return categories.find(category => category.id === id); }
 function workById(id) { return works.find(work => work.id === id); }
+function sizeById(id) { return sizes.find(size => size.id === id); }
 function productById(id) { return previewProducts.find(product => product.id === id); }
 function productsForCategory() { return previewProducts.filter(product => product.category === selectedCategory); }
+function gradesForCategory() { return [...new Set(productsForCategory().map(product => product.grade))]; }
+function selectionKey(work, size) { return `${work}-${size}`; }
+function selectedConfigurations() {
+    return Object.entries(workSelections).flatMap(([work, sizeGrades]) =>
+        Object.entries(sizeGrades).filter(([, grade]) => grade).map(([size, grade]) => ({ work, size, grade }))
+    );
+}
 
 function renderCategories() {
     const box = document.getElementById('categoryChoices');
@@ -281,36 +300,50 @@ function renderCategories() {
 }
 
 function renderWorks() {
+    const grades = gradesForCategory();
     const box = document.getElementById('workChoices');
-    box.innerHTML = works.map(work => `
-        <div class="choice ${selectedWorks.has(work.id) ? 'active' : ''}" data-work="${work.id}" role="button" tabindex="0">
-            <b>${work.label}</b><span>${work.description}</span>
-            ${work.id === 'full' ? `<span class="size-selector"><button type="button" class="${fullSizes.has('big') ? 'active' : ''}" data-full-size="big">كبير</button><button type="button" class="${fullSizes.has('small') ? 'active' : ''}" data-full-size="small">صغير</button></span>` : ''}
-            ${work.id === 'window' ? `<span class="window-counter" data-counter><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
-        </div>
-    `).join('') + `
-        <button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>إضافة عمل جديد غير موجود ضمن الخيارات السابقة</span></button>
-    `;
-    box.querySelectorAll('[data-work]').forEach(button => button.onclick = () => toggleWork(button.dataset.work));
-    box.querySelectorAll('[data-full-size]').forEach(button => button.onclick = event => {
-        event.stopPropagation();
-        toggleFullSize(button.dataset.fullSize);
+    box.innerHTML = works.map(work => {
+        const selections = workSelections[work.id] || {};
+        const activeSizes = Object.keys(selections);
+        return `
+            <div class="choice ${activeSizes.length ? 'active' : ''}">
+                <b>${work.label}</b><span>${work.description}</span>
+                ${work.id === 'window' ? `<span class="window-counter"><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
+                <span class="size-selector">
+                    ${sizes.map(size => `<button type="button" class="${selections[size.id] !== undefined ? 'active' : ''}" data-work-size="${work.id}:${size.id}">${size.label}</button>`).join('')}
+                </span>
+                ${activeSizes.map(size => `
+                    <span class="size-grade-block">
+                        <span class="size-grade-title"><b>درجة ${sizeById(size).label}</b><em>${selections[size] || 'اختر الدرجة'}</em></span>
+                        <span class="grade-selector">
+                            ${grades.map(grade => `<button type="button" class="${selections[size] === grade ? 'active' : ''}" data-grade="${work.id}:${size}:${grade}">${grade}</button>`).join('')}
+                        </span>
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    }).join('') + `<button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>إضافة عمل جديد غير موجود ضمن الخيارات السابقة</span></button>`;
+
+    box.querySelectorAll('[data-work-size]').forEach(button => button.onclick = () => {
+        const [work, size] = button.dataset.workSize.split(':');
+        toggleWorkSize(work, size);
     });
-    box.querySelectorAll('[data-window-change]').forEach(button => button.onclick = event => {
-        event.stopPropagation();
-        changeWindowCount(Number(button.dataset.windowChange));
+    box.querySelectorAll('[data-grade]').forEach(button => button.onclick = () => {
+        const [work, size, grade] = button.dataset.grade.split(':');
+        selectGrade(work, size, grade);
     });
+    box.querySelectorAll('[data-window-change]').forEach(button => button.onclick = () => changeWindowCount(Number(button.dataset.windowChange)));
     document.getElementById('openAdditional').onclick = openCustomPanel;
 }
 
 function selectCategory(id) {
     selectedCategory = id;
-    selectedWorks = new Set();
-    fullSizes = new Set();
+    workSelections = {};
     selectedParts = [];
     windowCount = 1;
     document.getElementById('workStep').classList.remove('hidden');
     document.getElementById('fractionStep').classList.add('hidden');
+    document.getElementById('fractionOptions').innerHTML = '';
     closeCustomPanel();
     renderCategories();
     renderWorks();
@@ -318,121 +351,104 @@ function selectCategory(id) {
     updateFlow(2);
 }
 
-function toggleWork(id) {
-    if (id === 'full') {
-        if (selectedWorks.has('full')) {
-            selectedWorks.delete('full');
-            fullSizes = new Set();
-        } else {
-            selectedWorks = new Set(['full']);
-            fullSizes = new Set(['big', 'small']);
-        }
+function toggleWorkSize(work, size) {
+    workSelections[work] ||= {};
+    if (workSelections[work][size] !== undefined) {
+        delete workSelections[work][size];
+        selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey(work, size));
     } else {
-        selectedWorks.delete('full');
-        fullSizes = new Set();
-        selectedWorks.has(id) ? selectedWorks.delete(id) : selectedWorks.add(id);
+        workSelections[work][size] = null;
     }
-    selectedParts = selectedParts.filter(part => part.custom || selectedWorks.has(part.work));
+    if (!Object.keys(workSelections[work]).length) delete workSelections[work];
     renderWorks();
-    refreshFractionStep();
+    refreshPricingStep();
     renderSelectedParts();
 }
 
-function toggleFullSize(size) {
-    selectedWorks = new Set(['full']);
-    fullSizes.has(size) ? fullSizes.delete(size) : fullSizes.add(size);
-    if (!fullSizes.size) selectedWorks.delete('full');
-    selectedParts = selectedParts.filter(part => part.custom || (part.work === 'full' && fullSizes.has(part.size)));
+function selectGrade(work, size, grade) {
+    workSelections[work] ||= {};
+    workSelections[work][size] = grade;
+    selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey(work, size));
     renderWorks();
-    refreshFractionStep();
+    refreshPricingStep();
     renderSelectedParts();
 }
 
 function changeWindowCount(change) {
     windowCount = Math.min(4, Math.max(1, windowCount + change));
-    selectedWorks.add('window');
-    selectedWorks.delete('full');
-    fullSizes = new Set();
-    selectedParts = selectedParts.filter(part => part.custom || part.work !== 'window');
+    selectedParts = selectedParts.map(part => part.work === 'window' && !part.custom ? { ...part, qty:windowCount } : part);
     renderWorks();
-    refreshFractionStep();
+    refreshPricingStep();
     renderSelectedParts();
 }
 
-function refreshFractionStep() {
-    const hasWorks = selectedWorks.size > 0;
-    document.getElementById('fractionStep').classList.toggle('hidden', !hasWorks);
-    if (hasWorks) {
-        renderFractionOptions();
-        updateFlow(3);
-    } else {
-        closeCustomPanel();
-        updateFlow(2);
-    }
-}
-
-function matchingOptions() {
-    return productsForCategory().flatMap(product => product.fractions
-        .filter(option => selectedWorks.has(option.work) && (option.work !== 'full' || fullSizes.has(product.size)))
-        .map(option => ({ product, option }))
+function matchingPrices() {
+    return selectedConfigurations().flatMap(configuration => productsForCategory()
+        .filter(product => product.size === configuration.size && product.grade === configuration.grade)
+        .flatMap(product => product.fractions
+            .filter(option => option.work === configuration.work)
+            .map(option => ({ ...configuration, product, option }))
+        )
     );
 }
 
-function renderFractionOptions() {
-    const matches = matchingOptions();
-    const workLabels = [...selectedWorks].map(id => id === 'full' ? `كامل (${[...fullSizes].map(size => size === 'big' ? 'كبير' : 'صغير').join(' + ')})` : workById(id).label);
-    const box = document.getElementById('fractionOptions');
-    document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — ${workLabels.join(' + ')}`;
-    document.getElementById('optionCount').textContent = `${matches.length} خيارات مسجلة`;
+function refreshPricingStep() {
+    const configurations = selectedConfigurations();
+    document.getElementById('fractionStep').classList.toggle('hidden', !configurations.length);
+    if (configurations.length) {
+        renderPricingOptions();
+        updateFlow(3);
+    } else {
+        updateFlow(Object.keys(workSelections).length ? 2 : 2);
+    }
+}
 
-    box.innerHTML = matches.map(({ product, option }) => {
-        const qty = option.work === 'window' ? windowCount : 1;
+function renderPricingOptions() {
+    const matches = matchingPrices();
+    const box = document.getElementById('fractionOptions');
+    document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — اختر التسعيرة المناسبة`;
+    document.getElementById('optionCount').textContent = `${matches.length} تسعيرات متاحة`;
+    box.innerHTML = matches.map(({ work, size, grade, product, option }) => {
+        const qty = work === 'window' ? windowCount : 1;
+        const key = selectionKey(work, size);
+        const selected = selectedParts.some(part => !part.custom && part.selectionKey === key && part.product.id === product.id);
         return `
-            <button class="fraction-option" data-product="${product.id}" data-option="${option.id}">
-                <div class="option-head"><b>${option.label}${qty > 1 ? ` × ${qty}` : ''}</b><span class="grade-badge">درجة ${product.grade}</span></div>
-                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name} — ${product.family}</div>
+            <button class="fraction-option ${selected ? 'selected-price' : ''}" data-product="${product.id}" data-option="${option.id}" data-key="${key}">
+                <div class="option-head"><b>${workById(work).label} — ${sizeById(size).label}</b><span class="grade-badge">${grade}</span></div>
+                <div style="color:#aab6ca;font-size:11px;margin-bottom:9px">${product.name}</div>
                 <div class="option-meta">
                     <span>الاستهلاك<b>${option.meters}م × ${qty} = ${(option.meters * qty).toFixed(2)}م</b></span>
-                    <span>السعر الافتراضي<b>${money(option.price * qty)}</b></span>
+                    <span>التسعيرة<b>${money(option.price * qty)}</b></span>
                     <span>المتوفر<b>${product.stock} متر</b></span>
                 </div>
             </button>
         `;
-    }).join('');
-
-    if (!matches.length) {
-        box.innerHTML = '<div class="empty-options">لا توجد خيارات تجزئة مسجلة للأعمال المختارة حاليًا. استخدم زر «إضافة» لتسجيل عمل مخصص.</div>';
-    }
-    box.querySelectorAll('[data-option]').forEach(button => button.onclick = () => addRegisteredOption(button.dataset.product, Number(button.dataset.option)));
+    }).join('') || '<div class="empty-options">لا توجد تسعيرة مسجلة لهذا الحجم والدرجة.</div>';
+    box.querySelectorAll('[data-option]').forEach(button => button.onclick = () => addPricedOption(button.dataset.product, Number(button.dataset.option), button.dataset.key));
 }
 
-function addRegisteredOption(productId, optionId) {
+function addPricedOption(productId, optionId, key) {
     const product = productById(productId);
     const option = product.fractions.find(fraction => fraction.id === optionId);
     const qty = option.work === 'window' ? windowCount : 1;
-    const selectionKey = option.work === 'full' ? `full-${product.size}` : option.work;
-    selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== selectionKey);
+    selectedParts = selectedParts.filter(part => part.custom || part.selectionKey !== key);
     selectedParts.push({
-        key: Date.now() + Math.random(),
-        name: option.label,
-        product,
-        work: option.work,
-        size: product.size,
-        selectionKey,
-        meters: option.meters,
-        qty,
-        unitPrice: option.price,
-        custom: false,
+        key:Date.now() + Math.random(), name:option.label, product, work:option.work,
+        size:product.size, selectionKey:key, meters:option.meters, qty,
+        unitPrice:option.price, custom:false,
     });
+    renderPricingOptions();
     renderSelectedParts();
 }
 
 function openCustomPanel() {
-    if (!selectedCategory) {
-        alert('اختر فئة المركبة أولًا');
-        return;
-    }
+    if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
     document.getElementById('fractionStep').classList.remove('hidden');
+    if (!selectedConfigurations().length) {
+        document.getElementById('selectionTitle').textContent = `${categoryById(selectedCategory).label} — إضافة مخصصة`;
+        document.getElementById('optionCount').textContent = '';
+        document.getElementById('fractionOptions').innerHTML = '<div class="empty-options">يمكن إضافة عمل مخصص دون اختيار تسعيرة جاهزة.</div>';
+    }
     document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${product.name}</option>`).join('');
     document.getElementById('customName').value = '';
     document.getElementById('customPanel').classList.remove('hidden');
@@ -441,16 +457,12 @@ function openCustomPanel() {
 }
 
 function closeCustomPanel() { document.getElementById('customPanel').classList.add('hidden'); }
-
 function addCustomPart() {
     const product = productById(document.getElementById('customProduct').value);
     const name = document.getElementById('customName').value.trim() || 'إضافة مخصصة';
     const meters = Number(document.getElementById('customMeters').value);
     const qty = Number(document.getElementById('customQty').value);
-    if (!product || meters <= 0 || qty <= 0) {
-        alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين');
-        return;
-    }
+    if (!product || meters <= 0 || qty <= 0) { alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين'); return; }
     selectedParts.push({ key:Date.now() + Math.random(), name, product, work:'additional', meters, qty, unitPrice:0, custom:true });
     closeCustomPanel();
     renderSelectedParts();
@@ -458,6 +470,7 @@ function addCustomPart() {
 
 function removePart(key) {
     selectedParts = selectedParts.filter(part => String(part.key) !== String(key));
+    renderPricingOptions();
     renderSelectedParts();
 }
 
@@ -465,19 +478,18 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : 'خيار تجزئة مسجل'}</small></div>
+            <div><b>${part.name} — ${part.product.name}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : 'تسعيرة مختارة'}</small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
-    `).join('') : '<div class="cart-empty" style="padding:20px">اختر الفئة، ثم حدد عملًا أو أكثر، ثم اختر نظام التجزئة المناسب لكل عمل.</div>';
+    `).join('') : '<div class="cart-empty" style="padding:20px">اختر الحجم داخل بطاقة العمل، ثم الدرجة، ثم اضغط على التسعيرة الظاهرة.</div>';
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
-
     const meters = selectedParts.reduce((sum, part) => sum + part.meters * part.qty, 0);
     const cost = selectedParts.reduce((sum, part) => sum + (part.product.cost / part.product.length) * part.meters * part.qty, 0);
     const defaultPrice = selectedParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0);
     document.getElementById('componentCount').textContent = selectedParts.length;
     document.getElementById('metersTotal').textContent = meters.toFixed(2) + ' متر';
     document.getElementById('costTotal').textContent = money(cost);
-    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} خيارات مضافة` : 'لم تتم إضافة خيارات';
+    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} تسعيرات مختارة` : 'لم تتم إضافة تسعيرات';
     document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
 }
 
@@ -487,31 +499,16 @@ function updateFlow(step) {
         item.classList.toggle('current', index + 1 === step);
     });
 }
-
 function resetBuilder() {
-    selectedCategory = null;
-    selectedWorks = new Set();
-    fullSizes = new Set();
-    selectedParts = [];
-    windowCount = 1;
+    selectedCategory = null; workSelections = {}; selectedParts = []; windowCount = 1;
     document.getElementById('workStep').classList.add('hidden');
     document.getElementById('fractionStep').classList.add('hidden');
-    closeCustomPanel();
-    renderCategories();
-    renderWorks();
-    renderSelectedParts();
-    updateFlow(1);
+    closeCustomPanel(); renderCategories(); renderWorks(); renderSelectedParts(); updateFlow(1);
 }
-
 function renderCart() {
     const box = document.getElementById('cart');
     box.innerHTML = cart.length ? cart.map((item, index) => `
-        <div class="cart-item">
-            <div class="cart-item-top">
-                <div><b>تضليل ${item.category} — ${item.works}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div>
-                <div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div>
-            </div>
-        </div>
+        <div class="cart-item"><div class="cart-item-top"><div><b>تضليل ${item.category}</b><div class="cart-meta">${item.parts.map(part => `${part.name}: ${part.product.name} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div></div></div>
     `).join('') : '<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
     const total = cart.reduce((sum, item) => sum + item.price, 0);
     document.getElementById('cartCount').textContent = `${cart.length} عناصر`;
@@ -529,32 +526,16 @@ document.getElementById('resetTint').onclick = resetBuilder;
 document.getElementById('addTint').onclick = () => {
     const price = Number(document.getElementById('salePrice').value);
     if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
-    if (!selectedParts.length) { alert('اختر نظام تجزئة أو أضف عملًا مخصصًا'); return; }
+    if (!selectedParts.length) { alert('اختر تسعيرة واحدة على الأقل'); return; }
     if (price <= 0) { alert('أدخل السعر النهائي'); return; }
-    const workLabels = [...selectedWorks].map(id => {
-        if (id === 'window') return `دريشة (${windowCount})`;
-        if (id === 'full') return `كامل (${[...fullSizes].map(size => size === 'big' ? 'كبير' : 'صغير').join(' + ')})`;
-        return workById(id).label;
-    });
-    if (selectedParts.some(part => part.custom)) workLabels.push('إضافة');
-    cart.push({
-        category: categoryById(selectedCategory).label,
-        works: workLabels.join(' + '),
-        parts: selectedParts.map(part => ({ ...part })),
-        price,
-    });
-    renderCart();
-    modal.classList.remove('open');
+    cart.push({ category:categoryById(selectedCategory).label, parts:selectedParts.map(part => ({ ...part })), price });
+    renderCart(); modal.classList.remove('open');
 };
 document.querySelectorAll('.pay').forEach(button => button.onclick = () => {
     document.querySelectorAll('.pay').forEach(item => item.classList.remove('active'));
     button.classList.add('active');
 });
-
-renderCategories();
-renderWorks();
-renderSelectedParts();
-renderCart();
+renderCategories(); renderWorks(); renderSelectedParts(); renderCart();
 </script>
 </body>
 </html>
