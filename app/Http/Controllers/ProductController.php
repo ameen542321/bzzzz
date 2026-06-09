@@ -615,7 +615,14 @@ class ProductController extends Controller
             'fractions.*.price'           => 'required|numeric|min:0',
         ]);
 
-        $slug = $this->buildStoreScopedSlug($request->name, $store->id);
+        $productName = $this->normalizeProductNameForCategory(
+            $request->name,
+            (int) $request->category_id,
+            $store->id,
+            $request->product_type
+        );
+
+        $slug = $this->buildStoreScopedSlug($productName, $store->id);
 
         // التفرد مطلوب داخل نفس المتجر فقط.
         // الـ slug نفسه يحمل معرف المتجر لتفادي التعارض مع القيد العالمي الحالي.
@@ -645,7 +652,7 @@ class ProductController extends Controller
                 'store_id'         => $store->id,
                 'user_id'          => auth()->id(),
                 'category_id'      => $request->category_id,
-                'name'             => $request->name,
+                'name'             => $productName,
                 'slug'             => $slug,
                 'description'      => $request->description,
                 'price'            => $request->price,
@@ -695,6 +702,43 @@ class ProductController extends Controller
             ->with('success', 'تم إضافة المنتج بنجاح');
     }
 
+    /**
+     * يوحّد اسم رول التضليل بصيغة: النوع + الحجم + الدرجة.
+     * مثال: «كوري كبير01» يصبح «كوري كبير 01» قبل إنشاء slug والحفظ.
+     * لا يغيّر أسماء المنتجات العادية أو منتجات الأقسام الأخرى.
+     */
+    private function normalizeProductNameForCategory(string $name, int $categoryId, int $storeId, string $productType): string
+    {
+        $normalized = preg_replace('/\s+/u', ' ', trim($name));
+        if ($productType !== 'fractional') {
+            return $normalized;
+        }
+
+        $categoryName = Category::query()
+            ->where('store_id', $storeId)
+            ->whereKey($categoryId)
+            ->value('name');
+
+        if ($categoryName !== 'تضليل') {
+            return $normalized;
+        }
+
+        preg_match('/(كبير|صغير)/u', $normalized, $sizeMatch);
+        preg_match('/(شفاف|01|02|03)/u', $normalized, $gradeMatch);
+        $size = $sizeMatch[1] ?? null;
+        $grade = $gradeMatch[1] ?? null;
+
+        if (! $size || ! $grade) {
+            // حتى إذا كان الاسم ناقصًا، نفصل الرموز المعروفة عن الكلمات لتسهيل تصحيحه لاحقًا.
+            return preg_replace('/\s*(شفاف|01|02|03)\s*/u', ' $1 ', $normalized);
+        }
+
+        $type = preg_replace('/(كبير|صغير|شفاف|01|02|03)/u', ' ', $normalized);
+        $type = preg_replace('/\s+/u', ' ', trim($type));
+
+        return $type !== '' ? "{$type} {$size} {$grade}" : "{$size} {$grade}";
+    }
+
     public function edit(Store $store, Product $product)
     {
         $this->ensureProductBelongsToStore($store, $product);
@@ -739,8 +783,15 @@ class ProductController extends Controller
         // واجهة التعديل تعرض roll_length للمنتج الكَسري، لذلك يجب التحقق منه
         // وحفظه هنا فعلياً حتى لا تبقى الواجهة تعرض قيمة لا تنعكس في قاعدة البيانات.
 
+        $productName = $this->normalizeProductNameForCategory(
+            $request->name,
+            (int) $request->category_id,
+            $store->id,
+            $request->product_type
+        );
+
         // توليد slug مرتبط بالمتجر بدون الحاجة لتعديل قاعدة البيانات
-        $slug = $this->buildStoreScopedSlug($request->name, $store->id);
+        $slug = $this->buildStoreScopedSlug($productName, $store->id);
 
         // فحص التكرار داخل نفس المتجر فقط.
         $exists = Product::withTrashed()
@@ -751,7 +802,7 @@ class ProductController extends Controller
 
         if ($exists) {
             return back()
-                ->withErrors(['name' => "عذراً، اسم المنتج \"{$request->name}\" محجوز مسبقاً في هذا المتجر، يرجى اختيار اسم آخر."])
+                ->withErrors(['name' => "عذراً، اسم المنتج \"{$productName}\" محجوز مسبقاً في هذا المتجر، يرجى اختيار اسم آخر."])
                 ->withInput();
         }
 
@@ -763,7 +814,7 @@ class ProductController extends Controller
         try {
             $product->update([
                 'category_id'      => $request->category_id,
-                'name'             => $request->name,
+                'name'             => $productName,
                 'slug'             => $slug,
                 'description'      => $request->description,
                 'price'            => $request->price,

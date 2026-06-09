@@ -156,6 +156,26 @@
                 <input type="number" step="0.01" name="roll_length" id="roll_length" value="{{ old('roll_length', 30) }}" class="w-full bg-gray-800 border border-blue-500/50 text-white rounded-lg px-4 py-2">
             </div>
 
+            <div id="tint_name_preview" class="hidden mb-4 p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                        <p class="text-indigo-200 font-bold text-sm">طريقة كتابة اسم منتج التضليل</p>
+                        <p class="text-xs text-gray-400 mt-1">اكتب: النوع ثم الحجم ثم الدرجة. لا تقلق إذا نسيت الفراغ؛ النظام يرتب الاسم ويفصل الدرجة تلقائيًا عند الحفظ.</p>
+                    </div>
+                    <span class="text-[10px] text-indigo-300 border border-indigo-500/30 rounded-full px-2 py-1">معاينة مباشرة</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">النوع</span><strong id="tint_name_type" class="text-white">—</strong></div>
+                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">الحجم</span><strong id="tint_name_size" class="text-white">—</strong></div>
+                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">الدرجة</span><strong id="tint_name_grade" class="text-white">—</strong></div>
+                </div>
+                <div class="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-sm">
+                    <span class="text-emerald-300">سيظهر المنتج هكذا:</span>
+                    <strong id="tint_normalized_name" class="text-white mr-1">أدخل اسم المنتج</strong>
+                </div>
+                <p class="mt-2 text-xs text-gray-400">مثال: كتابة <strong class="text-gray-200">كوري كبير01</strong> ستُحفظ وتظهر كـ <strong class="text-emerald-300">كوري كبير 01</strong>.</p>
+            </div>
+
             <div class="mb-6">
                 <label class="block text-gray-300 mb-2">اسم المنتج</label>
                 <input type="text" name="name" id="product_name" value="{{ old('name') }}" required class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
@@ -287,6 +307,33 @@
                 ? 'دليل إدخال رول التضليل'
                 : (isUpholstery ? 'دليل إدخال رول التنجيد والتلابيس' : 'دليل إدخال منتج رول/قص');
         }
+
+        document.getElementById('tint_name_preview').classList.toggle('hidden', !isFractional || !isTint);
+        updateTintNamePreview();
+    }
+
+    function parseTintProductName(value) {
+        const raw = String(value || '').trim().replace(/\s+/g, ' ');
+        const size = raw.match(/(كبير|صغير)/)?.[1] || '';
+        const grade = raw.match(/(شفاف|01|02|03)/)?.[1] || '';
+        const type = raw
+            .replace(/(كبير|صغير|شفاف|01|02|03)/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const normalized = [type, size, grade].filter(Boolean).join(' ');
+        return { type, size, grade, normalized };
+    }
+
+    function updateTintNamePreview() {
+        const input = document.getElementById('product_name');
+        const preview = document.getElementById('tint_name_preview');
+        if (!input || !preview || preview.classList.contains('hidden')) return;
+
+        const parsed = parseTintProductName(input.value);
+        document.getElementById('tint_name_type').textContent = parsed.type || '—';
+        document.getElementById('tint_name_size').textContent = parsed.size || '—';
+        document.getElementById('tint_name_grade').textContent = parsed.grade || '—';
+        document.getElementById('tint_normalized_name').textContent = parsed.normalized || 'أدخل اسم المنتج';
     }
 
     function toggleSplittableFields() {
@@ -327,6 +374,7 @@
     }
 
     window.onload = function() {
+        document.getElementById('product_name')?.addEventListener('input', updateTintNamePreview);
         toggleFractionSection();
         disableNumberWheelInputs();
     };
