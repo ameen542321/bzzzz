@@ -75,8 +75,8 @@
         .control-label { margin:11px 0 7px!important; color:#cbd5e1!important; font-size:12px!important; font-weight:900!important; }
         .exclusive-note { margin-top:10px!important; padding:8px 10px; color:#bfdbfe!important; background:#172554; border:1px solid #1d4ed8; border-radius:9px; font-size:10px!important; }
         .window-counter { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
-        .window-counter button { width:30px; height:30px; padding:0; color:#fff; background:#0f172a; border:1px solid #60a5fa; border-radius:8px; font-weight:900; }
-        .window-counter strong { min-width:22px; text-align:center; font-size:16px; }
+        .window-counter button { min-width:42px; height:34px; padding:0 12px; color:#fff; background:#0f172a; border:1px solid #60a5fa; border-radius:8px; font-weight:900; }
+        .window-counter button.active { background:#2563eb; border-color:#93c5fd; box-shadow:0 0 0 2px rgba(96,165,250,.2); }
         .size-selector { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.14); }
         .size-selector button { min-height:42px; padding:10px; color:#cbd5e1; background:#0f172a; border:1px solid #475569; border-radius:9px; font-weight:900; }
         .size-selector button.active { color:#fff; background:#059669; border-color:#6ee7b7; }
@@ -373,7 +373,7 @@ function renderWorks() {
                     <span class="work-card-state">${selection ? 'محدد' : 'غير محدد'}</span>
                 </span>
                 ${work.id === 'full' ? '<span class="exclusive-note">اختيار «كامل» يلغي تلقائيًا أي عمل آخر محدد.</span>' : ''}
-                ${work.id === 'window' ? `<span class="control-label">عدد الدرايش</span><span class="window-counter"><button type="button" data-window-change="-1">−</button><strong>${windowCount}</strong><button type="button" data-window-change="1">+</button></span>` : ''}
+                ${work.id === 'window' ? `<span class="control-label">عدد الدرايش</span><span class="window-counter">${[1,2,3,4].map(count => `<button type="button" class="${windowCount === count ? 'active' : ''}" data-window-count="${count}">${count}</button>`).join('')}</span>` : ''}
                 <span class="control-label">1 — اختر حجم رول واحد</span>
                 <span class="size-selector">
                     ${availableSizes.length
@@ -402,7 +402,7 @@ function renderWorks() {
         const [work, grade] = button.dataset.grade.split(':');
         selectGrade(work, grade);
     });
-    box.querySelectorAll('[data-window-change]').forEach(button => button.onclick = () => changeWindowCount(Number(button.dataset.windowChange)));
+    box.querySelectorAll('[data-window-count]').forEach(button => button.onclick = () => setWindowCount(Number(button.dataset.windowCount)));
     document.getElementById('openAdditional').onclick = openCustomPanel;
 }
 
@@ -461,8 +461,8 @@ function selectGrade(work, grade) {
     renderSelectedParts();
 }
 
-function changeWindowCount(change) {
-    windowCount = Math.min(4, Math.max(1, windowCount + change));
+function setWindowCount(count) {
+    windowCount = Math.min(4, Math.max(1, count));
     selectedParts = selectedParts.map(part => part.work === 'window' && !part.custom ? { ...part, qty:windowCount } : part);
     renderWorks();
     syncAutomaticPricing();

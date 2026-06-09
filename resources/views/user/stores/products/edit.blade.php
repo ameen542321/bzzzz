@@ -173,23 +173,43 @@
             </div>
 
             <div id="tint_name_preview" class="hidden mb-4 p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl">
-                <div class="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                        <p class="text-indigo-200 font-bold text-sm">طريقة كتابة اسم منتج التضليل</p>
-                        <p class="text-xs text-gray-400 mt-1">اكتب: النوع ثم الحجم ثم الدرجة. لا تقلق إذا نسيت الفراغ؛ النظام يرتب الاسم ويفصل الدرجة تلقائيًا عند الحفظ.</p>
-                    </div>
-                    <span class="text-[10px] text-indigo-300 border border-indigo-500/30 rounded-full px-2 py-1">معاينة مباشرة</span>
+                <div class="mb-4">
+                    <p class="text-indigo-200 font-bold text-sm">بيانات ظهور منتج التضليل</p>
+                    <p class="text-xs text-gray-400 mt-1">أدخل الأجزاء منفصلة، وسيكوّن النظام اسم المنتج الأساسي بالترتيب الصحيح تلقائيًا دون الاعتماد على المسافات أو طريقة الكتابة.</p>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">النوع</span><strong id="tint_name_type" class="text-white">—</strong></div>
-                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">الحجم</span><strong id="tint_name_size" class="text-white">—</strong></div>
-                    <div class="p-3 bg-gray-900/80 border border-gray-700 rounded-lg"><span class="block text-[10px] text-gray-500">الدرجة</span><strong id="tint_name_grade" class="text-white">—</strong></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <label class="block">
+                        <span class="block text-xs font-bold text-gray-300 mb-2">الصنع / النوع</span>
+                        <input type="text" name="tint_manufacturer" id="tint_manufacturer" value="{{ old('tint_manufacturer') }}" placeholder="مثال: كوري أو مخلوط" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-bold text-gray-300 mb-2">الحجم</span>
+                        <select name="tint_size" id="tint_size" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                            <option value="">اختر الحجم</option>
+                            <option value="كبير" @selected(old('tint_size') === 'كبير')>كبير</option>
+                            <option value="صغير" @selected(old('tint_size') === 'صغير')>صغير</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-bold text-gray-300 mb-2">الدرجة</span>
+                        <select name="tint_grade" id="tint_grade" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                            <option value="">اختر الدرجة</option>
+                            <option value="01" @selected(old('tint_grade') === '01')>01</option>
+                            <option value="02" @selected(old('tint_grade') === '02')>02</option>
+                            <option value="03" @selected(old('tint_grade') === '03')>03</option>
+                            <option value="شفاف" @selected(old('tint_grade') === 'شفاف')>شفاف</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-bold text-gray-300 mb-2">أخرى <span class="text-gray-500">(اختياري)</span></span>
+                        <input type="text" name="tint_extra" id="tint_extra" value="{{ old('tint_extra') }}" placeholder="مثال: أمريكي" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                    </label>
                 </div>
-                <div class="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-sm">
+                <div class="mt-4 p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-sm">
                     <span class="text-emerald-300">سيظهر المنتج هكذا:</span>
-                    <strong id="tint_normalized_name" class="text-white mr-1">أدخل اسم المنتج</strong>
+                    <strong id="tint_normalized_name" class="text-white mr-1">أكمل بيانات الظهور</strong>
                 </div>
-                <p class="mt-2 text-xs text-gray-400">مثال: كتابة <strong class="text-gray-200">كوري كبير01</strong> ستُحفظ وتظهر كـ <strong class="text-emerald-300">كوري كبير 01</strong>.</p>
+                <p class="mt-2 text-xs text-gray-400">مثال: الصنع «صيني» + الحجم «صغير» + الدرجة «01» = <strong class="text-emerald-300">صيني صغير 01</strong>.</p>
             </div>
 
             {{-- الاسم --}}
@@ -197,6 +217,7 @@
                 <label class="block text-gray-300 mb-2">اسم المنتج</label>
                 <input type="text" name="name" id="product_name" value="{{ old('name', $product->name) }}"
                        class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                <p id="tint_name_readonly_hint" class="hidden mt-2 text-xs text-indigo-300">هذا الحقل يُجمع تلقائيًا من بيانات الظهور أعلاه.</p>
             </div>
 
             {{-- سعر البيع --}}
@@ -325,29 +346,64 @@
         updateTintNamePreview();
     }
 
+    let tintNameFieldsInitialized = false;
+
     function parseTintProductName(value) {
         const raw = String(value || '').trim().replace(/\s+/g, ' ');
         const size = raw.match(/(كبير|صغير)/)?.[1] || '';
         const rawGrade = raw.match(/(شفاف|0?[1-3])/)?.[1] || '';
         const grade = rawGrade && rawGrade !== 'شفاف' ? rawGrade.padStart(2, '0') : rawGrade;
-        const type = raw
+        const manufacturer = raw
             .replace(/(كبير|صغير|شفاف|0?[1-3])/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
-        const normalized = [type, size, grade].filter(Boolean).join(' ');
-        return { type, size, grade, normalized };
+        return { manufacturer, size, grade };
+    }
+
+    function initializeTintNameFields() {
+        if (tintNameFieldsInitialized) return;
+        const manufacturer = document.getElementById('tint_manufacturer');
+        const size = document.getElementById('tint_size');
+        const grade = document.getElementById('tint_grade');
+        const extra = document.getElementById('tint_extra');
+        if (!manufacturer || !size || !grade || !extra) return;
+
+        if (!manufacturer.value && !size.value && !grade.value && !extra.value) {
+            const parsed = parseTintProductName(document.getElementById('product_name').value);
+            manufacturer.value = parsed.manufacturer;
+            size.value = parsed.size;
+            grade.value = parsed.grade;
+        }
+        tintNameFieldsInitialized = true;
     }
 
     function updateTintNamePreview() {
         const input = document.getElementById('product_name');
         const preview = document.getElementById('tint_name_preview');
-        if (!input || !preview || preview.classList.contains('hidden')) return;
+        const hint = document.getElementById('tint_name_readonly_hint');
+        if (!input || !preview) return;
 
-        const parsed = parseTintProductName(input.value);
-        document.getElementById('tint_name_type').textContent = parsed.type || '—';
-        document.getElementById('tint_name_size').textContent = parsed.size || '—';
-        document.getElementById('tint_name_grade').textContent = parsed.grade || '—';
-        document.getElementById('tint_normalized_name').textContent = parsed.normalized || 'أدخل اسم المنتج';
+        const active = !preview.classList.contains('hidden');
+        ['tint_manufacturer', 'tint_size', 'tint_grade'].forEach((id) => {
+            const field = document.getElementById(id);
+            if (field) field.required = active;
+        });
+        input.readOnly = active;
+        input.classList.toggle('cursor-not-allowed', active);
+        input.classList.toggle('text-gray-400', active);
+        hint?.classList.toggle('hidden', !active);
+        if (!active) return;
+
+        initializeTintNameFields();
+        const parts = [
+            document.getElementById('tint_manufacturer').value.trim(),
+            document.getElementById('tint_size').value,
+            document.getElementById('tint_grade').value,
+            document.getElementById('tint_extra').value.trim(),
+        ].filter(Boolean);
+        const normalized = parts.join(' ').replace(/\s+/g, ' ').trim();
+        input.value = normalized;
+        document.getElementById('tint_normalized_name').textContent = normalized || 'أكمل بيانات الظهور';
     }
 
     function toggleSplittableFields() {
@@ -379,7 +435,10 @@
     }
 
     window.onload = function() {
-        document.getElementById('product_name')?.addEventListener('input', updateTintNamePreview);
+        ['tint_manufacturer', 'tint_size', 'tint_grade', 'tint_extra'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('input', updateTintNamePreview);
+            document.getElementById(id)?.addEventListener('change', updateTintNamePreview);
+        });
         toggleFractionSection();
         toggleSplittableFields();
         disableNumberWheelInputs();

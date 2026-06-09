@@ -587,6 +587,10 @@ class ProductController extends Controller
         // 1. التعديل في الـ Validation
         $request->validate([
             'name'             => 'required|string|max:255',
+            'tint_manufacturer' => 'nullable|string|max:100',
+            'tint_size'         => 'nullable|in:كبير,صغير',
+            'tint_grade'        => 'nullable|in:01,02,03,شفاف',
+            'tint_extra'        => 'nullable|string|max:100',
             'category_id'      => ['required', Rule::exists('categories', 'id')->where('store_id', $store->id)],
             'price'            => 'required|numeric|min:0',
             'cost_price'       => 'nullable|numeric|min:0',
@@ -615,11 +619,14 @@ class ProductController extends Controller
             'fractions.*.price'           => 'required|numeric|min:0',
         ]);
 
+        $this->validateTintNameParts($request, $store);
+
         $productName = $this->normalizeProductNameForCategory(
             $request->name,
             (int) $request->category_id,
             $store->id,
-            $request->product_type
+            $request->product_type,
+            $request->only(['tint_manufacturer', 'tint_size', 'tint_grade', 'tint_extra'])
         );
 
         $slug = $this->buildStoreScopedSlug($productName, $store->id);
@@ -703,11 +710,40 @@ class ProductController extends Controller
     }
 
     /**
-     * يوحّد اسم رول التضليل بصيغة: النوع + الحجم + الدرجة.
+     * يضمن اكتمال الأجزاء التي يعتمد عليها اسم منتج التضليل في شاشة البيع.
+     */
+    private function validateTintNameParts(Request $request, Store $store): void
+    {
+        if ($request->product_type !== 'fractional') {
+            return;
+        }
+
+        $categoryName = Category::query()
+            ->where('store_id', $store->id)
+            ->whereKey((int) $request->category_id)
+            ->value('name');
+
+        if ($categoryName !== 'تضليل') {
+            return;
+        }
+
+        $request->validate([
+            'tint_manufacturer' => 'required|string|max:100',
+            'tint_size' => 'required|in:كبير,صغير',
+            'tint_grade' => 'required|in:01,02,03,شفاف',
+        ], [
+            'tint_manufacturer.required' => 'يرجى إدخال الصنع أو نوع التضليل.',
+            'tint_size.required' => 'يرجى اختيار حجم رول التضليل.',
+            'tint_grade.required' => 'يرجى اختيار درجة التضليل.',
+        ]);
+    }
+
+    /**
+     * يوحّد اسم رول التضليل بصيغة: الصنع/النوع + الحجم + الدرجة + بيانات أخرى اختيارية.
      * مثال: «كوري كبير01» يصبح «كوري كبير 01» قبل إنشاء slug والحفظ.
      * لا يغيّر أسماء المنتجات العادية أو منتجات الأقسام الأخرى.
      */
-    private function normalizeProductNameForCategory(string $name, int $categoryId, int $storeId, string $productType): string
+    private function normalizeProductNameForCategory(string $name, int $categoryId, int $storeId, string $productType, array $tintParts = []): string
     {
         $normalized = preg_replace('/\s+/u', ' ', trim($name));
         if ($productType !== 'fractional') {
@@ -723,6 +759,16 @@ class ProductController extends Controller
             return $normalized;
         }
 
+        $manufacturer = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_manufacturer'] ?? '')));
+        $extra = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_extra'] ?? '')));
+        $selectedSize = $tintParts['tint_size'] ?? null;
+        $selectedGrade = $tintParts['tint_grade'] ?? null;
+        if ($manufacturer !== '' && in_array($selectedSize, ['كبير', 'صغير'], true)
+            && in_array($selectedGrade, ['01', '02', '03', 'شفاف'], true)) {
+            return implode(' ', array_filter([$manufacturer, $selectedSize, $selectedGrade, $extra]));
+        }
+
+        // توافق مع منتجات التضليل القديمة التي أُدخل اسمها قبل إضافة الحقول المنفصلة.
         preg_match('/(كبير|صغير)/u', $normalized, $sizeMatch);
         preg_match('/(شفاف|0?[1-3])/u', $normalized, $gradeMatch);
         $size = $sizeMatch[1] ?? null;
@@ -765,6 +811,10 @@ class ProductController extends Controller
 
         $request->validate([
             'name'             => 'required|string|max:255',
+            'tint_manufacturer' => 'nullable|string|max:100',
+            'tint_size'         => 'nullable|in:كبير,صغير',
+            'tint_grade'        => 'nullable|in:01,02,03,شفاف',
+            'tint_extra'        => 'nullable|string|max:100',
             'category_id'      => ['required', Rule::exists('categories', 'id')->where('store_id', $store->id)],
             'price'            => 'required|numeric|min:0',
             'cost_price'       => 'nullable|numeric|min:0',
@@ -785,6 +835,9 @@ class ProductController extends Controller
             'fractions.*.deduction_value' => 'required|numeric|min:0',
             'fractions.*.price'           => 'required|numeric|min:0',
         ]);
+
+        $this->validateTintNameParts($request, $store);
+
         // ملاحظة مهمة:
         // واجهة التعديل تعرض roll_length للمنتج الكَسري، لذلك يجب التحقق منه
         // وحفظه هنا فعلياً حتى لا تبقى الواجهة تعرض قيمة لا تنعكس في قاعدة البيانات.
@@ -793,7 +846,8 @@ class ProductController extends Controller
             $request->name,
             (int) $request->category_id,
             $store->id,
-            $request->product_type
+            $request->product_type,
+            $request->only(['tint_manufacturer', 'tint_size', 'tint_grade', 'tint_extra'])
         );
 
         // توليد slug مرتبط بالمتجر بدون الحاجة لتعديل قاعدة البيانات
