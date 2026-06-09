@@ -38,12 +38,12 @@
             {{-- القسم --}}
             <div class="mb-6">
                 <label class="block text-gray-300 mb-2">القسم</label>
-                <select name="category_id" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-600">
+                <select name="category_id" id="category_id" onchange="updateFractionalGuidance()" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-600">
                     @foreach($mainCategories as $category)
-                        <option value="{{ $category->id }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }} (نشاط)</option>
+                        <option value="{{ $category->id }}" data-category-name="{{ $category->name }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }} (نشاط)</option>
                     @endforeach
                     @foreach($normalCategories as $category)
-                        <option value="{{ $category->id }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }}</option>
+                        <option value="{{ $category->id }}" data-category-name="{{ $category->name }}" @selected(old('category_id', $selectedCategory) == $category->id)>{{ $category->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -59,48 +59,55 @@
             </div>
 
 
-            {{-- إرشادات إدخال منتج الرول؛ تظهر فقط عند اختيار رول/قص. --}}
+            {{-- إرشادات منتج الرول؛ تتغير حسب القسم المختار وتظهر فقط للرول/القص. --}}
             <div id="fractional_product_guidance" class="mb-6 p-5 bg-sky-950/40 border border-sky-500/40 rounded-xl" style="display: none;">
                 <div class="flex items-start gap-3 mb-4">
                     <div class="shrink-0 w-10 h-10 rounded-lg bg-sky-500/15 text-sky-300 flex items-center justify-center">
                         <i class="fa-solid fa-circle-info"></i>
                     </div>
                     <div>
-                        <h3 class="text-sky-300 font-bold">دليل إدخال منتج رول التضليل</h3>
-                        <p class="text-xs text-gray-400 mt-1">أدخل كل رول فعلي كمنتج مستقل حتى تُحسب تكلفته ويُتابع مخزونه بالمتر بصورة صحيحة.</p>
+                        <h3 id="fractional_guidance_title" class="text-sky-300 font-bold">دليل إدخال منتج رول/قص</h3>
+                        <p class="text-xs text-gray-400 mt-1">سجّل كل رول فعلي كمنتج مستقل؛ فالتكلفة والمخزون والمتبقي تُتابع لكل منتج بالمتر.</p>
                     </div>
+                </div>
+
+                <div id="tint_product_guidance" class="hidden mb-4 p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-lg">
+                    <p class="text-indigo-200 font-bold text-sm mb-2"><i class="fa-solid fa-sun ml-1"></i> منتج تابع لقسم تضليل</p>
+                    <ul class="space-y-1 text-xs text-gray-300 list-disc list-inside">
+                        <li>اسم المنتج بالترتيب: <strong class="text-white">النوع + الحجم + الدرجة</strong>.</li>
+                        <li>أمثلة صحيحة: <strong class="text-white">كوري كبير 01</strong>، <strong class="text-white">أمريكي صغير 02</strong>، <strong class="text-white">مخلوط صغير 01</strong>.</li>
+                        <li>خيارات التجزئة القياسية: <strong class="text-white">كامل، أمامي، خلفي، دريشة</strong>. لا تضف «مخصص»؛ مكانه موجود في شاشة البيع.</li>
+                        <li>استهلاك «دريشة» وسعرها يُدخلان لدريشة واحدة، والنظام يضربهما في العدد عند البيع.</li>
+                    </ul>
+                </div>
+
+                <div id="upholstery_product_guidance" class="hidden mb-4 p-4 bg-amber-950/30 border border-amber-500/30 rounded-lg">
+                    <p class="text-amber-200 font-bold text-sm mb-2"><i class="fa-solid fa-couch ml-1"></i> منتج تابع لقسم تنجيد وتلابيس</p>
+                    <p class="text-xs text-gray-300">اكتب اسمًا يميز الخامة واللون أو المقاس، مثل: <strong class="text-white">جلد أسود عرض 1.5 متر</strong>. سمِّ خيارات القص حسب الأعمال الفعلية التي تبيعها، وحدد استهلاك كل خيار بالمتر.</p>
+                </div>
+
+                <div id="general_roll_guidance" class="hidden mb-4 p-4 bg-gray-900/70 border border-gray-700 rounded-lg">
+                    <p class="text-gray-200 font-bold text-sm mb-1">منتج رول في قسم آخر</p>
+                    <p class="text-xs text-gray-400">استخدم اسمًا واضحًا يميز المنتج، وأنشئ خيارات قص بأسماء يفهمها العامل مع استهلاك وسعر كل خيار.</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">1. اسم المنتج</span>
-                        <p class="text-gray-300">اكتب النوع والدرجة والحجم بوضوح، مثل: <span class="text-white font-bold">كوري 01 كبير</span> أو <span class="text-white font-bold">أمريكي 02 صغير</span>.</p>
+                        <span class="block text-sky-300 font-bold mb-1">طول الرول وسعر التكلفة</span>
+                        <p class="text-gray-300">أدخل طول الرول الكامل بالمتر، وسعر تكلفة <strong class="text-white">الرول الكامل</strong> وليس سعر المتر.</p>
                     </div>
                     <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">2. طول وتكلفة الرول</span>
-                        <p class="text-gray-300">طول الرول هو طوله الكامل بالمتر، وسعر التكلفة هو تكلفة <span class="text-white font-bold">الرول الكامل</span> وليس تكلفة المتر.</p>
+                        <span class="block text-sky-300 font-bold mb-1">عدد الرولات والمخزون</span>
+                        <p class="text-gray-300">عند الإضافة: المخزون بالمتر = عدد الرولات × طول الرول. وعند التعديل غيّر الكمية من إدارة المخزون.</p>
                     </div>
                     <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">3. خيارات التجزئة المطلوبة</span>
-                        <p class="text-gray-300">استخدم الأسماء: <span class="text-white font-bold">كامل، أمامي، خلفي، دريشة</span>. الخيار المخصص يُدخل من شاشة البيع ولا يلزم إضافته هنا.</p>
+                        <span class="block text-sky-300 font-bold mb-1">الاستهلاك بالمتر</span>
+                        <p class="text-gray-300">هو ما يُخصم من المخزون عند بيع الخيار. مثال: 1.5 تعني خصم 1.5 متر، وليست 1.5 رول.</p>
                     </div>
                     <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">4. الاستهلاك والسعر</span>
-                        <p class="text-gray-300">الاستهلاك هو عدد الأمتار المستخدمة للعمل الواحد، والسعر هو سعر بيع هذا العمل. في خيار دريشة أدخل بيانات <span class="text-white font-bold">دريشة واحدة</span>.</p>
+                        <span class="block text-sky-300 font-bold mb-1">السعر والهالك</span>
+                        <p class="text-gray-300">سعر كل عمل يوضع في خيار التجزئة. ونسبة الهالك تزيد الأمتار المخصومة لتغطية فاقد القص.</p>
                     </div>
-                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">5. عدد الرولات والمخزون</span>
-                        <p class="text-gray-300">عند الإضافة أدخل عدد الرولات الكاملة؛ النظام يحوله إلى مخزون بالمتر: عدد الرولات × طول الرول. وفي التعديل استخدم إدارة المخزون لتغيير الكمية.</p>
-                    </div>
-                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
-                        <span class="block text-sky-300 font-bold mb-1">6. الهالك وسعر البيع العام</span>
-                        <p class="text-gray-300">نسبة الهالك تُضاف إلى الاستهلاك عند الخصم. أما سعر البيع العام فهو سعر المنتج الافتراضي، وأسعار الأعمال الفعلية تُدخل داخل خيارات التجزئة.</p>
-                    </div>
-                </div>
-
-                <div class="mt-4 p-3 bg-amber-950/30 border border-amber-500/30 rounded-lg text-xs text-amber-100 leading-6">
-                    <i class="fa-solid fa-lightbulb text-amber-300 ml-1"></i>
-                    مثال: خيار <strong>أمامي</strong> باستهلاك <strong>1.5</strong> يعني خصم 1.5 متر من الرول. وخيار <strong>دريشة</strong> باستهلاك 0.5 وسعر 40 يعني أن ثلاث درايش تستهلك 1.5 متر ويكون سعرها 120.
                 </div>
             </div>
 
@@ -146,7 +153,7 @@
 
             <div class="mb-6">
                 <label class="block text-gray-300 mb-2">اسم المنتج</label>
-                <input type="text" name="name" value="{{ old('name') }}" required class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
+                <input type="text" name="name" id="product_name" value="{{ old('name') }}" required class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -182,10 +189,11 @@
 
             {{-- خيارات التجزئة --}}
             <div id="fractions_section" style="display: none;" class="mb-8 p-6 bg-gray-800/50 border border-blue-900/30 rounded-xl">
-                <div class="flex items-center justify-between mb-4 border-b border-gray-700 pb-2">
+                <div class="flex items-center justify-between mb-3 border-b border-gray-700 pb-2">
                     <h3 class="text-blue-400 font-bold flex items-center gap-2"><i class="fa-solid fa-scissors text-sm"></i> خيارات التجزئة</h3>
                     <button type="button" onclick="addFractionRow()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded-lg">+ إضافة خيار</button>
                 </div>
+                <p class="mb-4 text-xs text-gray-400">لكل سطر أدخل: <strong class="text-gray-200">اسم العمل</strong>، ثم <strong class="text-gray-200">استهلاك عمل واحد بالمتر</strong>، ثم <strong class="text-gray-200">سعر بيع عمل واحد</strong>.</p>
                 <div id="fractions_container"></div>
             </div>
 
@@ -227,6 +235,7 @@
     function toggleFractionSection() {
         const type = document.getElementById('product_type').value;
         document.getElementById('fractional_product_guidance').style.display = type === 'fractional' ? 'block' : 'none';
+        updateFractionalGuidance();
         const splittableDiv = document.getElementById('splittable_options_div');
         const rollDiv = document.getElementById('roll_length_div');
         const fractionSec = document.getElementById('fractions_section');
@@ -252,6 +261,26 @@
             stdQty.style.display = 'block';
             fracQty.style.display = 'none';
             toggleSplittableFields();
+        }
+    }
+
+    function updateFractionalGuidance() {
+        const productType = document.getElementById('product_type').value;
+        const categorySelect = document.getElementById('category_id');
+        const categoryName = categorySelect?.selectedOptions[0]?.dataset.categoryName?.trim() || '';
+        const isFractional = productType === 'fractional';
+        const isTint = categoryName === 'تضليل';
+        const isUpholstery = categoryName === 'تنجيد وتلابيس';
+
+        document.getElementById('tint_product_guidance').classList.toggle('hidden', !isFractional || !isTint);
+        document.getElementById('upholstery_product_guidance').classList.toggle('hidden', !isFractional || !isUpholstery);
+        document.getElementById('general_roll_guidance').classList.toggle('hidden', !isFractional || isTint || isUpholstery);
+
+        const title = document.getElementById('fractional_guidance_title');
+        if (title) {
+            title.textContent = isTint
+                ? 'دليل إدخال رول التضليل'
+                : (isUpholstery ? 'دليل إدخال رول التنجيد والتلابيس' : 'دليل إدخال منتج رول/قص');
         }
     }
 
