@@ -106,8 +106,13 @@
                     </div>
                     <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
                         <span class="block text-sky-300 font-bold mb-1">السعر والهالك</span>
-                        <p class="text-gray-300">سعر كل عمل يوضع في خيار التجزئة. ونسبة الهالك تزيد الأمتار المخصومة لتغطية فاقد القص.</p>
+                        <p class="text-gray-300">سعر كل عمل يوضع في خيار التجزئة. ونسبة الهالك تُطبق على <strong class="text-white">كل عملية أو خيار بيع</strong>، فتزيد الأمتار المخصومة وتكلفة المادة المستهلكة، ولا تُحسب مرة واحدة على الرول الكامل.</p>
                     </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-xs text-emerald-100 leading-6">
+                    <i class="fa-solid fa-calculator text-emerald-300 ml-1"></i>
+                    مثال: إذا كان استهلاك «أمامي» <strong>1.5 متر</strong> والهالك <strong>10%</strong>، يخصم النظام <strong>1.65 متر</strong> من المخزون، وتُحسب تكلفة البيع على 1.65 متر. وعند بيع «خلفي» لاحقًا تُطبق النسبة عليه أيضًا.
                 </div>
             </div>
 
