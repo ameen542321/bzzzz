@@ -724,16 +724,22 @@ class ProductController extends Controller
         }
 
         preg_match('/(كبير|صغير)/u', $normalized, $sizeMatch);
-        preg_match('/(شفاف|01|02|03)/u', $normalized, $gradeMatch);
+        preg_match('/(شفاف|0?[1-3])/u', $normalized, $gradeMatch);
         $size = $sizeMatch[1] ?? null;
         $grade = $gradeMatch[1] ?? null;
+        if ($grade !== null && $grade !== 'شفاف') {
+            $grade = str_pad($grade, 2, '0', STR_PAD_LEFT);
+        }
 
         if (! $size || ! $grade) {
             // حتى إذا كان الاسم ناقصًا، نفصل الرموز المعروفة عن الكلمات لتسهيل تصحيحه لاحقًا.
-            return preg_replace('/\s*(شفاف|01|02|03)\s*/u', ' $1 ', $normalized);
+            return preg_replace_callback('/\s*(شفاف|0?[1-3])\s*/u', static function ($match) {
+                $grade = $match[1] === 'شفاف' ? 'شفاف' : str_pad($match[1], 2, '0', STR_PAD_LEFT);
+                return " {$grade} ";
+            }, $normalized);
         }
 
-        $type = preg_replace('/(كبير|صغير|شفاف|01|02|03)/u', ' ', $normalized);
+        $type = preg_replace('/(كبير|صغير|شفاف|0?[1-3])/u', ' ', $normalized);
         $type = preg_replace('/\s+/u', ' ', trim($type));
 
         return $type !== '' ? "{$type} {$size} {$grade}" : "{$size} {$grade}";

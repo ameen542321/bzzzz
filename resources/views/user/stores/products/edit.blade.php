@@ -328,9 +328,10 @@
     function parseTintProductName(value) {
         const raw = String(value || '').trim().replace(/\s+/g, ' ');
         const size = raw.match(/(كبير|صغير)/)?.[1] || '';
-        const grade = raw.match(/(شفاف|01|02|03)/)?.[1] || '';
+        const rawGrade = raw.match(/(شفاف|0?[1-3])/)?.[1] || '';
+        const grade = rawGrade && rawGrade !== 'شفاف' ? rawGrade.padStart(2, '0') : rawGrade;
         const type = raw
-            .replace(/(كبير|صغير|شفاف|01|02|03)/g, ' ')
+            .replace(/(كبير|صغير|شفاف|0?[1-3])/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
         const normalized = [type, size, grade].filter(Boolean).join(' ');
