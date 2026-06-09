@@ -75,6 +75,52 @@
                 </select>
             </div>
 
+
+            {{-- إرشادات إدخال منتج الرول؛ تظهر فقط عند اختيار رول/قص. --}}
+            <div id="fractional_product_guidance" class="mb-6 p-5 bg-sky-950/40 border border-sky-500/40 rounded-xl" style="display: none;">
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="shrink-0 w-10 h-10 rounded-lg bg-sky-500/15 text-sky-300 flex items-center justify-center">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sky-300 font-bold">دليل إدخال منتج رول التضليل</h3>
+                        <p class="text-xs text-gray-400 mt-1">أدخل كل رول فعلي كمنتج مستقل حتى تُحسب تكلفته ويُتابع مخزونه بالمتر بصورة صحيحة.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">1. اسم المنتج</span>
+                        <p class="text-gray-300">اكتب النوع والدرجة والحجم بوضوح، مثل: <span class="text-white font-bold">كوري 01 كبير</span> أو <span class="text-white font-bold">أمريكي 02 صغير</span>.</p>
+                    </div>
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">2. طول وتكلفة الرول</span>
+                        <p class="text-gray-300">طول الرول هو طوله الكامل بالمتر، وسعر التكلفة هو تكلفة <span class="text-white font-bold">الرول الكامل</span> وليس تكلفة المتر.</p>
+                    </div>
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">3. خيارات التجزئة المطلوبة</span>
+                        <p class="text-gray-300">استخدم الأسماء: <span class="text-white font-bold">كامل، أمامي، خلفي، دريشة</span>. الخيار المخصص يُدخل من شاشة البيع ولا يلزم إضافته هنا.</p>
+                    </div>
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">4. الاستهلاك والسعر</span>
+                        <p class="text-gray-300">الاستهلاك هو عدد الأمتار المستخدمة للعمل الواحد، والسعر هو سعر بيع هذا العمل. في خيار دريشة أدخل بيانات <span class="text-white font-bold">دريشة واحدة</span>.</p>
+                    </div>
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">5. عدد الرولات والمخزون</span>
+                        <p class="text-gray-300">عند الإضافة أدخل عدد الرولات الكاملة؛ النظام يحوله إلى مخزون بالمتر: عدد الرولات × طول الرول. وفي التعديل استخدم إدارة المخزون لتغيير الكمية.</p>
+                    </div>
+                    <div class="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                        <span class="block text-sky-300 font-bold mb-1">6. الهالك وسعر البيع العام</span>
+                        <p class="text-gray-300">نسبة الهالك تُضاف إلى الاستهلاك عند الخصم. أما سعر البيع العام فهو سعر المنتج الافتراضي، وأسعار الأعمال الفعلية تُدخل داخل خيارات التجزئة.</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-amber-950/30 border border-amber-500/30 rounded-lg text-xs text-amber-100 leading-6">
+                    <i class="fa-solid fa-lightbulb text-amber-300 ml-1"></i>
+                    مثال: خيار <strong>أمامي</strong> باستهلاك <strong>1.5</strong> يعني خصم 1.5 متر من الرول. وخيار <strong>دريشة</strong> باستهلاك 0.5 وسعر 40 يعني أن ثلاث درايش تستهلك 1.5 متر ويكون سعرها 120.
+                </div>
+            </div>
+
             {{-- نظام الأطقم (يظهر فقط للمنتج العادي) --}}
 <div id="splittable_options_div" class="mb-6 p-4 bg-gray-800 border border-gray-700 rounded-lg">
     <div class="flex items-center justify-between">
@@ -215,6 +261,7 @@
 
     function toggleFractionSection() {
         const type = document.getElementById('product_type').value;
+        document.getElementById('fractional_product_guidance').style.display = type === 'fractional' ? 'block' : 'none';
         document.getElementById('fractions_section').style.display = type === 'fractional' ? 'block' : 'none';
         document.getElementById('waste_percentage_div').style.display = type === 'fractional' ? 'block' : 'none';
         document.getElementById('roll_length_div').style.display = type === 'fractional' ? 'block' : 'none';
