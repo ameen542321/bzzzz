@@ -588,8 +588,8 @@ class ProductController extends Controller
         $request->validate([
             'name'             => 'required|string|max:255',
             'tint_manufacturer' => 'nullable|string|max:100',
-            'tint_size'         => 'nullable|in:كبير,صغير',
-            'tint_grade'        => 'nullable|in:01,02,03,شفاف',
+            'tint_size'         => 'nullable|string|max:100',
+            'tint_grade'        => 'nullable|string|max:100',
             'tint_extra'        => 'nullable|string|max:100',
             'category_id'      => ['required', Rule::exists('categories', 'id')->where('store_id', $store->id)],
             'price'            => 'required|numeric|min:0',
@@ -729,12 +729,12 @@ class ProductController extends Controller
 
         $request->validate([
             'tint_manufacturer' => 'required|string|max:100',
-            'tint_size' => 'required|in:كبير,صغير',
-            'tint_grade' => 'required|in:01,02,03,شفاف',
+            'tint_size' => 'required|string|max:100',
+            'tint_grade' => 'required|string|max:100',
         ], [
             'tint_manufacturer.required' => 'يرجى إدخال الصنع أو نوع التضليل.',
-            'tint_size.required' => 'يرجى اختيار حجم رول التضليل.',
-            'tint_grade.required' => 'يرجى اختيار درجة التضليل.',
+            'tint_size.required' => 'يرجى إدخال حجم رول التضليل.',
+            'tint_grade.required' => 'يرجى إدخال درجة التضليل.',
         ]);
     }
 
@@ -761,10 +761,9 @@ class ProductController extends Controller
 
         $manufacturer = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_manufacturer'] ?? '')));
         $extra = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_extra'] ?? '')));
-        $selectedSize = $tintParts['tint_size'] ?? null;
-        $selectedGrade = $tintParts['tint_grade'] ?? null;
-        if ($manufacturer !== '' && in_array($selectedSize, ['كبير', 'صغير'], true)
-            && in_array($selectedGrade, ['01', '02', '03', 'شفاف'], true)) {
+        $selectedSize = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_size'] ?? '')));
+        $selectedGrade = preg_replace('/\s+/u', ' ', trim((string) ($tintParts['tint_grade'] ?? '')));
+        if ($manufacturer !== '' && $selectedSize !== '' && $selectedGrade !== '') {
             return implode(' ', array_filter([$manufacturer, $selectedSize, $selectedGrade, $extra]));
         }
 
@@ -812,8 +811,8 @@ class ProductController extends Controller
         $request->validate([
             'name'             => 'required|string|max:255',
             'tint_manufacturer' => 'nullable|string|max:100',
-            'tint_size'         => 'nullable|in:كبير,صغير',
-            'tint_grade'        => 'nullable|in:01,02,03,شفاف',
+            'tint_size'         => 'nullable|string|max:100',
+            'tint_grade'        => 'nullable|string|max:100',
             'tint_extra'        => 'nullable|string|max:100',
             'category_id'      => ['required', Rule::exists('categories', 'id')->where('store_id', $store->id)],
             'price'            => 'required|numeric|min:0',

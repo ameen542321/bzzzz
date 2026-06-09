@@ -214,10 +214,7 @@ const works = [
     { id:'rear', label:'خلفي', description:'الزجاج الخلفي' },
     { id:'window', label:'دريشة', description:'حدد عدد الدرايش من 1 إلى 4' },
 ];
-const sizes = [
-    { id:'big', label:'كبير' },
-    { id:'small', label:'صغير' },
-];
+let sizes = [];
 let previewProducts = [];
 
 function normalizeArabic(value) {
@@ -230,52 +227,49 @@ function normalizeArabic(value) {
         .replace(/\s+/g, ' ');
 }
 
-function inferTintType(name) {
-    const original = String(name || '').trim();
-    if (!original) return null;
+function parseTintIdentity(name) {
+    const original = String(name || '').trim().replace(/\s+/g, ' ');
+    const tokens = original.split(' ').filter(Boolean);
+    if (tokens.length < 3) return { tintType:null, size:null, sizeLabel:null, grade:null };
 
-    // نحذف الحجم والدرجة والكلمات الوصفية العامة، وما يتبقى هو نوع التضليل
-    // مثل: «مخلوط صغير 01» ← «مخلوط»، و«نيكل أمريكي كبير 02» ← «نيكل أمريكي».
-    const type = original
-        .replace(/(^|\s)(كبير|صغير|نصف\s*متر|نص\s*متر|رول\s*متر|مقاس\s*متر|0\.5)(?=\s|$)/gi, ' ')
-        .replace(/(^|\s)(0?[1-3]|شفاف)(?=\s|$)/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    const knownSizeIndex = tokens.findIndex(token => ['كبير', 'صغير'].includes(token));
+    const knownGradeIndex = tokens.findIndex(token => token === 'شفاف' || /^0?[1-3]$/.test(token));
+    let sizeIndex = knownSizeIndex;
+    let gradeIndex = knownGradeIndex;
 
-    return type || null;
+    // الأسماء الجديدة تُجمع دائمًا بالترتيب: الصنع، الحجم، الدرجة، ثم «أخرى».
+    // عند استخدام حجم أو درجة خاصة بالمتجر نعتمد موضعهما بدل قائمة ثابتة.
+    if (sizeIndex < 0 || gradeIndex < 0) {
+        sizeIndex = 1;
+        gradeIndex = 2;
+    }
+
+    const sizeLabel = tokens[sizeIndex] || null;
+    const rawGrade = tokens[gradeIndex] || null;
+    const grade = rawGrade;
+    const typeParts = tokens.filter((token, index) => index !== sizeIndex && index !== gradeIndex);
+    const tintType = typeParts.join(' ').trim() || null;
+
+    return {
+        tintType,
+        size:sizeLabel ? tintTypeId(sizeLabel) : null,
+        sizeLabel,
+        grade,
+    };
 }
 
-function tintTypeId(label) {
-    return normalizeArabic(label).replace(/\s+/g, '-');
-}
+function inferTintType(name) { return parseTintIdentity(name).tintType; }
+function inferSize(name) { return parseTintIdentity(name).size; }
+function inferGrade(name) { return parseTintIdentity(name).grade; }
 
-function rebuildTintTypes() {
-    const types = new Map();
+function rebuildSizes() {
+    const available = new Map();
     previewProducts.forEach(product => {
-        if (!product.tintType) return;
-        const id = tintTypeId(product.tintType);
-        if (!types.has(id)) {
-            types.set(id, {
-                id,
-                label:product.tintType,
-                description:`${previewProducts.filter(item => item.tintTypeId === id).length} منتج متوفر`,
-            });
+        if (product.size && product.sizeLabel && !available.has(product.size)) {
+            available.set(product.size, { id:product.size, label:product.sizeLabel });
         }
     });
-    categories = [...types.values()];
-}
-function inferSize(name) {
-    const normalized = normalizeArabic(name);
-    if (normalized.includes('نصف متر') || normalized.includes('نص متر') || normalized.includes('صغير') || normalized.includes('0.5')) return 'small';
-    if (normalized.includes('كبير') || normalized.includes('رول متر') || normalized.includes('مقاس متر')) return 'big';
-    return null;
-}
-
-function inferGrade(name) {
-    const normalized = normalizeArabic(name);
-    if (normalized.includes('شفاف')) return 'شفاف';
-    const match = normalized.match(/(^|[^0-9])(0?[1-3])([^0-9]|$)/);
-    return match ? match[2].padStart(2, '0') : null;
+    sizes = [...available.values()];
 }
 
 function inferWork(label) {
@@ -288,14 +282,17 @@ function inferWork(label) {
 }
 
 function mapProduct(product) {
+    const identity = parseTintIdentity(product.name);
     return {
         id:String(product.id),
         name:product.name,
-        tintType:inferTintType(product.name),
-        tintTypeId:tintTypeId(inferTintType(product.name) || ''),
-        size:inferSize(product.name),
-        grade:inferGrade(product.name),
+        tintType:identity.tintType,
+        tintTypeId:tintTypeId(identity.tintType || ''),
+        size:identity.size,
+        sizeLabel:identity.sizeLabel,
+        grade:identity.grade,
         price:Number(product.price || 0),
+        costPrice:Number(product.cost_price || 0),
         length:Number(product.roll_length || 0),
         stock:Number(product.quantity || 0),
         waste:Number(product.waste_percentage || 0),
@@ -317,6 +314,12 @@ let cart = [];
 const modal = document.getElementById('tintModal');
 
 function money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; }
+function partMaterialCost(part) {
+    const consumedMeters = Number(part.meters || 0) * Number(part.qty || 0);
+    const metersWithWaste = consumedMeters * (1 + Number(part.product.waste || 0) / 100);
+    const costPerMeter = part.product.length > 0 ? Number(part.product.costPrice || 0) / part.product.length : 0;
+    return metersWithWaste * costPerMeter;
+}
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -536,13 +539,16 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م${part.product.waste > 0 ? ` — الخصم مع هالك ${part.product.waste}%: ${((part.meters * part.qty) * (1 + part.product.waste / 100)).toFixed(2)}م` : ''} — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
+            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م${part.product.waste > 0 ? ` — الخصم مع هالك ${part.product.waste}%: ${((part.meters * part.qty) * (1 + part.product.waste / 100)).toFixed(2)}م` : ''} — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}<br><strong style="color:#fbbf24">تكلفة المادة مؤقتًا: ${money(partMaterialCost(part))}${part.product.waste > 0 ? ' — شاملة الهالك' : ''}</strong></small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
     `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
     const defaultPrice = selectedParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0);
-    document.getElementById('partsHint').textContent = selectedParts.length ? `${selectedParts.length} أعمال مضافة` : 'لم يتم اختيار أي عمل';
+    const totalMaterialCost = selectedParts.reduce((sum, part) => sum + partMaterialCost(part), 0);
+    document.getElementById('partsHint').textContent = selectedParts.length
+        ? `${selectedParts.length} أعمال — تكلفة المادة مؤقتًا: ${money(totalMaterialCost)}`
+        : 'لم يتم اختيار أي عمل';
     document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
 }
 
@@ -609,6 +615,7 @@ async function loadPreviewProducts() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         previewProducts = (payload.products || []).map(mapProduct);
+        rebuildSizes();
         rebuildTintTypes();
         const mappedProducts = previewProducts.filter(product => product.tintType && product.size && product.grade).length;
         status.textContent = `${previewProducts.length} منتج من قسم تضليل — ${categories.length} نوع — ${mappedProducts} جاهز`;

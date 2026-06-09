@@ -168,21 +168,13 @@
                     </label>
                     <label class="block">
                         <span class="block text-xs font-bold text-gray-300 mb-2">الحجم</span>
-                        <select name="tint_size" id="tint_size" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
-                            <option value="">اختر الحجم</option>
-                            <option value="كبير" @selected(old('tint_size') === 'كبير')>كبير</option>
-                            <option value="صغير" @selected(old('tint_size') === 'صغير')>صغير</option>
-                        </select>
+                        <input type="text" name="tint_size" id="tint_size" value="{{ old('tint_size') }}" placeholder="مثال: كبير أو صغير" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                        <span class="block mt-1 text-[10px] text-gray-500">يُترك حسب تسمية المتجر، وسيظهر كما كتبته.</span>
                     </label>
                     <label class="block">
                         <span class="block text-xs font-bold text-gray-300 mb-2">الدرجة</span>
-                        <select name="tint_grade" id="tint_grade" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
-                            <option value="">اختر الدرجة</option>
-                            <option value="01" @selected(old('tint_grade') === '01')>01</option>
-                            <option value="02" @selected(old('tint_grade') === '02')>02</option>
-                            <option value="03" @selected(old('tint_grade') === '03')>03</option>
-                            <option value="شفاف" @selected(old('tint_grade') === 'شفاف')>شفاف</option>
-                        </select>
+                        <input type="text" name="tint_grade" id="tint_grade" value="{{ old('tint_grade') }}" placeholder="مثال: 01 أو شفاف" class="w-full bg-gray-900 border border-indigo-500/30 text-white rounded-lg px-3 py-2 text-sm">
+                        <span class="block mt-1 text-[10px] text-gray-500">يمكن إدخال أي درجة معتمدة لديك.</span>
                     </label>
                     <label class="block">
                         <span class="block text-xs font-bold text-gray-300 mb-2">أخرى <span class="text-gray-500">(اختياري)</span></span>
@@ -336,15 +328,21 @@
     let tintNameFieldsInitialized = false;
 
     function parseTintProductName(value) {
-        const raw = String(value || '').trim().replace(/\s+/g, ' ');
-        const size = raw.match(/(كبير|صغير)/)?.[1] || '';
-        const rawGrade = raw.match(/(شفاف|0?[1-3])/)?.[1] || '';
-        const grade = rawGrade && rawGrade !== 'شفاف' ? rawGrade.padStart(2, '0') : rawGrade;
-        const manufacturer = raw
-            .replace(/(كبير|صغير|شفاف|0?[1-3])/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        return { manufacturer, size, grade };
+        const tokens = String(value || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+        if (tokens.length < 3) return { manufacturer:tokens[0] || '', size:'', grade:'', extra:'' };
+
+        const knownSizeIndex = tokens.findIndex(token => ['كبير', 'صغير'].includes(token));
+        const knownGradeIndex = tokens.findIndex(token => token === 'شفاف' || /^0?[1-3]$/.test(token));
+        const sizeIndex = knownSizeIndex >= 0 && knownGradeIndex >= 0 ? knownSizeIndex : 1;
+        const gradeIndex = knownSizeIndex >= 0 && knownGradeIndex >= 0 ? knownGradeIndex : 2;
+        const remaining = tokens.filter((token, index) => index !== sizeIndex && index !== gradeIndex);
+
+        return {
+            manufacturer:remaining.shift() || '',
+            size:tokens[sizeIndex] || '',
+            grade:tokens[gradeIndex] || '',
+            extra:remaining.join(' '),
+        };
     }
 
     function initializeTintNameFields() {
@@ -360,6 +358,7 @@
             manufacturer.value = parsed.manufacturer;
             size.value = parsed.size;
             grade.value = parsed.grade;
+            extra.value = parsed.extra;
         }
         tintNameFieldsInitialized = true;
     }
