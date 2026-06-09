@@ -39,6 +39,12 @@ class QuickSaleController extends Controller
                     ->orderBy('id');
             }])
             ->where('store_id', $storeId)
+            // نافذة التضليل لا تعرض رولات القماش والجلد أو أي رول خارج القسم المعتمد «تضليل».
+            ->whereHas('category', function ($query) use ($storeId) {
+                $query->where('store_id', $storeId)
+                    ->where('name', 'تضليل')
+                    ->where('status', 'active');
+            })
             ->where('product_type', 'fractional')
             ->where('status', 'active')
             ->orderBy('name')

@@ -166,11 +166,11 @@
         </div>
         <div class="modal-body">
             <div class="flow" id="flowIndicator">
-                <span class="current">1 الفئة</span><b>←</b><span>2 العمل والحجم والدرجة</span>
+                <span class="current">1 نوع التضليل</span><b>←</b><span>2 العمل والحجم والدرجة</span>
             </div>
 
             <div class="step">
-                <span class="label">1 — اختر فئة المركبة</span>
+                <span class="label">1 — اختر نوع التضليل المتوفر</span>
                 <div class="choice-grid" id="categoryChoices"></div>
             </div>
 
@@ -204,14 +204,10 @@
 </div>
 
 <script>
-// تقرأ المعاينة منتجات الرول الحقيقية وخيارات التجزئة من المتجر الحالي.
-// التصنيف حسب النوع/الحجم/الدرجة مؤقت ويُستنتج من الاسم إلى أن نعتمد طريقة تصنيف نهائية.
+// تقرأ المعاينة منتجات الرول الحقيقية من قسم «تضليل» فقط مع خيارات التجزئة التابعة لها.
+// نوع التضليل والحجم والدرجة تُستخرج من صيغة الاسم المعتمدة: النوع + الحجم + الدرجة.
 const previewProductsUrl = new URL('accountant/quick-sale/tint-preview-products', document.baseURI).toString();
-const categories = [
-    { id:'korean', label:'كوري', description:'منتجات التضليل الكوري المتوفرة' },
-    { id:'american', label:'أمريكي', description:'منتجات التضليل الأمريكي المتوفرة' },
-    { id:'other', label:'أخرى', description:'المنتجات الأخرى أو غير المصنفة' },
-];
+let categories = [];
 const works = [
     { id:'full', label:'كامل', description:'تضليل السيارة كاملة' },
     { id:'front', label:'أمامي', description:'الزجاج الأمامي' },
@@ -234,13 +230,40 @@ function normalizeArabic(value) {
         .replace(/\s+/g, ' ');
 }
 
-function inferCategory(name) {
-    const normalized = normalizeArabic(name);
-    if (normalized.includes('كوري')) return 'korean';
-    if (normalized.includes('امريكي')) return 'american';
-    return 'other';
+function inferTintType(name) {
+    const original = String(name || '').trim();
+    if (!original) return null;
+
+    // نحذف الحجم والدرجة والكلمات الوصفية العامة، وما يتبقى هو نوع التضليل
+    // مثل: «مخلوط صغير 01» ← «مخلوط»، و«نيكل أمريكي كبير 02» ← «نيكل أمريكي».
+    const type = original
+        .replace(/(^|\s)(كبير|صغير|نصف\s*متر|نص\s*متر|رول\s*متر|مقاس\s*متر|0\.5)(?=\s|$)/gi, ' ')
+        .replace(/(^|\s)(01|02|03|شفاف)(?=\s|$)/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return type || null;
 }
 
+function tintTypeId(label) {
+    return normalizeArabic(label).replace(/\s+/g, '-');
+}
+
+function rebuildTintTypes() {
+    const types = new Map();
+    previewProducts.forEach(product => {
+        if (!product.tintType) return;
+        const id = tintTypeId(product.tintType);
+        if (!types.has(id)) {
+            types.set(id, {
+                id,
+                label:product.tintType,
+                description:`${previewProducts.filter(item => item.tintTypeId === id).length} منتج متوفر`,
+            });
+        }
+    });
+    categories = [...types.values()];
+}
 function inferSize(name) {
     const normalized = normalizeArabic(name);
     if (normalized.includes('نصف متر') || normalized.includes('نص متر') || normalized.includes('صغير') || normalized.includes('0.5')) return 'small';
@@ -271,7 +294,8 @@ function mapProduct(product) {
     return {
         id:String(product.id),
         name:product.name,
-        category:inferCategory(product.name),
+        tintType:inferTintType(product.name),
+        tintTypeId:tintTypeId(inferTintType(product.name) || ''),
         size:inferSize(product.name),
         grade:inferGrade(product.name),
         price:Number(product.price || 0),
@@ -308,8 +332,8 @@ function categoryById(id) { return categories.find(category => category.id === i
 function workById(id) { return works.find(work => work.id === id); }
 function sizeById(id) { return sizes.find(size => size.id === id); }
 function productById(id) { return previewProducts.find(product => product.id === id); }
-function productsForCategory() { return previewProducts.filter(product => product.category === selectedCategory); }
-function gradesForCategory() { return [...new Set(productsForCategory().map(product => product.grade))]; }
+function productsForCategory() { return previewProducts.filter(product => product.tintTypeId === selectedCategory); }
+function gradesForCategory() { return [...new Set(productsForCategory().map(product => product.grade).filter(Boolean))]; }
 function selectionKey(work) { return work; }
 function selectedConfigurations() {
     return Object.entries(workSelections)
@@ -319,11 +343,11 @@ function selectedConfigurations() {
 
 function renderCategories() {
     const box = document.getElementById('categoryChoices');
-    box.innerHTML = categories.map(category => `
-        <button class="choice ${selectedCategory === category.id ? 'active' : ''}" data-category="${category.id}">
-            <b>${category.label}</b><span>${category.description}</span>
+    box.innerHTML = categories.length ? categories.map(category => `
+        <button class="choice ${selectedCategory === category.id ? 'active' : ''}" data-category="${escapeHtml(category.id)}">
+            <b>${escapeHtml(category.label)}</b><span>${escapeHtml(category.description)}</span>
         </button>
-    `).join('');
+    `).join('') : '<div class="cart-empty" style="grid-column:1/-1">لا توجد أنواع تضليل مكتملة الاسم. استخدم الصيغة: النوع + الحجم + الدرجة.</div>';
     box.querySelectorAll('[data-category]').forEach(button => button.onclick = () => selectCategory(button.dataset.category));
 }
 
@@ -497,7 +521,7 @@ function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
     box.innerHTML = selectedParts.length ? selectedParts.map(part => `
         <div class="builder-row">
-            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
+            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م${part.product.waste > 0 ? ` — الخصم مع هالك ${part.product.waste}%: ${((part.meters * part.qty) * (1 + part.product.waste / 100)).toFixed(2)}م` : ''} — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}</small></div>
             <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
         </div>
     `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
@@ -554,7 +578,7 @@ function renderRealProducts(search = '') {
     const products = previewProducts.filter(product => !term || normalizeArabic(product.name).includes(term));
     box.innerHTML = products.length ? products.map(product => `
         <div class="product">
-            <div><b>${escapeHtml(product.name)}</b><span class="stock">المتوفر: ${product.stock.toFixed(2)} متر — ${product.fractions.length} خيارات تجزئة${product.size && product.grade ? '' : ' — يحتاج تصنيف اسم'}</span></div>
+            <div><b>${escapeHtml(product.name)}</b><span class="stock">المتوفر: ${product.stock.toFixed(2)} متر — ${product.fractions.length} خيارات تجزئة${product.tintType && product.size && product.grade ? ` — النوع: ${escapeHtml(product.tintType)}` : ' — يحتاج اسمًا بصيغة النوع + الحجم + الدرجة'}</span></div>
             <span class="price">${money(product.price)}</span>
         </div>
     `).join('') : '<div class="cart-empty" style="grid-column:1/-1">لا توجد منتجات رول مطابقة.</div>';
@@ -570,8 +594,9 @@ async function loadPreviewProducts() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         previewProducts = (payload.products || []).map(mapProduct);
-        const mappedProducts = previewProducts.filter(product => product.size && product.grade).length;
-        status.textContent = `${previewProducts.length} منتج رول حقيقي — ${mappedProducts} جاهز للبطاقات`;
+        rebuildTintTypes();
+        const mappedProducts = previewProducts.filter(product => product.tintType && product.size && product.grade).length;
+        status.textContent = `${previewProducts.length} منتج من قسم تضليل — ${categories.length} نوع — ${mappedProducts} جاهز`;
         status.style.color = '#34d399';
         document.getElementById('openTint').disabled = previewProducts.length === 0;
         renderRealProducts();
