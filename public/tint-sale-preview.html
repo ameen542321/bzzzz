@@ -97,8 +97,21 @@
         .option-meta span { padding:8px; color:#94a3b8; background:#0f1829; border-radius:9px; font-size:10px; }
         .option-meta b { display:block; margin-top:4px; color:#fff; font-size:11px; }
         .empty-options { grid-column:1/-1; padding:25px; color:#94a3b8; text-align:center; background:#101a2c; border:1px dashed #334155; border-radius:14px; }
-        .custom-panel { margin-top:12px; padding:14px; background:#18152d; border:1px solid #6d4bc3; border-radius:15px; }
-        .custom-grid { display:grid; grid-template-columns:1.2fr 1fr 1fr .7fr; gap:10px; }
+        .custom-panel { margin-top:12px; padding:16px; background:#18152d; border:1px solid #6d4bc3; border-radius:15px; }
+        .custom-rows { display:grid; gap:12px; }
+        .custom-row { position:relative; padding:14px; background:#111827; border:1px solid #4c3b78; border-radius:13px; }
+        .custom-row-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+        .custom-grid { display:grid; grid-template-columns:1.2fr 1fr .8fr .65fr .8fr; gap:10px; }
+        .custom-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
+        .full-composition { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+        .full-part { padding:12px; background:#0f1b2d; border:1px solid #315077; border-radius:12px; }
+        .full-part strong { display:block; margin-bottom:4px; color:#fff; }
+        .full-part small { display:block; color:#94a3b8; line-height:1.6; }
+        .full-part .grade-selector { margin-top:10px; }
+        .cart-cost { margin-top:6px; color:#fbbf24; font-size:12px; font-weight:900; }
+        .cart-totals { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid #334155; }
+        .cart-total-chip { padding:8px 10px; background:#0f172a; border-radius:9px; font-size:11px; color:#94a3b8; }
+        .cart-total-chip b { display:block; margin-top:4px; color:#fff; font-size:13px; }
         .builder-list { display:grid; gap:8px; }
         .builder-row { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:14px; background:#141e31; border:1px solid #2c3a52; border-radius:13px; }
         .builder-row-content { min-width:0; flex:1; }
@@ -141,13 +154,14 @@
             .products,.option-grid,.work-choice-grid { grid-template-columns:1fr; }
             .choice-grid { grid-template-columns:1fr 1fr; }
             .custom-grid { grid-template-columns:1fr 1fr; }
+            .full-composition { grid-template-columns:1fr; }
             .preview-grid,.operation-totals { grid-template-columns:1fr 1fr; }
             .part-metrics { grid-template-columns:1fr 1fr; }
             .topbar { align-items:flex-start; flex-direction:column; gap:12px; }
             .badge { width:100%; text-align:center; }
         }
         @media(max-width:520px) {
-            .choice-grid,.custom-grid,.price-review-grid,.operation-totals,.part-metrics,.formulas-grid { grid-template-columns:1fr; }
+            .choice-grid,.custom-grid,.price-review-grid,.operation-totals,.part-metrics,.formulas-grid,.cart-totals { grid-template-columns:1fr; }
             .option-meta { grid-template-columns:1fr; }
             .modal-actions { flex-direction:column; }
         }
@@ -176,6 +190,7 @@
             <div class="card"><span class="label">نوع الدفع</span><div class="pay-grid"><button class="pay active">كاش</button><button class="pay">شبكة</button><button class="pay">مختلط</button><button class="pay">آجل</button></div></div>
             <div class="card summary">
                 <div class="sum-row"><span>المنتجات</span><b id="productsTotal">0.00 ر.س</b></div>
+                <div class="sum-row"><span>تكلفة المواد (مع الهالك)</span><b id="cartCostTotal" style="color:#fbbf24">0.00 ر.س</b></div>
                 <div class="sum-row"><span>الضريبة</span><b>0.00 ر.س</b></div>
                 <div class="sum-row total"><span>الإجمالي</span><b id="finalTotal">0.00 ر.س</b></div>
                 <button class="primary confirm">تأكيد العملية ✓</button>
@@ -208,13 +223,12 @@
             <div class="step hidden" id="customStep">
                 <div class="custom-panel" id="customPanel">
                     <div class="section-head"><div><span class="label" style="margin:0 0 5px">إضافة اختيار غير مسجل</span><b>تسجيل عمل مخصص</b></div><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
-                    <div class="custom-grid">
-                        <div><span class="label">منتج التضليل المستخدم</span><select class="input" id="customProduct"></select></div>
-                        <div><span class="label">وصف العمل</span><input class="input" id="customName" placeholder="مثال: جزء من دريشة"></div>
-                        <div><span class="label">الاستهلاك بالمتر</span><input class="input" id="customMeters" type="number" min="0.1" step="0.1" value="0.5"></div>
-                        <div><span class="label">العدد</span><input class="input" id="customQty" type="number" min="1" value="1"></div>
+                    <div class="note" style="margin:0 0 12px">يمكن تسجيل أكثر من سطر مخصص في العملية نفسها. أضف سطرًا لكل منتج أو عمل مختلف، ثم أضف جميع السطور إلى الملخص دفعة واحدة.</div>
+                    <div class="custom-rows" id="customRows"></div>
+                    <div class="custom-actions">
+                        <button class="ghost" type="button" id="addCustomRow">+ إضافة سطر آخر</button>
+                        <button class="secondary" type="button" id="addCustomPart">إضافة السطور المخصصة إلى التركيبة</button>
                     </div>
-                    <button class="secondary" style="margin-top:10px" id="addCustomPart">إضافة المخصص إلى التركيبة</button>
                 </div>
             </div>
 
@@ -464,10 +478,22 @@ function gradesForWorkAndSize(work, size) {
         .filter(Boolean))];
 }
 function selectionKey(work) { return work; }
+function sizeIdByLabel(label) {
+    const normalized = normalizeArabic(label);
+    return sizes.find(size => normalizeArabic(size.label) === normalized)?.id || null;
+}
+function fullGradesForSize(sizeLabel) {
+    const size = sizeIdByLabel(sizeLabel);
+    if (!size) return [];
+    return [...new Set(productsForWork('full')
+        .filter(product => product.size === size)
+        .map(product => product.grade)
+        .filter(Boolean))];
+}
 function selectedConfigurations() {
     return Object.entries(workSelections)
-        .filter(([, selection]) => selection.size && selection.grade)
-        .map(([work, selection]) => ({ work, size:selection.size, grade:selection.grade }));
+        .filter(([work, selection]) => work !== 'full' && selection.size && selection.grade)
+        .map(([work, selection]) => ({ work, ownerWork:work, size:selection.size, grade:selection.grade }));
 }
 
 function renderCategories() {
@@ -484,6 +510,37 @@ function renderWorks() {
     const box = document.getElementById('workChoices');
     box.innerHTML = works.map(work => {
         const selection = workSelections[work.id] || null;
+        if (work.id === 'full') {
+            const largeGrades = fullGradesForSize('كبير');
+            const smallGrades = fullGradesForSize('صغير');
+            const isActive = Boolean(selection?.largeGrade || selection?.smallGrade);
+            return `
+                <div class="choice work-card ${isActive ? 'active' : ''}">
+                    <span class="work-card-head">
+                        <span><b class="work-card-title">${work.label}</b><span class="work-card-description">الأمامي والخلفي من الرول الكبير، والجوانب من الرول الصغير</span></span>
+                        <span class="work-card-state">${isActive ? 'محدد' : 'غير محدد'}</span>
+                    </span>
+                    <span class="exclusive-note">اختيار «كامل» يلغي الأعمال الأخرى. الحالات النادرة التي تستخدم الصغير للأمامي أو الخلفي تسجل من «إضافة».</span>
+                    <span class="full-composition">
+                        <span class="full-part">
+                            <strong>الرول الكبير</strong><small>للزجاج الأمامي والخلفي</small>
+                            <span class="control-label">اختر الدرجة</span>
+                            <span class="grade-selector">
+                                ${largeGrades.length ? largeGrades.map(grade => `<button type="button" class="${selection?.largeGrade === grade ? 'active' : ''}" data-full-grade="large:${grade}">${escapeHtml(grade)}</button>`).join('') : '<em style="color:#f87171;font-size:11px">لا يوجد خيار «كامل» لرول كبير</em>'}
+                            </span>
+                        </span>
+                        <span class="full-part">
+                            <strong>الرول الصغير</strong><small>للجوانب والدرايش</small>
+                            <span class="control-label">اختر الدرجة</span>
+                            <span class="grade-selector">
+                                ${smallGrades.length ? smallGrades.map(grade => `<button type="button" class="${selection?.smallGrade === grade ? 'active' : ''}" data-full-grade="small:${grade}">${escapeHtml(grade)}</button>`).join('') : '<em style="color:#f87171;font-size:11px">لا يوجد خيار «كامل» لرول صغير</em>'}
+                            </span>
+                        </span>
+                    </span>
+                </div>
+            `;
+        }
+
         const availableSizes = availableSizesForWork(work.id);
         const availableGrades = selection ? gradesForWorkAndSize(work.id, selection.size) : [];
         return `
@@ -492,27 +549,26 @@ function renderWorks() {
                     <span><b class="work-card-title">${work.label}</b><span class="work-card-description">${work.description}</span></span>
                     <span class="work-card-state">${selection ? 'محدد' : 'غير محدد'}</span>
                 </span>
-                ${work.id === 'full' ? '<span class="exclusive-note">اختيار «كامل» يلغي تلقائيًا أي عمل آخر محدد.</span>' : ''}
                 ${work.id === 'window' ? `<span class="control-label">عدد الدرايش</span><span class="window-counter">${[1,2,3,4].map(count => `<button type="button" class="${windowCount === count ? 'active' : ''}" data-window-count="${count}">${count}</button>`).join('')}</span>` : ''}
                 <span class="control-label">1 — اختر حجم رول واحد</span>
                 <span class="size-selector">
                     ${availableSizes.length
-                        ? availableSizes.map(size => `<button type="button" class="${selection?.size === size.id ? 'active' : ''}" data-work-size="${work.id}:${size.id}">${size.label}</button>`).join('')
+                        ? availableSizes.map(size => `<button type="button" class="${selection?.size === size.id ? 'active' : ''}" data-work-size="${work.id}:${size.id}">${escapeHtml(size.label)}</button>`).join('')
                         : '<em style="color:#f87171;font-size:11px">لا يوجد منتج بهذا العمل</em>'}
                 </span>
                 ${selection ? `
                     <span class="size-grade-block">
-                        <span class="size-grade-title"><b>2 — اختر درجة الرول ${sizeById(selection.size).label}</b><em>${selection.grade || 'لم تحدد'}</em></span>
+                        <span class="size-grade-title"><b>2 — اختر درجة الرول ${escapeHtml(sizeById(selection.size).label)}</b><em>${escapeHtml(selection.grade || 'لم تحدد')}</em></span>
                         <span class="grade-selector">
                             ${availableGrades.length
-                                ? availableGrades.map(grade => `<button type="button" class="${selection.grade === grade ? 'active' : ''}" data-grade="${work.id}:${grade}">${grade}</button>`).join('')
+                                ? availableGrades.map(grade => `<button type="button" class="${selection.grade === grade ? 'active' : ''}" data-grade="${work.id}:${grade}">${escapeHtml(grade)}</button>`).join('')
                                 : '<em style="color:#f87171;font-size:11px">لا توجد درجة متاحة لهذا الحجم</em>'}
                         </span>
                     </span>
                 ` : ''}
             </div>
         `;
-    }).join('') + `<button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>إضافة عمل جديد غير موجود ضمن الخيارات السابقة</span></button>`;
+    }).join('') + `<button class="choice add-choice" id="openAdditional"><b>إضافة +</b><span>تسجيل سطر مخصص واحد أو عدة سطور في العملية نفسها</span></button>`;
 
     box.querySelectorAll('[data-work-size]').forEach(button => button.onclick = () => {
         const [work, size] = button.dataset.workSize.split(':');
@@ -521,6 +577,10 @@ function renderWorks() {
     box.querySelectorAll('[data-grade]').forEach(button => button.onclick = () => {
         const [work, grade] = button.dataset.grade.split(':');
         selectGrade(work, grade);
+    });
+    box.querySelectorAll('[data-full-grade]').forEach(button => button.onclick = () => {
+        const [role, grade] = button.dataset.fullGrade.split(':');
+        selectFullGrade(role, grade);
     });
     box.querySelectorAll('[data-window-count]').forEach(button => button.onclick = () => setWindowCount(Number(button.dataset.windowCount)));
     document.getElementById('openAdditional').onclick = openCustomPanel;
@@ -544,12 +604,9 @@ function toggleWorkSize(work, size) {
     const current = workSelections[work];
     const isSameSize = current?.size === size;
 
-    if (!isSameSize && work === 'full') {
-        workSelections = {};
-        selectedParts = selectedParts.filter(part => part.custom);
-    } else if (!isSameSize && work !== 'full' && workSelections.full) {
+    if (!isSameSize && workSelections.full) {
         delete workSelections.full;
-        selectedParts = selectedParts.filter(part => part.custom || part.work !== 'full');
+        selectedParts = selectedParts.filter(part => part.custom || part.ownerWork !== 'full');
     }
 
     if (isSameSize) {
@@ -557,7 +614,7 @@ function toggleWorkSize(work, size) {
     } else {
         workSelections[work] = { size, grade:null };
     }
-    selectedParts = selectedParts.filter(part => part.custom || part.work !== work);
+    selectedParts = selectedParts.filter(part => part.custom || part.ownerWork !== work);
     renderWorks();
     syncAutomaticPricing();
     renderSelectedParts();
@@ -567,15 +624,27 @@ function selectGrade(work, grade) {
     const selection = workSelections[work];
     if (!selection || !gradesForWorkAndSize(work, selection.size).includes(grade)) return;
 
-    if (work === 'full') {
-        workSelections = { full:selection };
-        selectedParts = selectedParts.filter(part => part.custom || part.work === 'full');
-    } else if (workSelections.full) {
+    if (workSelections.full) {
         delete workSelections.full;
-        selectedParts = selectedParts.filter(part => part.custom || part.work !== 'full');
+        selectedParts = selectedParts.filter(part => part.custom || part.ownerWork !== 'full');
     }
     workSelections[work].grade = grade;
-    selectedParts = selectedParts.filter(part => part.custom || part.work !== work);
+    selectedParts = selectedParts.filter(part => part.custom || part.ownerWork !== work);
+    renderWorks();
+    syncAutomaticPricing();
+    renderSelectedParts();
+}
+
+function selectFullGrade(role, grade) {
+    const sizeLabel = role === 'large' ? 'كبير' : 'صغير';
+    if (!fullGradesForSize(sizeLabel).includes(grade)) return;
+
+    const current = workSelections.full || { largeGrade:null, smallGrade:null };
+    const field = role === 'large' ? 'largeGrade' : 'smallGrade';
+    const nextGrade = current[field] === grade ? null : grade;
+    workSelections = { full:{ ...current, [field]:nextGrade } };
+    if (!workSelections.full.largeGrade && !workSelections.full.smallGrade) delete workSelections.full;
+    selectedParts = selectedParts.filter(part => part.custom || part.ownerWork === 'full');
     renderWorks();
     syncAutomaticPricing();
     renderSelectedParts();
@@ -598,44 +667,111 @@ function findAutomaticPrice(configuration) {
     return null;
 }
 
+function automaticPart(configuration, keySuffix, displayName = null) {
+    const match = findAutomaticPrice(configuration);
+    if (!match) return null;
+    const { work, ownerWork = work, product, option } = match;
+    return {
+        key:`automatic-${ownerWork}-${keySuffix || work}`,
+        name:displayName || option.label,
+        product,
+        work,
+        ownerWork,
+        size:product.size,
+        selectionKey:selectionKey(ownerWork),
+        meters:option.meters,
+        qty:work === 'window' && ownerWork !== 'full' ? windowCount : 1,
+        unitPrice:option.price,
+        custom:false,
+    };
+}
+
 function syncAutomaticPricing() {
     const customParts = selectedParts.filter(part => part.custom);
-    const automaticParts = selectedConfigurations().map(configuration => {
-        const match = findAutomaticPrice(configuration);
-        if (!match) return null;
-        const { work, product, option } = match;
-        return {
-            key:`automatic-${work}`,
-            name:option.label,
-            product,
-            work,
-            size:product.size,
-            selectionKey:selectionKey(work),
-            meters:option.meters,
-            qty:work === 'window' ? windowCount : 1,
-            unitPrice:option.price,
-            custom:false,
-        };
-    }).filter(Boolean);
+    const automaticParts = selectedConfigurations()
+        .map(configuration => automaticPart(configuration, configuration.work))
+        .filter(Boolean);
+
+    const full = workSelections.full;
+    if (full?.largeGrade) {
+        const largeSize = sizeIdByLabel('كبير');
+        const part = automaticPart(
+            { work:'full', ownerWork:'full', size:largeSize, grade:full.largeGrade },
+            'large',
+            'كامل — الأمامي والخلفي (كبير)'
+        );
+        if (part) automaticParts.push(part);
+    }
+    if (full?.smallGrade) {
+        const smallSize = sizeIdByLabel('صغير');
+        const part = automaticPart(
+            { work:'full', ownerWork:'full', size:smallSize, grade:full.smallGrade },
+            'small',
+            'كامل — الجوانب والدرايش (صغير)'
+        );
+        if (part) automaticParts.push(part);
+    }
+
     selectedParts = [...customParts, ...automaticParts];
 }
 
+let customRowSequence = 0;
+
+function customProductOptions(selected = '') {
+    return productsForCategory().map(product => `<option value="${product.id}" ${String(product.id) === String(selected) ? 'selected' : ''}>${escapeHtml(product.name)}</option>`).join('');
+}
+function customRowMarkup(rowId) {
+    return `
+        <div class="custom-row" data-custom-row="${rowId}">
+            <div class="custom-row-head"><b>السطر المخصص ${rowId}</b><button class="danger" type="button" data-remove-custom-row="${rowId}" style="padding:6px 9px">حذف السطر</button></div>
+            <div class="custom-grid">
+                <div><span class="label">منتج التضليل المستخدم</span><select class="input" data-custom-field="product">${customProductOptions()}</select></div>
+                <div><span class="label">وصف العمل</span><input class="input" data-custom-field="name" placeholder="مثال: جزء من دريشة"></div>
+                <div><span class="label">الاستهلاك بالمتر</span><input class="input" data-custom-field="meters" type="number" min="0.1" step="0.1" value="0.5"></div>
+                <div><span class="label">العدد</span><input class="input" data-custom-field="qty" type="number" min="1" value="1"></div>
+                <div><span class="label">سعر البيع للوحدة</span><input class="input" data-custom-field="price" type="number" min="0" step="0.01" value="0"></div>
+            </div>
+        </div>`;
+}
+function addCustomRow() {
+    customRowSequence += 1;
+    document.getElementById('customRows').insertAdjacentHTML('beforeend', customRowMarkup(customRowSequence));
+    bindCustomRowButtons();
+}
+function bindCustomRowButtons() {
+    document.querySelectorAll('[data-remove-custom-row]').forEach(button => button.onclick = () => {
+        const rows = document.querySelectorAll('[data-custom-row]');
+        if (rows.length === 1) { alert('يجب إبقاء سطر مخصص واحد على الأقل'); return; }
+        document.querySelector(`[data-custom-row="${button.dataset.removeCustomRow}"]`)?.remove();
+    });
+}
 function openCustomPanel() {
-    if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
-    document.getElementById('customProduct').innerHTML = productsForCategory().map(product => `<option value="${product.id}">${escapeHtml(product.name)}</option>`).join('');
-    document.getElementById('customName').value = '';
+    if (!selectedCategory) { alert('اختر نوع التضليل أولًا'); return; }
+    customRowSequence = 0;
+    document.getElementById('customRows').innerHTML = '';
+    addCustomRow();
     document.getElementById('customStep').classList.remove('hidden');
-    document.getElementById('customName').focus();
+    document.querySelector('[data-custom-field="name"]')?.focus();
 }
 
 function closeCustomPanel() { document.getElementById('customStep').classList.add('hidden'); }
 function addCustomPart() {
-    const product = productById(document.getElementById('customProduct').value);
-    const name = document.getElementById('customName').value.trim() || 'إضافة مخصصة';
-    const meters = Number(document.getElementById('customMeters').value);
-    const qty = Number(document.getElementById('customQty').value);
-    if (!product || meters <= 0 || qty <= 0) { alert('حدد المنتج وأدخل استهلاكًا وعددًا صحيحين'); return; }
-    selectedParts.push({ key:Date.now() + Math.random(), name, product, work:'additional', meters, qty, unitPrice:0, custom:true });
+    const rows = [...document.querySelectorAll('[data-custom-row]')];
+    const additions = [];
+    for (const row of rows) {
+        const field = name => row.querySelector(`[data-custom-field="${name}"]`);
+        const product = productById(field('product').value);
+        const name = field('name').value.trim() || 'إضافة مخصصة';
+        const meters = Number(field('meters').value);
+        const qty = Number(field('qty').value);
+        const unitPrice = Number(field('price').value);
+        if (!product || meters <= 0 || qty <= 0 || unitPrice < 0) {
+            alert('راجع المنتج والاستهلاك والعدد وسعر البيع في جميع السطور المخصصة');
+            return;
+        }
+        additions.push({ key:Date.now() + Math.random(), name, product, work:'additional', ownerWork:'additional', meters, qty, unitPrice, custom:true });
+    }
+    selectedParts.push(...additions);
     closeCustomPanel();
     renderSelectedParts();
 }
@@ -643,7 +779,7 @@ function addCustomPart() {
 function removePart(key) {
     const part = selectedParts.find(item => String(item.key) === String(key));
     if (part && !part.custom) {
-        delete workSelections[part.work];
+        delete workSelections[part.ownerWork || part.work];
         syncAutomaticPricing();
         renderWorks();
     } else {
@@ -720,12 +856,35 @@ function resetBuilder() {
 }
 function renderCart() {
     const box = document.getElementById('cart');
-    box.innerHTML = cart.length ? cart.map((item, index) => `
-        <div class="cart-item"><div class="cart-item-top"><div><b>تضليل ${escapeHtml(item.category)}</b><div class="cart-meta">${item.parts.map(part => `${escapeHtml(part.name)}: ${escapeHtml(part.product.name)} — ${(part.meters * part.qty).toFixed(2)}م`).join('<br>')}</div></div><div><div class="cart-price">${money(item.price)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div></div></div>
-    `).join('') : '<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
+    box.innerHTML = cart.length ? cart.map((item, index) => {
+        const materialCost = item.parts.reduce((sum, part) => sum + partCalculation(part).totalCost, 0);
+        const deductedMeters = item.parts.reduce((sum, part) => sum + partCalculation(part).deductedMeters, 0);
+        const details = item.parts.map(part => {
+            const calculation = partCalculation(part);
+            return `${escapeHtml(part.name)}: ${escapeHtml(part.product.name)} — ${calculation.usedMeters.toFixed(2)}م — التكلفة ${money(calculation.totalCost)}`;
+        }).join('<br>');
+        return `
+            <div class="cart-item">
+                <div class="cart-item-top">
+                    <div class="builder-row-content">
+                        <b>تضليل ${escapeHtml(item.category)}</b>
+                        <div class="cart-meta">${details}</div>
+                        <div class="cart-totals">
+                            <div class="cart-total-chip">سعر البيع النهائي<b>${money(item.price)}</b></div>
+                            <div class="cart-total-chip">تكلفة المواد مع الهالك<b style="color:#fbbf24">${money(materialCost)}</b></div>
+                            <div class="cart-total-chip">إجمالي الطول المخصوم<b>${deductedMeters.toFixed(2)} م</b></div>
+                            <div class="cart-total-chip">الربح التقديري<b style="color:${item.price - materialCost >= 0 ? '#34d399' : '#f87171'}">${money(item.price - materialCost)}</b></div>
+                        </div>
+                    </div>
+                    <div><div class="cart-price">${money(item.price)}</div><div class="cart-cost">التكلفة: ${money(materialCost)}</div><button class="danger" style="padding:6px 9px;margin-top:9px" onclick="removeCartItem(${index})">حذف</button></div>
+                </div>
+            </div>`;
+    }).join('') : '<div class="cart-empty">لم تتم إضافة منتجات بعد.<br>استخدم زر «تضليل سريع» لبناء العملية.</div>';
     const total = cart.reduce((sum, item) => sum + item.price, 0);
+    const totalCost = cart.reduce((sum, item) => sum + item.parts.reduce((partSum, part) => partSum + partCalculation(part).totalCost, 0), 0);
     document.getElementById('cartCount').textContent = `${cart.length} عناصر`;
     document.getElementById('productsTotal').textContent = money(total);
+    document.getElementById('cartCostTotal').textContent = money(totalCost);
     document.getElementById('finalTotal').textContent = money(total);
 }
 
@@ -734,12 +893,17 @@ document.getElementById('openTint').onclick = () => { modal.classList.add('open'
 document.getElementById('closeTint').onclick = () => modal.classList.remove('open');
 modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
 document.getElementById('closeCustom').onclick = closeCustomPanel;
+document.getElementById('addCustomRow').onclick = addCustomRow;
 document.getElementById('addCustomPart').onclick = addCustomPart;
 document.getElementById('resetTint').onclick = resetBuilder;
 document.getElementById('addTint').onclick = () => {
     const price = Number(document.getElementById('salePrice').value);
-    if (!selectedCategory) { alert('اختر فئة المركبة أولًا'); return; }
-    if (!selectedParts.length) { alert('اختر تسعيرة واحدة على الأقل'); return; }
+    if (!selectedCategory) { alert('اختر نوع التضليل أولًا'); return; }
+    if (workSelections.full && (!workSelections.full.largeGrade || !workSelections.full.smallGrade)) {
+        alert('للتضليل الكامل اختر درجة الرول الكبير ودرجة الرول الصغير');
+        return;
+    }
+    if (!selectedParts.length) { alert('اختر عملًا واحدًا على الأقل'); return; }
     if (price <= 0) { alert('أدخل السعر النهائي'); return; }
     cart.push({ category:categoryById(selectedCategory).label, parts:selectedParts.map(part => ({ ...part })), price });
     renderCart(); modal.classList.remove('open');
