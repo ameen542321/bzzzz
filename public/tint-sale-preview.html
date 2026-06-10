@@ -100,11 +100,30 @@
         .custom-panel { margin-top:12px; padding:14px; background:#18152d; border:1px solid #6d4bc3; border-radius:15px; }
         .custom-grid { display:grid; grid-template-columns:1.2fr 1fr 1fr .7fr; gap:10px; }
         .builder-list { display:grid; gap:8px; }
-        .builder-row { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:12px; background:#141e31; border:1px solid #2c3a52; border-radius:13px; }
-        .builder-row small { display:block; margin-top:5px; color:#94a3b8; line-height:1.6; }
+        .builder-row { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:14px; background:#141e31; border:1px solid #2c3a52; border-radius:13px; }
+        .builder-row-content { min-width:0; flex:1; }
+        .builder-row-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+        .part-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+        .part-metric { padding:8px; background:#0d1728; border:1px solid #263650; border-radius:9px; }
+        .part-metric span { display:block; color:#94a3b8; font-size:9px; line-height:1.4; }
+        .part-metric b { display:block; margin-top:4px; color:#fff; font-size:11px; }
+        .part-metric.waste { border-color:#854d0e; background:#211805; }
+        .part-metric.waste b { color:#fbbf24; }
+        .part-metric.cost { border-color:#166534; background:#082317; }
+        .part-metric.cost b { color:#6ee7b7; }
         .preview-box { margin-top:16px; padding:15px; background:#071426; border:1px solid #1e3a5f; border-radius:15px; }
         .preview-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
         .price-review-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:16px; }
+        .operation-totals { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; margin-top:12px; }
+        .operation-total { padding:11px; background:#0d1728; border:1px solid #263650; border-radius:11px; }
+        .operation-total span { display:block; color:#94a3b8; font-size:10px; }
+        .operation-total b { display:block; margin-top:6px; color:#fff; font-size:14px; }
+        .operation-total.sales b { color:#60a5fa; }
+        .operation-total.cost b { color:#6ee7b7; }
+        .operation-total.waste b { color:#fbbf24; }
+        .formulas-box { margin-top:12px; padding:13px; color:#cbd5e1; background:#091426; border:1px solid #1e3a5f; border-radius:12px; font-size:11px; line-height:1.9; }
+        .formulas-box strong { color:#93c5fd; }
+        .formulas-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 18px; margin-top:7px; }
         .price-review-item { padding:12px; background:#111d30; border:1px solid #263650; border-radius:12px; }
         .price-review-item .label { margin-bottom:7px; }
         .price-review-item .input[readonly] { color:#cbd5e1; background:#0b1322; cursor:default; }
@@ -122,12 +141,13 @@
             .products,.option-grid,.work-choice-grid { grid-template-columns:1fr; }
             .choice-grid { grid-template-columns:1fr 1fr; }
             .custom-grid { grid-template-columns:1fr 1fr; }
-            .preview-grid { grid-template-columns:1fr; }
+            .preview-grid,.operation-totals { grid-template-columns:1fr 1fr; }
+            .part-metrics { grid-template-columns:1fr 1fr; }
             .topbar { align-items:flex-start; flex-direction:column; gap:12px; }
             .badge { width:100%; text-align:center; }
         }
         @media(max-width:520px) {
-            .choice-grid,.custom-grid,.price-review-grid { grid-template-columns:1fr; }
+            .choice-grid,.custom-grid,.price-review-grid,.operation-totals,.part-metrics,.formulas-grid { grid-template-columns:1fr; }
             .option-meta { grid-template-columns:1fr; }
             .modal-actions { flex-direction:column; }
         }
@@ -209,13 +229,35 @@
                     <input class="input" id="salePrice" type="number" value="0" min="1" step="0.01">
                 </div>
                 <div class="price-review-item">
-                    <span class="label">سعر البيع المسجل</span>
+                    <span class="label">إجمالي سعر البيع المسجل</span>
                     <input class="input" id="registeredSalePrice" type="text" value="0.00 ر.س" readonly>
                 </div>
                 <div class="price-review-item cost">
-                    <span class="label">التكلفة الأساسية للمواد</span>
-                    <input class="input" id="baseMaterialCost" type="text" value="0.00 ر.س" readonly>
-                    <small style="display:block;margin-top:6px;color:#a78b6d;font-size:10px">قبل إضافة نسبة الهالك.</small>
+                    <span class="label">إجمالي التكلفة مع الهالك</span>
+                    <input class="input" id="totalMaterialCost" type="text" value="0.00 ر.س" readonly>
+                </div>
+            </div>
+
+            <div class="operation-totals">
+                <div class="operation-total sales"><span>إجمالي سعر البيع</span><b id="totalSaleSummary">0.00 ر.س</b></div>
+                <div class="operation-total cost"><span>التكلفة الأساسية</span><b id="baseCostSummary">0.00 ر.س</b></div>
+                <div class="operation-total waste"><span>تكلفة الهالك</span><b id="wasteCostSummary">0.00 ر.س</b></div>
+                <div class="operation-total"><span>الطول المستخدم</span><b id="usedMetersSummary">0.00 م</b></div>
+                <div class="operation-total waste"><span>الهالك المستخدم</span><b id="wasteMetersSummary">0.00 م</b></div>
+                <div class="operation-total"><span>إجمالي الطول المخصوم</span><b id="deductedMetersSummary">0.00 م</b></div>
+            </div>
+
+            <div class="formulas-box">
+                <strong>المعادلات المستخدمة في المعاينة</strong>
+                <div class="formulas-grid">
+                    <div>تكلفة المتر = تكلفة الرول ÷ طول الرول</div>
+                    <div>الطول المستخدم = استهلاك الخيار × العدد</div>
+                    <div>الهالك بالمتر = الطول المستخدم × نسبة الهالك ÷ 100</div>
+                    <div>تكلفة الاستخدام = الطول المستخدم × تكلفة المتر</div>
+                    <div>تكلفة الهالك = أمتار الهالك × تكلفة المتر</div>
+                    <div>إجمالي التكلفة = تكلفة الاستخدام + تكلفة الهالك</div>
+                    <div>سعر البيع = سعر خيار التجزئة × العدد</div>
+                    <div>إجمالي الطول المخصوم = الطول المستخدم + الهالك</div>
                 </div>
             </div>
             <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة كسطر واحد</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
@@ -362,14 +404,39 @@ let cart = [];
 const modal = document.getElementById('tintModal');
 
 function money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; }
-function partBaseMaterialCost(part) {
-    const consumedMeters = Number(part.meters || 0) * Number(part.qty || 0);
-    const costPerMeter = part.product.length > 0 ? Number(part.product.costPrice || 0) / part.product.length : 0;
-    return consumedMeters * costPerMeter;
+function partCalculation(part) {
+    const quantity = Number(part.qty || 0);
+    const metersPerItem = Number(part.meters || 0);
+    const usedMeters = metersPerItem * quantity;
+    const wasteRate = Number(part.product.waste || 0);
+    const wasteMeters = usedMeters * wasteRate / 100;
+    const deductedMeters = usedMeters + wasteMeters;
+    const rollLength = Number(part.product.length || 0);
+    const rollCost = Number(part.product.costPrice || 0);
+    const costPerMeter = rollLength > 0 ? rollCost / rollLength : 0;
+    const usageCost = usedMeters * costPerMeter;
+    const wasteCost = wasteMeters * costPerMeter;
+    const totalCost = usageCost + wasteCost;
+    const salePrice = Number(part.unitPrice || 0) * quantity;
+
+    return {
+        quantity,
+        metersPerItem,
+        usedMeters,
+        wasteRate,
+        wasteMeters,
+        deductedMeters,
+        rollLength,
+        rollCost,
+        costPerMeter,
+        usageCost,
+        wasteCost,
+        totalCost,
+        salePrice,
+    };
 }
-function partMaterialCost(part) {
-    return partBaseMaterialCost(part) * (1 + Number(part.product.waste || 0) / 100);
-}
+function partBaseMaterialCost(part) { return partCalculation(part).usageCost; }
+function partMaterialCost(part) { return partCalculation(part).totalCost; }
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -587,22 +654,57 @@ function removePart(key) {
 
 function renderSelectedParts() {
     const box = document.getElementById('selectedParts');
-    box.innerHTML = selectedParts.length ? selectedParts.map(part => `
-        <div class="builder-row">
-            <div><b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b><small>${part.meters}م × ${part.qty} = ${(part.meters * part.qty).toFixed(2)}م${part.product.waste > 0 ? ` — الخصم مع هالك ${part.product.waste}%: ${((part.meters * part.qty) * (1 + part.product.waste / 100)).toFixed(2)}م` : ''} — ${part.custom ? 'إضافة مخصصة' : `مطبق تلقائيًا — ${money(part.unitPrice * part.qty)}`}<br><strong style="color:#fbbf24">تكلفة المادة مؤقتًا: ${money(partMaterialCost(part))}${part.product.waste > 0 ? ' — شاملة الهالك' : ''}</strong></small></div>
-            <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
-        </div>
-    `).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستُضاف التسعيرة المسجلة تلقائيًا هنا.</div>';
+    box.innerHTML = selectedParts.length ? selectedParts.map(part => {
+        const calculation = partCalculation(part);
+        return `
+            <div class="builder-row">
+                <div class="builder-row-content">
+                    <div class="builder-row-title">
+                        <b>${escapeHtml(part.name)} — ${escapeHtml(part.product.name)}</b>
+                        <span class="source-tag">${part.custom ? 'إضافة مخصصة' : 'خيار تجزئة مسجل'}</span>
+                    </div>
+                    <div class="part-metrics">
+                        <div class="part-metric"><span>الطول المحدد</span><b>${calculation.metersPerItem.toFixed(2)}م × ${calculation.quantity} = ${calculation.usedMeters.toFixed(2)}م</b></div>
+                        <div class="part-metric"><span>سعر البيع</span><b>${money(calculation.salePrice)}</b></div>
+                        <div class="part-metric"><span>تكلفة المتر</span><b>${money(calculation.costPerMeter)}</b></div>
+                        <div class="part-metric cost"><span>تكلفة الاستخدام الأساسي</span><b>${money(calculation.usageCost)}</b></div>
+                        <div class="part-metric waste"><span>الهالك (${calculation.wasteRate.toFixed(2)}%)</span><b>${calculation.wasteMeters.toFixed(2)}م</b></div>
+                        <div class="part-metric waste"><span>تكلفة الهالك</span><b>${money(calculation.wasteCost)}</b></div>
+                        <div class="part-metric"><span>الطول المخصوم مع الهالك</span><b>${calculation.deductedMeters.toFixed(2)}م</b></div>
+                        <div class="part-metric cost"><span>إجمالي التكلفة</span><b>${money(calculation.totalCost)}</b></div>
+                    </div>
+                </div>
+                <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
+            </div>
+        `;
+    }).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستظهر تفاصيل الطول والسعر والتكلفة والهالك هنا.</div>';
+
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
-    const defaultPrice = selectedParts.reduce((sum, part) => sum + part.unitPrice * part.qty, 0);
-    const baseMaterialCost = selectedParts.reduce((sum, part) => sum + partBaseMaterialCost(part), 0);
-    const totalMaterialCost = selectedParts.reduce((sum, part) => sum + partMaterialCost(part), 0);
+
+    const totals = selectedParts.reduce((sum, part) => {
+        const calculation = partCalculation(part);
+        sum.salePrice += calculation.salePrice;
+        sum.usageCost += calculation.usageCost;
+        sum.wasteCost += calculation.wasteCost;
+        sum.totalCost += calculation.totalCost;
+        sum.usedMeters += calculation.usedMeters;
+        sum.wasteMeters += calculation.wasteMeters;
+        sum.deductedMeters += calculation.deductedMeters;
+        return sum;
+    }, { salePrice:0, usageCost:0, wasteCost:0, totalCost:0, usedMeters:0, wasteMeters:0, deductedMeters:0 });
+
     document.getElementById('partsHint').textContent = selectedParts.length
-        ? `${selectedParts.length} أعمال — تكلفة المادة مؤقتًا: ${money(totalMaterialCost)}`
+        ? `${selectedParts.length} أعمال — تكلفة الهالك: ${money(totals.wasteCost)}`
         : 'لم يتم اختيار أي عمل';
-    document.getElementById('salePrice').value = defaultPrice > 0 ? defaultPrice.toFixed(2) : 0;
-    document.getElementById('registeredSalePrice').value = money(defaultPrice);
-    document.getElementById('baseMaterialCost').value = money(baseMaterialCost);
+    document.getElementById('salePrice').value = totals.salePrice > 0 ? totals.salePrice.toFixed(2) : 0;
+    document.getElementById('registeredSalePrice').value = money(totals.salePrice);
+    document.getElementById('totalMaterialCost').value = money(totals.totalCost);
+    document.getElementById('totalSaleSummary').textContent = money(totals.salePrice);
+    document.getElementById('baseCostSummary').textContent = money(totals.usageCost);
+    document.getElementById('wasteCostSummary').textContent = money(totals.wasteCost);
+    document.getElementById('usedMetersSummary').textContent = totals.usedMeters.toFixed(2) + ' م';
+    document.getElementById('wasteMetersSummary').textContent = totals.wasteMeters.toFixed(2) + ' م';
+    document.getElementById('deductedMetersSummary').textContent = totals.deductedMeters.toFixed(2) + ' م';
 }
 
 function updateFlow(step) {
