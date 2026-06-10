@@ -11,8 +11,14 @@
             <a href="{{ route('accountant.dashboard') }}" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition">← رجوع</a>
             <h1 class="text-lg md:text-xl font-bold text-white">تسجيل بيع جديد</h1>
         </div>
-        <div class="text-gray-400 text-sm bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700 w-full md:w-auto text-center font-sans">
-            المحاسب: <span class="font-bold text-blue-400">{{ auth('accountant')->user()->name }}</span>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            <a href="{{ route('accountant.quick-sale.tint-preview') }}" target="_blank" rel="noopener"
+               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg border border-indigo-400/40 text-sm font-black text-center transition whitespace-nowrap">
+                معاينة التضليل
+            </a>
+            <div class="text-gray-400 text-sm bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700 text-center font-sans">
+                المحاسب: <span class="font-bold text-blue-400">{{ auth('accountant')->user()->name }}</span>
+            </div>
         </div>
     </div>
 
