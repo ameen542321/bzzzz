@@ -739,20 +739,27 @@ class ProductController extends Controller
         // واجهة التعديل تعرض roll_length للمنتج الكَسري، لذلك يجب التحقق منه
         // وحفظه هنا فعلياً حتى لا تبقى الواجهة تعرض قيمة لا تنعكس في قاعدة البيانات.
 
-        // توليد slug مرتبط بالمتجر بدون الحاجة لتعديل قاعدة البيانات
-        $slug = $this->buildStoreScopedSlug($request->name, $store->id);
+        /*
+         * عند تعديل التكلفة أو أي حقل آخر دون تغيير الاسم يجب إبقاء slug الحالي.
+         * إعادة بنائه في كل حفظ كانت تسبب تعارضاً وهمياً لبعض المنتجات القديمة
+         * التي تملك slug مختلفاً عن الصيغة الحالية المرتبطة بالمتجر.
+         */
+        $nameChanged = $product->name !== $request->name;
+        $slug = $this->resolveProductSlugForUpdate($product, $request->name, $store->id);
 
-        // فحص التكرار داخل نفس المتجر فقط.
-        $exists = Product::withTrashed()
-            ->where('store_id', $store->id)
-            ->where('slug', $slug)
-            ->where('id', '!=', $product->id)
-            ->exists();
+        // لا نحتاج إلى فحص حجز الاسم إلا إذا غيّر المستخدم الاسم فعلياً.
+        if ($nameChanged) {
+            $exists = Product::withTrashed()
+                ->where('store_id', $store->id)
+                ->where('slug', $slug)
+                ->where('id', '!=', $product->id)
+                ->exists();
 
-        if ($exists) {
-            return back()
-                ->withErrors(['name' => "عذراً، اسم المنتج \"{$request->name}\" محجوز مسبقاً في هذا المتجر، يرجى اختيار اسم آخر."])
-                ->withInput();
+            if ($exists) {
+                return back()
+                    ->withErrors(['name' => "عذراً، اسم المنتج \"{$request->name}\" محجوز مسبقاً في هذا المتجر، يرجى اختيار اسم آخر."])
+                    ->withInput();
+            }
         }
 
         $imagePath = $product->image;
@@ -947,6 +954,19 @@ class ProductController extends Controller
         }
 
         return $slug;
+    }
+
+    /**
+     * يحافظ على slug المنتج عند تعديل بيانات لا تشمل الاسم، ويولّد قيمة جديدة
+     * مرتبطة بالمتجر فقط عندما يتغير الاسم فعلياً.
+     */
+    protected function resolveProductSlugForUpdate(Product $product, string $name, int $storeId): string
+    {
+        if ($product->name === $name) {
+            return (string) $product->slug;
+        }
+
+        return $this->buildStoreScopedSlug($name, $storeId);
     }
 
     /**
