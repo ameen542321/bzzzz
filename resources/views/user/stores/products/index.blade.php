@@ -42,7 +42,8 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 text-[12px] sm:text-sm">
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
             <p class="text-gray-400 text-xs">إجمالي التكلفة</p>
-            <p class="text-green-500 font-bold text-lg sm:text-xl">{{ number_format($totalCostValue, 0) }} <span class="text-xs text-gray-500">ر.س</span></p>
+            {{-- القيم المالية تُعرض بدقتين حتى لا يتغير سعر التكلفة بسبب التقريب إلى عدد صحيح. --}}
+            <p class="text-green-500 font-bold text-lg sm:text-xl">{{ number_format((float) $totalCostValue, 2) }} <span class="text-xs text-gray-500">ر.س</span></p>
         </div>
         <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700">
             <p class="text-gray-400 text-xs">القيمة السوقية</p>
@@ -162,7 +163,11 @@
                     $lowStock = $product->quantity <= $product->min_stock;
                 }
 
-                $productCost = ($product->cost_price ?? 0) * ($isFractional ? $rolls : $product->quantity);
+                // cost_price يمثل تكلفة وحدة التخزين: الرول للمنتج الكسري، والطقم للمنتج
+                // القابل للتقسيم، والحبة للمنتج العادي. نحسب إجمالي المخزون بنفس الوحدة.
+                $costUnitLabel = $isFractional ? 'للرول' : ($isSet ? 'للطقم' : 'للحبة');
+                $productCost = (float) ($product->cost_price ?? 0)
+                    * ($isFractional ? $rolls : (float) $product->quantity);
                 $serialNumber = $loop->iteration;
 
                 $headerPriceLabel = 'الحبة';
@@ -284,9 +289,10 @@
                                     @endif
                                 </div>
                                 <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 h-full flex flex-col justify-between">
-                                    <p class="text-gray-500 text-[10px]">التكلفة</p>
-                                    <p class="text-green-400 font-bold text-lg sm:text-xl">{{ number_format($product->cost_price, 0) }} <span class="text-xs text-gray-500">ر.س</span></p>
-                                    <p class="text-gray-400 text-[9px]">إجمالي تكلفة المخزون الحالي: {{ number_format($productCost, 0) }} ر.س</p>
+                                    <p class="text-gray-500 text-[10px]">سعر التكلفة {{ $costUnitLabel }}</p>
+                                    {{-- لا نقرّب سعر التكلفة إلى عدد صحيح حتى تظهر القيمة المخزنة فعلياً. --}}
+                                    <p class="text-green-400 font-bold text-lg sm:text-xl">{{ number_format((float) ($product->cost_price ?? 0), 2) }} <span class="text-xs text-gray-500">ر.س</span></p>
+                                    <p class="text-gray-400 text-[9px]">إجمالي تكلفة المخزون الحالي: {{ number_format($productCost, 2) }} ر.س</p>
                                 </div>
                             </div>
                         </div>
