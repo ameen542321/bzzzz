@@ -46,9 +46,10 @@ class Product extends Model
         });
 
         static::updating(function ($product) {
-            // لا نعيد توليد الـ slug إذا تم تحديده صراحةً من الكنترولر
-            // (مثلاً slug مرتبط بالمتجر). نولّد تلقائياً فقط عند غيابه.
-            if (! $product->isDirty('slug')) {
+            // لا نعيد توليد الـ slug عند تعديل حقول أخرى مع بقاء الاسم كما هو؛
+            // وإلا قد نفقد الـ slug المرتبط بالمتجر ونصطدم بقيد التفرد العالمي.
+            // عند تغير الاسم فقط، نولّده تلقائياً إذا لم يحدده المستدعي صراحةً.
+            if ($product->isDirty('name') && ! $product->isDirty('slug')) {
                 $product->slug = Str::slug($product->name, '-', null);
             }
         });
