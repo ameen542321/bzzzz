@@ -95,7 +95,14 @@ Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->nam
             ->name('quick-sale.index');
          // مدخل محمي للمحاسب إلى صفحة معاينة التضليل المستقلة.
          Route::get('/quick-sale/tint-preview', function () {
-             return redirect()->to(asset('tint-sale-preview.html'));
+             // نمرر رابط البيانات المولّد من Laravel بدل أن تخمّن صفحة HTML مسار التطبيق.
+             // هذا يحافظ على المسار الصحيح حتى عند تشغيل المشروع داخل مجلد فرعي مثل /public.
+             $previewUrl = asset('tint-sale-preview.html');
+             $productsUrl = route('accountant.quick-sale.tint-preview-products', [], false);
+
+             return redirect()->to($previewUrl . '?' . http_build_query([
+                 'products_url' => $productsUrl,
+             ]));
          })->name('quick-sale.tint-preview');
          Route::get('/quick-sale/tint-preview-products', [QuickSaleController::class, 'tintPreviewProducts'])
             ->name('quick-sale.tint-preview-products');

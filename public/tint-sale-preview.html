@@ -226,7 +226,14 @@
 <script>
 // تقرأ المعاينة منتجات الرول الحقيقية من قسم «تضليل» فقط مع خيارات التجزئة التابعة لها.
 // نوع التضليل والحجم والدرجة تُستخرج من صيغة الاسم المعتمدة: النوع + الحجم + الدرجة.
-const previewProductsUrl = new URL('accountant/quick-sale/tint-preview-products', document.baseURI).toString();
+const previewProductsUrl = (() => {
+    const configuredUrl = new URLSearchParams(window.location.search).get('products_url');
+    if (configuredUrl) return new URL(configuredUrl, document.baseURI).toString();
+
+    // احتياط للروابط القديمة المباشرة: نبني المسار بجانب ملف المعاينة.
+    const previewDirectory = window.location.pathname.replace(/tint-sale-preview\.html$/, '');
+    return new URL(`${previewDirectory}accountant/quick-sale/tint-preview-products`, window.location.origin).toString();
+})();
 let categories = [];
 const works = [
     { id:'full', label:'كامل', description:'تضليل السيارة كاملة' },
@@ -637,7 +644,23 @@ async function loadPreviewProducts() {
             headers:{ 'Accept':'application/json' },
             credentials:'same-origin',
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (response.redirected && /\/login(?:\?|$)/.test(new URL(response.url).pathname)) {
+            throw new Error('انتهت جلسة المحاسب. سجل الدخول ثم افتح المعاينة من شاشة البيع السريع.');
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok) {
+            let message = `فشل طلب البيانات (HTTP ${response.status})`;
+            if (contentType.includes('application/json')) {
+                const errorPayload = await response.json();
+                message = errorPayload.message || message;
+            }
+            throw new Error(message);
+        }
+        if (!contentType.includes('application/json')) {
+            throw new Error('عاد الخادم بصفحة بدل بيانات المنتجات. افتح المعاينة من زر شاشة البيع السريع وتأكد من تحديث مسارات Laravel.');
+        }
+
         const payload = await response.json();
         previewProducts = (payload.products || []).map(mapProduct);
         rebuildSizes();
@@ -653,10 +676,11 @@ async function loadPreviewProducts() {
         renderCart();
     } catch (error) {
         console.error('تعذر تحميل منتجات المعاينة', error);
-        status.textContent = 'تعذر تحميل البيانات — سجل دخول المحاسب أولًا';
+        const errorMessage = error?.message || 'تعذر تحميل بيانات منتجات التضليل.';
+        status.textContent = `تعذر تحميل البيانات — ${errorMessage}`;
         status.style.color = '#f87171';
         document.getElementById('openTint').disabled = true;
-        document.getElementById('realProducts').innerHTML = '<div class="cart-empty" style="grid-column:1/-1">تعذر تحميل منتجات المتجر. افتح الصفحة بعد تسجيل الدخول بحساب المحاسب.</div>';
+        document.getElementById('realProducts').innerHTML = `<div class="cart-empty" style="grid-column:1/-1">${escapeHtml(errorMessage)}</div>`;
     }
 }
 

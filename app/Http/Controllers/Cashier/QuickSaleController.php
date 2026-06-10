@@ -31,7 +31,14 @@ class QuickSaleController extends Controller
      */
     public function tintPreviewProducts()
     {
-        $storeId = auth('accountant')->user()->store_id;
+        $accountant = auth('accountant')->user();
+        if (! $accountant) {
+            return response()->json([
+                'message' => 'انتهت جلسة المحاسب. سجل الدخول ثم افتح المعاينة من شاشة البيع السريع.',
+            ], 401);
+        }
+
+        $storeId = $accountant->store_id;
 
         $products = Product::query()
             ->with(['fractions' => function ($query) {
