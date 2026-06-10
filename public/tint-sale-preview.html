@@ -254,6 +254,27 @@ function normalizeArabic(value) {
         .replace(/\s+/g, ' ');
 }
 
+function tintTypeId(label) {
+    return normalizeArabic(label).replace(/\s+/g, '-');
+}
+
+function rebuildTintTypes() {
+    const types = new Map();
+    previewProducts.forEach(product => {
+        if (!product.tintType) return;
+
+        const id = tintTypeId(product.tintType);
+        if (!types.has(id)) {
+            types.set(id, {
+                id,
+                label:product.tintType,
+                description:`${previewProducts.filter(item => item.tintTypeId === id).length} منتج متوفر`,
+            });
+        }
+    });
+    categories = [...types.values()];
+}
+
 function parseTintIdentity(name) {
     const original = String(name || '').trim().replace(/\s+/g, ' ');
     const tokens = original.split(' ').filter(Boolean);
