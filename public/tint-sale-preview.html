@@ -154,9 +154,88 @@
         .modal-actions { display:flex; gap:10px; margin-top:18px; }
         .modal-actions .primary { flex:1; }
         .hidden { display:none!important; }
+
+        /* تصميم المعاينة الجديد: الاختيار في مساحة واضحة والملخص ثابت بجانبه. */
+        .preview-kicker { color:#60a5fa; font-size:11px; font-weight:900; letter-spacing:.04em; }
+        .topbar-copy { display:grid; gap:4px; }
+        .topbar-actions { display:flex; align-items:center; gap:10px; }
+        .launch-card { position:relative; overflow:hidden; background:linear-gradient(135deg,rgba(29,78,216,.24),rgba(15,23,42,.96) 48%); border-color:#315077; }
+        .launch-card::after { content:""; position:absolute; inset:auto -70px -90px auto; width:210px; height:210px; background:radial-gradient(circle,rgba(37,99,235,.25),transparent 66%); pointer-events:none; }
+        .launch-copy { display:flex; align-items:center; gap:12px; }
+        .launch-icon { display:grid; place-items:center; width:46px; height:46px; flex:0 0 46px; color:#dbeafe; background:#1d4ed8; border:1px solid #60a5fa; border-radius:14px; font-size:22px; }
+        .launch-card .secondary { position:relative; z-index:1; min-width:150px; min-height:46px; font-size:15px; box-shadow:0 10px 24px rgba(5,150,105,.2); }
+        .modal-wrap { padding:10px; }
+        .modal { width:min(1320px,100%); height:min(94vh,920px); max-height:none; overflow:hidden; display:flex; flex-direction:column; border-radius:24px; }
+        .modal-head { flex:0 0 auto; padding:16px 20px; }
+        .modal-head-copy { display:flex; align-items:center; gap:12px; }
+        .modal-head-icon { display:grid; place-items:center; width:44px; height:44px; color:#bfdbfe; background:#1d4ed8; border:1px solid #60a5fa; border-radius:14px; font-size:22px; }
+        .modal-subtitle { color:#94a3b8; font-size:11px; margin-top:4px; }
+        .modal-body { min-height:0; flex:1; padding:0; overflow:hidden; }
+        .builder-layout { display:grid; grid-template-columns:minmax(0,1.75fr) minmax(330px,.75fr); height:100%; min-height:0; }
+        .builder-main { min-width:0; overflow:auto; padding:18px 20px 28px; }
+        .builder-summary { min-width:0; overflow:auto; padding:18px; background:#09111f; border-right:1px solid #263650; }
+        .summary-sticky { display:grid; gap:14px; }
+        .summary-title { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+        .summary-title h3 { margin:0; font-size:17px; }
+        .summary-count { padding:5px 9px; color:#bfdbfe; background:#172554; border:1px solid #1d4ed8; border-radius:999px; font-size:10px; }
+        .quick-guide { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+        .guide-item { display:flex; align-items:center; gap:8px; padding:10px; color:#94a3b8; background:#0b1526; border:1px solid #263650; border-radius:12px; font-size:11px; }
+        .guide-item b { display:grid; place-items:center; width:24px; height:24px; flex:0 0 24px; color:#fff; background:#1e3a5f; border-radius:8px; }
+        .guide-item.current { color:#fff; background:#102a4c; border-color:#2563eb; }
+        .guide-item.done { color:#d1fae5; background:#073426; border-color:#059669; }
+        .flow { display:none; }
+        .step-panel { padding:16px; background:#0b1526; border:1px solid #263650; border-radius:16px; }
+        .step-panel + .step-panel { margin-top:14px; }
+        .step-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+        .step-heading-copy { display:flex; align-items:center; gap:10px; }
+        .step-number { display:grid; place-items:center; width:30px; height:30px; color:#fff; background:#2563eb; border-radius:10px; font-weight:900; }
+        .step-title { margin:0; color:#fff; font-size:15px; }
+        .step-help { margin-top:3px; color:#7f8da3; font-size:10px; }
+        .choice-grid { grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); }
+        .category-choice { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px; }
+        .category-choice > span { margin:0; color:inherit; font-size:inherit; }
+        .category-choice > span > span { margin-top:4px; }
+        .category-choice .category-arrow { color:#64748b; font-size:18px; }
+        .category-choice.active .category-arrow { color:#fff; }
+        .work-choice-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+        .work-card { min-height:0; padding:14px; background:#111c2e; }
+        .work-card-head { margin-bottom:8px!important; }
+        .work-card-title { display:flex; align-items:center; gap:8px; font-size:16px; }
+        .work-icon { display:grid!important; place-items:center; width:30px; height:30px; margin:0!important; color:#bfdbfe!important; background:#172554; border:1px solid #1d4ed8; border-radius:9px; font-size:15px!important; }
+        .work-card-description { min-height:0; }
+        .work-card-state { min-width:auto; }
+        .work-card[data-work-card="full"] { grid-column:1/-1; border-color:#315077; background:linear-gradient(135deg,#101d31,#0d1728); }
+        .full-composition { gap:12px; }
+        .full-part { padding:14px; background:#0a1424; }
+        .full-part strong { display:flex; align-items:center; gap:7px; }
+        .size-selector,.grade-selector,.window-counter,.full-type-selector { gap:7px; }
+        .size-selector button,.grade-selector button,.window-counter button,.full-type-selector button { transition:.16s ease; }
+        .size-selector button:hover,.grade-selector button:hover,.window-counter button:hover,.full-type-selector button:hover { transform:translateY(-1px); border-color:#60a5fa; }
+        .builder-list { max-height:none; }
+        .builder-row { display:block; padding:12px; }
+        .builder-row-title { align-items:flex-start; }
+        .part-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .builder-row > .danger { width:100%; margin-top:10px; padding:7px!important; background:#32161d; color:#fca5a5; }
+        .summary-empty { padding:26px 12px; }
+        .price-review-grid { grid-template-columns:1fr; margin-top:0; }
+        .price-review-item:first-child { border-color:#2563eb; background:#0e2140; }
+        .price-review-item:first-child .input { font-size:19px; font-weight:900; text-align:center; }
+        .operation-totals { grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:0; }
+        .operation-total { padding:10px; }
+        .formulas-box { margin-top:0; }
+        .formulas-box summary { cursor:pointer; color:#93c5fd; font-weight:900; }
+        .formulas-box[open] summary { margin-bottom:8px; }
+        .formulas-grid { grid-template-columns:1fr; }
+        .modal-actions { flex:0 0 auto; margin:0; padding:14px 20px; background:#111b2e; border-top:1px solid #2b3951; }
+        .modal-actions .primary { font-size:15px; }
+        .modal-actions-note { display:flex; align-items:center; color:#94a3b8; font-size:10px; }
         @media(max-width:850px) {
             .layout { grid-template-columns:1fr; }
-            .products,.option-grid,.work-choice-grid { grid-template-columns:1fr; }
+            .products,.option-grid { grid-template-columns:1fr; }
+            .builder-layout { grid-template-columns:1fr; overflow:auto; }
+            .builder-main,.builder-summary { overflow:visible; }
+            .builder-summary { border-right:0; border-top:1px solid #263650; }
+            .work-choice-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .choice-grid { grid-template-columns:1fr 1fr; }
             .custom-grid { grid-template-columns:1fr 1fr; }
             .full-composition { grid-template-columns:1fr; }
@@ -168,20 +247,24 @@
         @media(max-width:520px) {
             .choice-grid,.custom-grid,.price-review-grid,.operation-totals,.part-metrics,.formulas-grid,.cart-totals { grid-template-columns:1fr; }
             .option-meta { grid-template-columns:1fr; }
+            .modal { height:calc(100vh - 12px); border-radius:16px; }
+            .quick-guide,.work-choice-grid { grid-template-columns:1fr; }
             .modal-actions { flex-direction:column; }
+            .modal-actions-note { justify-content:center; }
         }
     </style>
 </head>
 <body>
 <div class="page">
     <header class="topbar">
-        <div><div class="title">تسجيل بيع جديد</div><div style="color:#64748b;font-size:12px;margin-top:5px">معاينة مرتبطة ببيانات المتجر — لا تحفظ أي بيانات</div></div>
+        <div class="topbar-copy"><span class="preview-kicker">وضع المعاينة</span><div class="title">معاينة بيع التضليل</div><div style="color:#64748b;font-size:12px">اختبر الاختيارات والأسعار والتكلفة دون حفظ عملية أو خصم مخزون.</div></div>
         <div class="badge">البيانات: <b id="dataStatus" style="color:#fbbf24">جارٍ التحميل...</b></div>
     </header>
     <main class="layout">
         <section class="stack">
-            <div class="card">
-                <div class="section-head"><div><span class="label">ابحث عن منتج</span><b>المنتجات السريعة</b></div><button class="secondary" id="openTint" disabled>+ تضليل سريع</button></div>
+            <div class="card launch-card">
+                <div class="section-head"><div class="launch-copy"><span class="launch-icon">◩</span><div><span class="label">ابدأ من هنا</span><b>تسجيل تضليل بخطوات سريعة</b><div style="color:#94a3b8;font-size:11px;margin-top:5px">النوع ← العمل ← الحجم والدرجة ← مراجعة السعر والتكلفة</div></div></div><button class="secondary" id="openTint" disabled>فتح شاشة التضليل</button></div>
+                <div class="section-head" style="margin-top:18px"><div><span class="label">المنتجات المرتبطة</span><b>منتجات قسم تضليل</b></div></div>
                 <div class="search-row"><input class="input" id="productSearch" placeholder="اكتب اسم المنتج..."><button class="ghost" id="productSearchButton">بحث</button></div>
                 <div class="products" id="realProducts"><div class="cart-empty" style="grid-column:1/-1">جارٍ تحميل منتجات الرول...</div></div>
             </div>
@@ -207,83 +290,109 @@
 <div class="modal-wrap" id="tintModal">
     <div class="modal">
         <div class="modal-head">
-            <div><h2>إضافة تضليل سريع</h2><div style="color:#64748b;font-size:11px;margin-top:4px">حدد الفئة والعمل، ثم اختر من خيارات التجزئة المسجلة أو أضف خيارًا مخصصًا</div></div>
+            <div class="modal-head-copy">
+                <span class="modal-head-icon">◩</span>
+                <div><h2>تسجيل تضليل سريع</h2><div class="modal-subtitle">اختر النوع والعمل فقط، وستظهر الأسعار والاستهلاك تلقائيًا من خيارات التجزئة المسجلة.</div></div>
+            </div>
             <button class="danger" id="closeTint">إغلاق</button>
         </div>
+
         <div class="modal-body">
-            <div class="flow" id="flowIndicator">
-                <span class="current">1 نوع التضليل</span><b>←</b><span>2 العمل والحجم والدرجة</span>
-            </div>
-
-            <div class="step">
-                <span class="label">1 — اختر نوع التضليل المتوفر</span>
-                <div class="choice-grid" id="categoryChoices"></div>
-            </div>
-
-            <div class="step hidden" id="workStep">
-                <span class="label">2 — اختر نوع العمل المطلوب (يمكن اختيار أكثر من خيار)</span>
-                <div class="choice-grid work-choice-grid" id="workChoices"></div>
-            </div>
-
-            <div class="step hidden" id="customStep">
-                <div class="custom-panel" id="customPanel">
-                    <div class="section-head"><div><span class="label" style="margin:0 0 5px">إضافة اختيار غير مسجل</span><b>تسجيل عمل مخصص</b></div><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
-                    <div class="note" style="margin:0 0 12px">يمكن تسجيل أكثر من سطر مخصص في العملية نفسها. أضف سطرًا لكل منتج أو عمل مختلف، ثم أضف جميع السطور إلى الملخص دفعة واحدة.</div>
-                    <div class="custom-rows" id="customRows"></div>
-                    <div class="custom-actions">
-                        <button class="ghost" type="button" id="addCustomRow">+ إضافة سطر آخر</button>
-                        <button class="secondary" type="button" id="addCustomPart">إضافة السطور المخصصة إلى التركيبة</button>
+            <div class="builder-layout">
+                <section class="builder-main">
+                    <div class="flow" id="flowIndicator">
+                        <span class="current">1 نوع التضليل</span><b>←</b><span>2 العمل والحجم والدرجة</span>
                     </div>
-                </div>
-            </div>
+                    <div class="quick-guide" id="quickGuide">
+                        <div class="guide-item current" data-guide-step="1"><b>1</b><span>اختر نوع التضليل</span></div>
+                        <div class="guide-item" data-guide-step="2"><b>2</b><span>حدد العمل والمقاس والدرجة</span></div>
+                        <div class="guide-item" data-guide-step="3"><b>3</b><span>راجع الملخص وأضف للسلة</span></div>
+                    </div>
 
-            <div class="step">
-                <div class="section-head"><span class="label" style="margin:0">ملخص عملية التضليل</span><span id="partsHint" style="color:#64748b;font-size:11px">لم يتم اختيار أي عمل</span></div>
-                <div class="builder-list" id="selectedParts"></div>
-            </div>
+                    <div class="step-panel">
+                        <div class="step-heading">
+                            <div class="step-heading-copy"><span class="step-number">1</span><div><h3 class="step-title">نوع التضليل</h3><div class="step-help">تظهر الأنواع الموجودة فعليًا في منتجات قسم تضليل.</div></div></div>
+                        </div>
+                        <div class="choice-grid" id="categoryChoices"></div>
+                    </div>
 
-            <div class="price-review-grid">
-                <div class="price-review-item">
-                    <span class="label">السعر النهائي للعميل</span>
-                    <input class="input" id="salePrice" type="number" value="0" min="1" step="0.01">
-                </div>
-                <div class="price-review-item">
-                    <span class="label">إجمالي سعر البيع المسجل</span>
-                    <input class="input" id="registeredSalePrice" type="text" value="0.00 ر.س" readonly>
-                </div>
-                <div class="price-review-item cost">
-                    <span class="label">إجمالي التكلفة مع الهالك</span>
-                    <input class="input" id="totalMaterialCost" type="text" value="0.00 ر.س" readonly>
-                </div>
-            </div>
+                    <div class="step-panel hidden" id="workStep">
+                        <div class="step-heading">
+                            <div class="step-heading-copy"><span class="step-number">2</span><div><h3 class="step-title">العمل المطلوب</h3><div class="step-help">يمكن جمع أمامي وخلفي ودريشة، أما «كامل» فيلغي الاختيارات الجزئية.</div></div></div>
+                        </div>
+                        <div class="choice-grid work-choice-grid" id="workChoices"></div>
+                    </div>
 
-            <div class="operation-totals">
-                <div class="operation-total sales"><span>إجمالي سعر البيع</span><b id="totalSaleSummary">0.00 ر.س</b></div>
-                <div class="operation-total cost"><span>التكلفة الأساسية</span><b id="baseCostSummary">0.00 ر.س</b></div>
-                <div class="operation-total waste"><span>تكلفة الهالك</span><b id="wasteCostSummary">0.00 ر.س</b></div>
-                <div class="operation-total"><span>الطول المستخدم</span><b id="usedMetersSummary">0.00 م</b></div>
-                <div class="operation-total waste"><span>الهالك المستخدم</span><b id="wasteMetersSummary">0.00 م</b></div>
-                <div class="operation-total"><span>إجمالي الطول المخصوم</span><b id="deductedMetersSummary">0.00 م</b></div>
-            </div>
+                    <div class="step-panel hidden" id="customStep">
+                        <div class="custom-panel" id="customPanel">
+                            <div class="section-head"><div><span class="label" style="margin:0 0 5px">إضافة غير مسجلة</span><b>عمل مخصص</b></div><button class="ghost" id="closeCustom" style="padding:7px 10px">إلغاء</button></div>
+                            <div class="note" style="margin:0 0 12px">أضف سطرًا مستقلًا لكل منتج أو عمل مختلف، ثم انقل جميع السطور إلى ملخص العملية.</div>
+                            <div class="custom-rows" id="customRows"></div>
+                            <div class="custom-actions">
+                                <button class="ghost" type="button" id="addCustomRow">+ سطر مخصص آخر</button>
+                                <button class="secondary" type="button" id="addCustomPart">اعتماد السطور المخصصة</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
-            <div class="formulas-box">
-                <strong>المعادلات المستخدمة في المعاينة</strong>
-                <div class="formulas-grid">
-                    <div>تكلفة المتر = تكلفة الرول ÷ طول الرول</div>
-                    <div>الطول المستخدم = استهلاك الخيار × العدد</div>
-                    <div>الهالك بالمتر = الطول المستخدم × نسبة الهالك ÷ 100</div>
-                    <div>تكلفة الاستخدام = الطول المستخدم × تكلفة المتر</div>
-                    <div>تكلفة الهالك = أمتار الهالك × تكلفة المتر</div>
-                    <div>إجمالي التكلفة = تكلفة الاستخدام + تكلفة الهالك</div>
-                    <div>سعر البيع = سعر خيار التجزئة × العدد</div>
-                    <div>إجمالي الطول المخصوم = الطول المستخدم + الهالك</div>
-                </div>
+                <aside class="builder-summary">
+                    <div class="summary-sticky">
+                        <div class="summary-title">
+                            <div><span class="preview-kicker">مراجعة مباشرة</span><h3>ملخص العملية</h3></div>
+                            <span class="summary-count" id="partsHint">لم يتم الاختيار</span>
+                        </div>
+                        <div class="builder-list" id="selectedParts"></div>
+
+                        <div class="price-review-grid">
+                            <div class="price-review-item">
+                                <span class="label">السعر النهائي للعميل</span>
+                                <input class="input" id="salePrice" type="number" value="0" min="1" step="0.01">
+                            </div>
+                            <div class="price-review-item">
+                                <span class="label">سعر البيع من خيارات التجزئة</span>
+                                <input class="input" id="registeredSalePrice" type="text" value="0.00 ر.س" readonly>
+                            </div>
+                            <div class="price-review-item cost">
+                                <span class="label">تكلفة المواد مع الهالك</span>
+                                <input class="input" id="totalMaterialCost" type="text" value="0.00 ر.س" readonly>
+                            </div>
+                        </div>
+
+                        <div class="operation-totals">
+                            <div class="operation-total sales"><span>إجمالي البيع</span><b id="totalSaleSummary">0.00 ر.س</b></div>
+                            <div class="operation-total cost"><span>التكلفة الأساسية</span><b id="baseCostSummary">0.00 ر.س</b></div>
+                            <div class="operation-total waste"><span>تكلفة الهالك</span><b id="wasteCostSummary">0.00 ر.س</b></div>
+                            <div class="operation-total"><span>الطول المستخدم</span><b id="usedMetersSummary">0.00 م</b></div>
+                            <div class="operation-total waste"><span>هالك بالمتر</span><b id="wasteMetersSummary">0.00 م</b></div>
+                            <div class="operation-total"><span>الخصم من المخزون</span><b id="deductedMetersSummary">0.00 م</b></div>
+                        </div>
+
+                        <details class="formulas-box">
+                            <summary>عرض معادلات الاحتساب</summary>
+                            <div class="formulas-grid">
+                                <div>تكلفة المتر = تكلفة الرول ÷ طول الرول</div>
+                                <div>الطول المستخدم = استهلاك الخيار × العدد</div>
+                                <div>الهالك = الطول المستخدم × النسبة ÷ 100</div>
+                                <div>تكلفة الاستخدام = الطول المستخدم × تكلفة المتر</div>
+                                <div>تكلفة الهالك = أمتار الهالك × تكلفة المتر</div>
+                                <div>إجمالي التكلفة = الاستخدام + الهالك</div>
+                                <div>سعر البيع = سعر خيار التجزئة × العدد</div>
+                                <div>خصم المخزون = الاستخدام + الهالك</div>
+                            </div>
+                        </details>
+                    </div>
+                </aside>
             </div>
-            <div class="modal-actions"><button class="primary" id="addTint">إضافة العملية للسلة كسطر واحد</button><button class="ghost" id="resetTint">إعادة تعيين</button></div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="primary" id="addTint">إضافة العملية إلى السلة</button>
+            <button class="ghost" id="resetTint">بدء اختيار جديد</button>
+            <span class="modal-actions-note">المعاينة لا تحفظ بيعًا ولا تخصم مخزونًا.</span>
         </div>
     </div>
 </div>
-
 <script>
 // تقرأ المعاينة منتجات الرول الحقيقية من قسم «تضليل» فقط مع خيارات التجزئة التابعة لها.
 // نوع التضليل والحجم والدرجة تُستخرج من صيغة الاسم المعتمدة: النوع + الحجم + الدرجة.
@@ -524,11 +633,15 @@ function selectedConfigurations() {
 function renderCategories() {
     const box = document.getElementById('categoryChoices');
     box.innerHTML = categories.length ? categories.map(category => `
-        <button class="choice ${selectedCategory === category.id ? 'active' : ''}" data-category="${escapeHtml(category.id)}">
-            <b>${escapeHtml(category.label)}</b><span>${escapeHtml(category.description)}</span>
+        <button class="choice category-choice ${selectedCategory === category.id ? 'active' : ''}" data-category="${escapeHtml(category.id)}">
+            <span><b>${escapeHtml(category.label)}</b><span>${escapeHtml(category.description)}</span></span><i class="category-arrow">‹</i>
         </button>
     `).join('') : '<div class="cart-empty" style="grid-column:1/-1">لا توجد أنواع تضليل مكتملة الاسم. استخدم الصيغة: النوع + الحجم + الدرجة.</div>';
     box.querySelectorAll('[data-category]').forEach(button => button.onclick = () => selectCategory(button.dataset.category));
+}
+
+function workIcon(workId) {
+    return { full:'▦', front:'▰', rear:'▱', window:'▥' }[workId] || '•';
 }
 
 function renderWorks() {
@@ -566,9 +679,9 @@ function renderWorks() {
                     </span>`;
             }).join('');
             return `
-                <div class="choice work-card ${isActive ? 'active' : ''}" style="grid-column:1/-1">
+                <div class="choice work-card ${isActive ? 'active' : ''}" data-work-card="full">
                     <span class="work-card-head">
-                        <span><b class="work-card-title">${work.label}</b><span class="work-card-description">اختر نوعًا وحجمًا ودرجة مستقلة للأمامي والخلفي والجوانب</span></span>
+                        <span><b class="work-card-title"><i class="work-icon">${workIcon(work.id)}</i>${work.label}</b><span class="work-card-description">اختر نوعًا وحجمًا ودرجة مستقلة للأمامي والخلفي والجوانب</span></span>
                         <span class="work-card-state">${isActive ? 'قيد التحديد' : 'غير محدد'}</span>
                     </span>
                     <span class="exclusive-note">اختيار «كامل» يلغي الأعمال الأخرى، لكنه لا يستخدم تجزئة «كامل»: الأمامي من تجزئة «أمامي»، والخلفي من «خلفي»، والجوانب من «دريشة» × 4.</span>
@@ -581,9 +694,9 @@ function renderWorks() {
         const availableSizes = availableSizesForWork(work.id);
         const availableGrades = selection ? gradesForWorkAndSize(work.id, selection.size) : [];
         return `
-            <div class="choice work-card ${selection ? 'active' : ''}">
+            <div class="choice work-card ${selection ? 'active' : ''}" data-work-card="${work.id}">
                 <span class="work-card-head">
-                    <span><b class="work-card-title">${work.label}</b><span class="work-card-description">${work.description}</span></span>
+                    <span><b class="work-card-title"><i class="work-icon">${workIcon(work.id)}</i>${work.label}</b><span class="work-card-description">${work.description}</span></span>
                     <span class="work-card-state">${selection ? 'محدد' : 'غير محدد'}</span>
                 </span>
                 ${work.id === 'window' ? `<span class="control-label">عدد الدرايش</span><span class="window-counter">${[1,2,3,4].map(count => `<button type="button" class="${windowCount === count ? 'active' : ''}" data-window-count="${count}">${count}</button>`).join('')}</span>` : ''}
@@ -890,7 +1003,7 @@ function renderSelectedParts() {
                 <button class="danger" data-remove="${part.key}" style="padding:7px 10px">حذف</button>
             </div>
         `;
-    }).join('') : '<div class="cart-empty" style="padding:20px">اختر حجمًا واحدًا داخل بطاقة العمل ثم الدرجة، وستظهر تفاصيل الطول والسعر والتكلفة والهالك هنا.</div>';
+    }).join('') : '<div class="cart-empty summary-empty">ابدأ باختيار نوع التضليل، ثم حدد العمل والحجم والدرجة. ستظهر المراجعة هنا تلقائيًا.</div>';
 
     box.querySelectorAll('[data-remove]').forEach(button => button.onclick = () => removePart(button.dataset.remove));
 
@@ -918,12 +1031,18 @@ function renderSelectedParts() {
     document.getElementById('usedMetersSummary').textContent = totals.usedMeters.toFixed(2) + ' م';
     document.getElementById('wasteMetersSummary').textContent = totals.wasteMeters.toFixed(2) + ' م';
     document.getElementById('deductedMetersSummary').textContent = totals.deductedMeters.toFixed(2) + ' م';
+    updateFlow(selectedParts.length ? 3 : (selectedCategory ? 2 : 1));
 }
 
 function updateFlow(step) {
     document.querySelectorAll('#flowIndicator span').forEach((item, index) => {
         item.classList.toggle('done', index + 1 < step);
         item.classList.toggle('current', index + 1 === step);
+    });
+    document.querySelectorAll('[data-guide-step]').forEach(item => {
+        const itemStep = Number(item.dataset.guideStep);
+        item.classList.toggle('done', itemStep < step);
+        item.classList.toggle('current', itemStep === step);
     });
 }
 function resetBuilder() {
