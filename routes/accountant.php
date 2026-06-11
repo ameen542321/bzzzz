@@ -102,6 +102,7 @@ Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])->nam
 
              return redirect()->to($previewUrl . '?' . http_build_query([
                  'products_url' => $productsUrl,
+                 'auto_open' => 1,
              ]));
          })->name('quick-sale.tint-preview');
          Route::get('/quick-sale/tint-preview-products', [QuickSaleController::class, 'tintPreviewProducts'])
