@@ -103,11 +103,16 @@
         .custom-row-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
         .custom-grid { display:grid; grid-template-columns:1.2fr 1fr .8fr .65fr .8fr; gap:10px; }
         .custom-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
-        .full-composition { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-        .full-part { padding:12px; background:#0f1b2d; border:1px solid #315077; border-radius:12px; }
-        .full-part strong { display:block; margin-bottom:4px; color:#fff; }
-        .full-part small { display:block; color:#94a3b8; line-height:1.6; }
-        .full-part .grade-selector { margin-top:10px; }
+        .full-composition { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:12px; }
+        .full-part { min-width:0; padding:13px; background:#0f1b2d; border:1px solid #315077; border-radius:12px; }
+        .full-part strong { display:block; margin-bottom:4px; color:#fff; font-size:15px; }
+        .full-part small { display:block; min-height:38px; color:#94a3b8; line-height:1.6; }
+        .full-part .grade-selector { margin-top:8px; }
+        .full-type-selector { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; margin-top:8px; }
+        .full-type-selector button { min-height:36px; padding:7px 5px; color:#cbd5e1; background:#111827; border:1px solid #475569; border-radius:8px; font-size:11px; font-weight:900; }
+        .full-type-selector button.active { color:#fff; background:#2563eb; border-color:#93c5fd; }
+        .full-part .size-selector { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .full-source-note { margin-top:10px!important; padding:8px; color:#d1fae5!important; background:#064e3b; border:1px solid #059669; border-radius:8px; font-size:10px!important; }
         .cart-cost { margin-top:6px; color:#fbbf24; font-size:12px; font-weight:900; }
         .cart-totals { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid #334155; }
         .cart-total-chip { padding:8px 10px; background:#0f172a; border-radius:9px; font-size:11px; color:#94a3b8; }
@@ -482,14 +487,34 @@ function sizeIdByLabel(label) {
     const normalized = normalizeArabic(label);
     return sizes.find(size => normalizeArabic(size.label) === normalized)?.id || null;
 }
-function fullGradesForSize(sizeLabel) {
-    const size = sizeIdByLabel(sizeLabel);
-    if (!size) return [];
-    return [...new Set(productsForWork('full')
+const fullComponents = [
+    { id:'front', work:'front', label:'الأمامي', description:'يأخذ استهلاك وسعر خيار «أمامي»', preferredSize:'كبير', qty:1 },
+    { id:'rear', work:'rear', label:'الخلفي', description:'يأخذ استهلاك وسعر خيار «خلفي»', preferredSize:'كبير', qty:1 },
+    { id:'sides', work:'window', label:'الجوانب والدرايش', description:'يأخذ خيار «دريشة» لأربع درايش', preferredSize:'صغير', qty:4 },
+];
+function fullComponentById(id) { return fullComponents.find(component => component.id === id); }
+function productsForTintTypeAndWork(categoryId, work) {
+    return previewProducts.filter(product => product.tintTypeId === categoryId && product.fractions.some(option => option.work === work));
+}
+function fullTypesForWork(work) {
+    const available = new Set(previewProducts.filter(product => product.fractions.some(option => option.work === work)).map(product => product.tintTypeId));
+    return categories.filter(category => available.has(category.id));
+}
+function fullSizesForComponent(componentId, categoryId) {
+    const component = fullComponentById(componentId);
+    if (!component || !categoryId) return [];
+    const available = new Set(productsForTintTypeAndWork(categoryId, component.work).map(product => product.size).filter(Boolean));
+    return sizes.filter(size => available.has(size.id));
+}
+function fullGradesForComponent(componentId, categoryId, size) {
+    const component = fullComponentById(componentId);
+    if (!component || !categoryId || !size) return [];
+    return [...new Set(productsForTintTypeAndWork(categoryId, component.work)
         .filter(product => product.size === size)
         .map(product => product.grade)
         .filter(Boolean))];
 }
+
 function selectedConfigurations() {
     return Object.entries(workSelections)
         .filter(([work, selection]) => work !== 'full' && selection.size && selection.grade)
@@ -511,32 +536,44 @@ function renderWorks() {
     box.innerHTML = works.map(work => {
         const selection = workSelections[work.id] || null;
         if (work.id === 'full') {
-            const largeGrades = fullGradesForSize('كبير');
-            const smallGrades = fullGradesForSize('صغير');
-            const isActive = Boolean(selection?.largeGrade || selection?.smallGrade);
+            const fullSelection = selection || {};
+            const isActive = fullComponents.some(component => fullSelection[component.id]?.categoryId);
+            const componentCards = fullComponents.map(component => {
+                const componentSelection = fullSelection[component.id] || {};
+                const availableTypes = fullTypesForWork(component.work);
+                const availableSizes = fullSizesForComponent(component.id, componentSelection.categoryId);
+                const availableGrades = fullGradesForComponent(component.id, componentSelection.categoryId, componentSelection.size);
+                return `
+                    <span class="full-part">
+                        <strong>${escapeHtml(component.label)}</strong>
+                        <small>${escapeHtml(component.description)} — المقاس المعتاد: ${escapeHtml(component.preferredSize)}</small>
+                        <span class="control-label">1 — نوع التضليل</span>
+                        <span class="full-type-selector">
+                            ${availableTypes.length ? availableTypes.map(category => `<button type="button" class="${componentSelection.categoryId === category.id ? 'active' : ''}" data-full-type="${component.id}:${escapeHtml(category.id)}">${escapeHtml(category.label)}</button>`).join('') : '<em style="color:#f87171;font-size:11px">لا يوجد منتج بخيار التجزئة المطلوب</em>'}
+                        </span>
+                        ${componentSelection.categoryId ? `
+                            <span class="control-label">2 — الحجم</span>
+                            <span class="size-selector">
+                                ${availableSizes.map(size => `<button type="button" class="${componentSelection.size === size.id ? 'active' : ''}" data-full-size="${component.id}:${escapeHtml(size.id)}">${escapeHtml(size.label)}</button>`).join('') || '<em style="color:#f87171;font-size:11px">لا يوجد حجم متاح</em>'}
+                            </span>
+                        ` : ''}
+                        ${componentSelection.size ? `
+                            <span class="control-label">3 — الدرجة</span>
+                            <span class="grade-selector">
+                                ${availableGrades.map(grade => `<button type="button" class="${componentSelection.grade === grade ? 'active' : ''}" data-full-grade="${component.id}:${escapeHtml(grade)}">${escapeHtml(grade)}</button>`).join('') || '<em style="color:#f87171;font-size:11px">لا توجد درجة متاحة</em>'}
+                            </span>
+                        ` : ''}
+                    </span>`;
+            }).join('');
             return `
-                <div class="choice work-card ${isActive ? 'active' : ''}">
+                <div class="choice work-card ${isActive ? 'active' : ''}" style="grid-column:1/-1">
                     <span class="work-card-head">
-                        <span><b class="work-card-title">${work.label}</b><span class="work-card-description">الأمامي والخلفي من الرول الكبير، والجوانب من الرول الصغير</span></span>
-                        <span class="work-card-state">${isActive ? 'محدد' : 'غير محدد'}</span>
+                        <span><b class="work-card-title">${work.label}</b><span class="work-card-description">اختر نوعًا وحجمًا ودرجة مستقلة للأمامي والخلفي والجوانب</span></span>
+                        <span class="work-card-state">${isActive ? 'قيد التحديد' : 'غير محدد'}</span>
                     </span>
-                    <span class="exclusive-note">اختيار «كامل» يلغي الأعمال الأخرى. الحالات النادرة التي تستخدم الصغير للأمامي أو الخلفي تسجل من «إضافة».</span>
-                    <span class="full-composition">
-                        <span class="full-part">
-                            <strong>الرول الكبير</strong><small>للزجاج الأمامي والخلفي</small>
-                            <span class="control-label">اختر الدرجة</span>
-                            <span class="grade-selector">
-                                ${largeGrades.length ? largeGrades.map(grade => `<button type="button" class="${selection?.largeGrade === grade ? 'active' : ''}" data-full-grade="large:${grade}">${escapeHtml(grade)}</button>`).join('') : '<em style="color:#f87171;font-size:11px">لا يوجد خيار «كامل» لرول كبير</em>'}
-                            </span>
-                        </span>
-                        <span class="full-part">
-                            <strong>الرول الصغير</strong><small>للجوانب والدرايش</small>
-                            <span class="control-label">اختر الدرجة</span>
-                            <span class="grade-selector">
-                                ${smallGrades.length ? smallGrades.map(grade => `<button type="button" class="${selection?.smallGrade === grade ? 'active' : ''}" data-full-grade="small:${grade}">${escapeHtml(grade)}</button>`).join('') : '<em style="color:#f87171;font-size:11px">لا يوجد خيار «كامل» لرول صغير</em>'}
-                            </span>
-                        </span>
-                    </span>
+                    <span class="exclusive-note">اختيار «كامل» يلغي الأعمال الأخرى، لكنه لا يستخدم تجزئة «كامل»: الأمامي من تجزئة «أمامي»، والخلفي من «خلفي»، والجوانب من «دريشة» × 4.</span>
+                    <span class="full-composition">${componentCards}</span>
+                    <span class="full-source-note">يمكن اختيار صيني للأمامي، ومخلوط للخلفي، ونوع ثالث للجوانب في العملية نفسها. سعر البيع من سعر خيار التجزئة، والتكلفة من تكلفة الرول وطوله والاستهلاك والهالك.</span>
                 </div>
             `;
         }
@@ -578,9 +615,17 @@ function renderWorks() {
         const [work, grade] = button.dataset.grade.split(':');
         selectGrade(work, grade);
     });
+    box.querySelectorAll('[data-full-type]').forEach(button => button.onclick = () => {
+        const [component, categoryId] = button.dataset.fullType.split(':');
+        selectFullType(component, categoryId);
+    });
+    box.querySelectorAll('[data-full-size]').forEach(button => button.onclick = () => {
+        const [component, size] = button.dataset.fullSize.split(':');
+        selectFullSize(component, size);
+    });
     box.querySelectorAll('[data-full-grade]').forEach(button => button.onclick = () => {
-        const [role, grade] = button.dataset.fullGrade.split(':');
-        selectFullGrade(role, grade);
+        const [component, grade] = button.dataset.fullGrade.split(':');
+        selectFullGrade(component, grade);
     });
     box.querySelectorAll('[data-window-count]').forEach(button => button.onclick = () => setWindowCount(Number(button.dataset.windowCount)));
     document.getElementById('openAdditional').onclick = openCustomPanel;
@@ -635,19 +680,44 @@ function selectGrade(work, grade) {
     renderSelectedParts();
 }
 
-function selectFullGrade(role, grade) {
-    const sizeLabel = role === 'large' ? 'كبير' : 'صغير';
-    if (!fullGradesForSize(sizeLabel).includes(grade)) return;
-
-    const current = workSelections.full || { largeGrade:null, smallGrade:null };
-    const field = role === 'large' ? 'largeGrade' : 'smallGrade';
-    const nextGrade = current[field] === grade ? null : grade;
-    workSelections = { full:{ ...current, [field]:nextGrade } };
-    if (!workSelections.full.largeGrade && !workSelections.full.smallGrade) delete workSelections.full;
+function ensureFullSelection() {
+    if (!workSelections.full) workSelections = { full:{} };
+    return workSelections.full;
+}
+function clearPartialWorksForFull() {
+    Object.keys(workSelections).forEach(work => { if (work !== 'full') delete workSelections[work]; });
     selectedParts = selectedParts.filter(part => part.custom || part.ownerWork === 'full');
-    renderWorks();
-    syncAutomaticPricing();
-    renderSelectedParts();
+}
+function selectFullType(componentId, categoryId) {
+    const component = fullComponentById(componentId);
+    if (!component || !fullTypesForWork(component.work).some(category => category.id === categoryId)) return;
+    clearPartialWorksForFull();
+    const full = ensureFullSelection();
+    const current = full[componentId] || {};
+    if (current.categoryId === categoryId) {
+        delete full[componentId];
+    } else {
+        const availableSizes = fullSizesForComponent(componentId, categoryId);
+        const preferred = availableSizes.find(size => normalizeArabic(size.label) === normalizeArabic(component.preferredSize));
+        full[componentId] = { categoryId, size:(preferred || availableSizes[0])?.id || null, grade:null };
+    }
+    if (!Object.keys(full).length) delete workSelections.full;
+    renderWorks(); syncAutomaticPricing(); renderSelectedParts();
+}
+function selectFullSize(componentId, size) {
+    const full = workSelections.full;
+    const selection = full?.[componentId];
+    if (!selection || !fullSizesForComponent(componentId, selection.categoryId).some(item => item.id === size)) return;
+    selection.size = selection.size === size ? null : size;
+    selection.grade = null;
+    renderWorks(); syncAutomaticPricing(); renderSelectedParts();
+}
+function selectFullGrade(componentId, grade) {
+    const full = workSelections.full;
+    const selection = full?.[componentId];
+    if (!selection || !fullGradesForComponent(componentId, selection.categoryId, selection.size).includes(grade)) return;
+    selection.grade = selection.grade === grade ? null : grade;
+    renderWorks(); syncAutomaticPricing(); renderSelectedParts();
 }
 
 function setWindowCount(count) {
@@ -659,7 +729,10 @@ function setWindowCount(count) {
 }
 
 function findAutomaticPrice(configuration) {
-    for (const product of productsForCategory()) {
+    const candidates = configuration.categoryId
+        ? productsForTintTypeAndWork(configuration.categoryId, configuration.work)
+        : productsForCategory();
+    for (const product of candidates) {
         if (product.size !== configuration.size || product.grade !== configuration.grade) continue;
         const option = product.fractions.find(item => item.work === configuration.work);
         if (option) return { ...configuration, product, option };
@@ -682,6 +755,7 @@ function automaticPart(configuration, keySuffix, displayName = null) {
         meters:option.meters,
         qty:work === 'window' && ownerWork !== 'full' ? windowCount : 1,
         unitPrice:option.price,
+        componentId:configuration.componentId || null,
         custom:false,
     };
 }
@@ -693,24 +767,22 @@ function syncAutomaticPricing() {
         .filter(Boolean);
 
     const full = workSelections.full;
-    if (full?.largeGrade) {
-        const largeSize = sizeIdByLabel('كبير');
-        const part = automaticPart(
-            { work:'full', ownerWork:'full', size:largeSize, grade:full.largeGrade },
-            'large',
-            'كامل — الأمامي والخلفي (كبير)'
-        );
-        if (part) automaticParts.push(part);
+    if (full) {
+        fullComponents.forEach(component => {
+            const selection = full[component.id];
+            if (!selection?.categoryId || !selection.size || !selection.grade) return;
+            const part = automaticPart(
+                { work:component.work, ownerWork:'full', componentId:component.id, categoryId:selection.categoryId, size:selection.size, grade:selection.grade },
+                component.id,
+                `كامل — ${component.label}`
+            );
+            if (part) {
+                part.qty = component.qty;
+                automaticParts.push(part);
+            }
+        });
     }
-    if (full?.smallGrade) {
-        const smallSize = sizeIdByLabel('صغير');
-        const part = automaticPart(
-            { work:'full', ownerWork:'full', size:smallSize, grade:full.smallGrade },
-            'small',
-            'كامل — الجوانب والدرايش (صغير)'
-        );
-        if (part) automaticParts.push(part);
-    }
+
 
     selectedParts = [...customParts, ...automaticParts];
 }
@@ -779,7 +851,12 @@ function addCustomPart() {
 function removePart(key) {
     const part = selectedParts.find(item => String(item.key) === String(key));
     if (part && !part.custom) {
-        delete workSelections[part.ownerWork || part.work];
+        if (part.ownerWork === 'full' && part.componentId && workSelections.full) {
+            delete workSelections.full[part.componentId];
+            if (!Object.keys(workSelections.full).length) delete workSelections.full;
+        } else {
+            delete workSelections[part.ownerWork || part.work];
+        }
         syncAutomaticPricing();
         renderWorks();
     } else {
@@ -801,8 +878,8 @@ function renderSelectedParts() {
                     </div>
                     <div class="part-metrics">
                         <div class="part-metric"><span>الطول المحدد</span><b>${calculation.metersPerItem.toFixed(2)}م × ${calculation.quantity} = ${calculation.usedMeters.toFixed(2)}م</b></div>
-                        <div class="part-metric"><span>سعر البيع</span><b>${money(calculation.salePrice)}</b></div>
-                        <div class="part-metric"><span>تكلفة المتر</span><b>${money(calculation.costPerMeter)}</b></div>
+                        <div class="part-metric"><span>${part.custom ? 'سعر البيع (مدخل مخصص)' : 'سعر البيع (من خيار التجزئة)'}</span><b>${money(calculation.salePrice)}</b></div>
+                        <div class="part-metric"><span>تكلفة المتر (تكلفة الرول ÷ طوله)</span><b>${money(calculation.costPerMeter)}</b></div>
                         <div class="part-metric cost"><span>تكلفة الاستخدام الأساسي</span><b>${money(calculation.usageCost)}</b></div>
                         <div class="part-metric waste"><span>الهالك (${calculation.wasteRate.toFixed(2)}%)</span><b>${calculation.wasteMeters.toFixed(2)}م</b></div>
                         <div class="part-metric waste"><span>تكلفة الهالك</span><b>${money(calculation.wasteCost)}</b></div>
@@ -899,13 +976,21 @@ document.getElementById('resetTint').onclick = resetBuilder;
 document.getElementById('addTint').onclick = () => {
     const price = Number(document.getElementById('salePrice').value);
     if (!selectedCategory) { alert('اختر نوع التضليل أولًا'); return; }
-    if (workSelections.full && (!workSelections.full.largeGrade || !workSelections.full.smallGrade)) {
-        alert('للتضليل الكامل اختر درجة الرول الكبير ودرجة الرول الصغير');
-        return;
+    if (workSelections.full) {
+        const missingComponent = fullComponents.find(component => {
+            const selection = workSelections.full[component.id];
+            return !selection?.categoryId || !selection.size || !selection.grade;
+        });
+        if (missingComponent) {
+            alert(`أكمل نوع وحجم ودرجة ${missingComponent.label} في التضليل الكامل`);
+            return;
+        }
     }
     if (!selectedParts.length) { alert('اختر عملًا واحدًا على الأقل'); return; }
     if (price <= 0) { alert('أدخل السعر النهائي'); return; }
-    cart.push({ category:categoryById(selectedCategory).label, parts:selectedParts.map(part => ({ ...part })), price });
+    const usedTypes = [...new Set(selectedParts.map(part => part.product.tintType).filter(Boolean))];
+    const operationLabel = usedTypes.length ? usedTypes.join(' / ') : categoryById(selectedCategory).label;
+    cart.push({ category:operationLabel, parts:selectedParts.map(part => ({ ...part })), price });
     renderCart(); modal.classList.remove('open');
 };
 document.querySelectorAll('.pay').forEach(button => button.onclick = () => {
