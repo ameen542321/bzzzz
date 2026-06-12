@@ -22,31 +22,27 @@ class QuickSaleController extends Controller
 {
     public function index()
     {
-        return view('cashier.quick-sale.index');
+        $tintProducts = $this->tintProductsForStore(auth('accountant')->user()->store_id);
+
+        return view('cashier.quick-sale.index', [
+            'tintProducts' => $tintProducts,
+            'hasAvailableTintProducts' => collect($tintProducts)->contains(
+                fn (array $product) => $product['quantity'] > 0 && count($product['fractions']) > 0
+            ),
+        ]);
     }
 
     /**
-     * يعيد بيانات منتجات الرول وخيارات التجزئة للمعاينة فقط.
-     * لا ينشئ بيعًا ولا يغيّر المخزون أو أي بيانات في قاعدة البيانات.
+     * يعيد منتجات التضليل المجهزة لنافذة البيع دون أي تعديل على المخزون.
      */
-    public function tintPreviewProducts()
+    private function tintProductsForStore(int $storeId): array
     {
-        $accountant = auth('accountant')->user();
-        if (! $accountant) {
-            return response()->json([
-                'message' => 'انتهت جلسة المحاسب. سجل الدخول ثم افتح المعاينة من شاشة البيع السريع.',
-            ], 401);
-        }
-
-        $storeId = $accountant->store_id;
-
-        $products = Product::query()
+        return Product::query()
             ->with(['fractions' => function ($query) {
                 $query->select('id', 'product_id', 'option_label', 'deduction_value', 'price')
                     ->orderBy('id');
             }])
             ->where('store_id', $storeId)
-            // نافذة التضليل لا تعرض رولات القماش والجلد أو أي رول خارج القسم المعتمد «تضليل».
             ->whereHas('category', function ($query) use ($storeId) {
                 $query->where('store_id', $storeId)
                     ->where('name', 'تضليل')
@@ -63,10 +59,8 @@ class QuickSaleController extends Controller
                 'quantity',
                 'roll_length',
                 'waste_percentage',
-            ]);
-
-        return response()->json([
-            'products' => $products->map(function (Product $product) {
+            ])
+            ->map(function (Product $product) {
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
@@ -82,9 +76,27 @@ class QuickSaleController extends Controller
                             'deduction_value' => (float) $fraction->deduction_value,
                             'price' => (float) $fraction->price,
                         ];
-                    })->values(),
+                    })->values()->all(),
                 ];
-            })->values(),
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * يبقى هذا المسار للمعاينة المستقلة، بينما صفحة البيع تحمل البيانات مسبقًا.
+     */
+    public function tintPreviewProducts()
+    {
+        $accountant = auth('accountant')->user();
+        if (! $accountant) {
+            return response()->json([
+                'message' => 'انتهت جلسة المحاسب. سجل الدخول ثم افتح المعاينة من شاشة البيع السريع.',
+            ], 401);
+        }
+
+        return response()->json([
+            'products' => $this->tintProductsForStore($accountant->store_id),
         ]);
     }
 

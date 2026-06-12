@@ -22,7 +22,8 @@
 
         {{-- العمود الأيمن: البحث والسلة --}}
         <div class="lg:col-span-2 space-y-6">
-            {{-- إجراء سريع في موضع البيع الفعلي، بدل وضعه بجانب بيانات المحاسب. --}}
+            @if($hasAvailableTintProducts)
+            {{-- يظهر زر التضليل فقط عند وجود رول تضليل متوفر وله خيارات تجزئة. --}}
             <div class="rounded-2xl border border-indigo-500/30 bg-gradient-to-l from-indigo-950/80 to-gray-900 p-3 shadow-lg sm:p-4">
                 <button type="button"
                         @click="window.dispatchEvent(new CustomEvent('open-tint-sale-modal'))"
@@ -31,12 +32,13 @@
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl">◩</span>
                         <span class="min-w-0">
                             <span class="block text-sm font-black sm:text-base">تضليل</span>
-                            <span class="mt-0.5 block text-[10px] text-indigo-100/80 sm:text-xs">افتح نافذة اختيار نوع التضليل والعمل والحجم والدرجة</span>
+                            <span class="mt-0.5 block text-[10px] text-indigo-100/80 sm:text-xs">إضافة عملية تضليل سريعة إلى السلة</span>
                         </span>
                     </span>
                     <span class="shrink-0 text-lg" aria-hidden="true">←</span>
                 </button>
             </div>
+            @endif
 
             {{-- البحث المرن مع التولتيب --}}
             <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl shadow-lg relative group">
@@ -171,17 +173,33 @@
                         <p class="text-gray-400 text-xs mt-1">ابحث عن منتج أو اختر من المنتجات الأكثر بيعًا لإضافته بسرعة.</p>
                     </div>
                     <template x-for="(item, index) in cart" :key="item.temp_id">
-                        <div class="flex flex-col bg-gray-800/40 p-3 rounded-xl border border-gray-800 gap-2 text-right">
+                        <div x-show="!item.tint_group_id || isFirstTintGroupItem(item, index)" class="flex flex-col bg-gray-800/40 p-3 rounded-xl border border-gray-800 gap-2 text-right">
                             <template x-if="item.tint_group_id && isFirstTintGroupItem(item, index)">
-                                <div class="mb-1 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2">
-                                    <div class="min-w-0">
-                                        <span class="block text-xs font-black text-indigo-200" x-text="item.tint_group_label"></span>
-                                        <span class="mt-0.5 block text-[10px] text-indigo-300/70">مكونات عملية تضليل واحدة</span>
+                                <div class="space-y-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-3">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <span class="block text-sm font-black text-indigo-100" x-text="item.tint_group_label"></span>
+                                            <span class="mt-1 block text-xl font-black text-green-400" x-text="Math.round(tintGroupTotal(item.tint_group_id)) + ' ر.س'"></span>
+                                        </div>
+                                        <div class="flex shrink-0 gap-2">
+                                            <button type="button" @click="toggleTintGroupDetails(item.tint_group_id)" class="rounded-lg border border-blue-400/40 bg-blue-500/10 px-3 py-2 text-[10px] font-black text-blue-200" x-text="isTintGroupExpanded(item.tint_group_id) ? 'إخفاء التفاصيل' : 'التفاصيل'"></button>
+                                            <button type="button" @click="removeTintGroup(item.tint_group_id)" class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[10px] font-bold text-red-300">حذف</button>
+                                        </div>
                                     </div>
-                                    <button type="button" @click="removeTintGroup(item.tint_group_id)" class="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300">حذف العملية</button>
+                                    <div x-show="isTintGroupExpanded(item.tint_group_id)" x-transition class="space-y-2 border-t border-indigo-400/20 pt-3">
+                                        <template x-for="detail in tintGroupDetails(item.tint_group_id)" :key="detail.key">
+                                            <div class="flex items-start justify-between gap-3 rounded-lg bg-gray-950/50 px-3 py-2">
+                                                <div class="min-w-0">
+                                                    <span class="block text-xs font-black text-white" x-text="detail.label"></span>
+                                                    <span class="mt-0.5 block text-[10px] text-gray-400" x-text="detail.product + ' — ' + detail.registration"></span>
+                                                </div>
+                                                <span class="shrink-0 text-xs font-black text-green-400" x-text="Math.round(detail.price) + ' ر.س'"></span>
+                                            </div>
+                                        </template>
+                                    </div>
                                 </div>
                             </template>
-                            <div class="flex justify-between items-start">
+                            <div x-show="!item.tint_group_id" class="flex justify-between items-start">
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
                                         <div class="min-w-0">
@@ -243,7 +261,7 @@
                                 </div>
                                 <button x-show="!item.tint_group_id" @click="removeItem(item)" class="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition">🗑️</button>
                             </div>
-                            <div class="flex items-center justify-between border-t border-gray-700/50 pt-2">
+                            <div x-show="!item.tint_group_id" class="flex items-center justify-between border-t border-gray-700/50 pt-2">
                                 <div x-show="!item.is_fractional" class="flex items-center bg-gray-900 rounded-lg p-1 border border-gray-700">
                                     <button @click="decrease(item)" class="w-8 h-8 text-white hover:bg-gray-700 rounded-md font-bold">-</button>
                                     <span class="w-10 text-center text-white font-black text-lg" x-text="item.quantity"></span>
@@ -570,7 +588,9 @@
     </div>
 </div>
 
+@if($hasAvailableTintProducts)
 @include('cashier.quick-sale.partials.tint-modal')
+@endif
 @endsection
 
 @section('scripts')
@@ -580,6 +600,7 @@ function quickSale() {
         search: '',
         results: [],
         cart: [],
+        expandedTintGroups: {},
         labor_total: 0,
         paid_amount: 0,
         agreed_credit_total: 0,
@@ -823,6 +844,26 @@ function quickSale() {
         isFirstTintGroupItem(item, index) {
             if (!item.tint_group_id) return false;
             return this.cart.findIndex(candidate => candidate.tint_group_id === item.tint_group_id) === index;
+        },
+
+        tintGroupItems(groupId) {
+            return this.cart.filter(item => item.tint_group_id === groupId);
+        },
+
+        tintGroupTotal(groupId) {
+            return this.tintGroupItems(groupId).reduce((sum, item) => sum + Number(item.total || 0), 0);
+        },
+
+        tintGroupDetails(groupId) {
+            return this.tintGroupItems(groupId)[0]?.tint_group_details || [];
+        },
+
+        toggleTintGroupDetails(groupId) {
+            this.expandedTintGroups[groupId] = !this.expandedTintGroups[groupId];
+        },
+
+        isTintGroupExpanded(groupId) {
+            return Boolean(this.expandedTintGroups[groupId]);
         },
 
         removeTintGroup(groupId) {
