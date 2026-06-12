@@ -3,7 +3,7 @@
 @section('title', 'البيع السريع المطوّر')
 
 @section('content')
-<div x-data="quickSale()" x-init="init()" class="max-w-full lg:max-w-5xl mx-auto py-4 md:py-10 px-2 md:px-6 text-right" dir="rtl">
+<div x-data="quickSale()" x-init="init()" @tint-items-ready.window="addTintItemsToCart($event.detail)" class="max-w-full lg:max-w-5xl mx-auto py-4 md:py-10 px-2 md:px-6 text-right" dir="rtl">
 
     {{-- 🔥 الشريط العلوي --}}
     <div class="flex flex-col md:flex-row items-center justify-between bg-gray-900 border border-gray-800 px-4 py-4 rounded-2xl mb-6 gap-4 shadow-xl">
@@ -170,12 +170,24 @@
                         <p class="text-white font-bold text-sm">السلة فارغة حالياً</p>
                         <p class="text-gray-400 text-xs mt-1">ابحث عن منتج أو اختر من المنتجات الأكثر بيعًا لإضافته بسرعة.</p>
                     </div>
-                    <template x-for="item in cart" :key="item.temp_id">
+                    <template x-for="(item, index) in cart" :key="item.temp_id">
                         <div class="flex flex-col bg-gray-800/40 p-3 rounded-xl border border-gray-800 gap-2 text-right">
+                            <template x-if="item.tint_group_id && isFirstTintGroupItem(item, index)">
+                                <div class="mb-1 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2">
+                                    <div class="min-w-0">
+                                        <span class="block text-xs font-black text-indigo-200" x-text="item.tint_group_label"></span>
+                                        <span class="mt-0.5 block text-[10px] text-indigo-300/70">مكونات عملية تضليل واحدة</span>
+                                    </div>
+                                    <button type="button" @click="removeTintGroup(item.tint_group_id)" class="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300">حذف العملية</button>
+                                </div>
+                            </template>
                             <div class="flex justify-between items-start">
                                 <div class="flex-1">
                                     <div class="flex items-center gap-2">
-                                        <p class="text-white font-bold text-sm" x-text="item.name"></p>
+                                        <div class="min-w-0">
+                                            <p class="text-white font-bold text-sm" x-text="item.tint_component_label || item.name"></p>
+                                            <p x-show="item.tint_group_id" class="mt-0.5 truncate text-[10px] text-gray-400" x-text="item.name"></p>
+                                        </div>
                                         <template x-if="item.is_splittable && !item.is_fractional">
                                             <span class="text-[10px] bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded border border-blue-700">نظام أطقم</span>
                                         </template>
@@ -201,7 +213,7 @@
                                     </template>
 
                                     {{-- خيارات التجزئة (للمنتجات الرول) --}}
-                                    <template x-if="item.is_fractional">
+                                    <template x-if="item.is_fractional && !item.tint_group_id">
                                         <div class="space-y-2 mt-2">
                                             <select x-model="item.fraction_id" @change="updateFractionPrice(item)" @wheel="preventWheelChange($event)"
                                                     class="w-full bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-2 py-2 outline-none">
@@ -229,7 +241,7 @@
                                         </div>
                                     </template>
                                 </div>
-                                <button @click="removeItem(item)" class="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition">🗑️</button>
+                                <button x-show="!item.tint_group_id" @click="removeItem(item)" class="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition">🗑️</button>
                             </div>
                             <div class="flex items-center justify-between border-t border-gray-700/50 pt-2">
                                 <div x-show="!item.is_fractional" class="flex items-center bg-gray-900 rounded-lg p-1 border border-gray-700">
@@ -792,6 +804,30 @@ function quickSale() {
         increase(item) { if (item.is_fractional) return; item.quantity++; this.calculateItemTotal(item); },
         decrease(item) { if (item.is_fractional) return; if (item.quantity > 1) { item.quantity--; this.calculateItemTotal(item); } },
         removeItem(item) { this.cart = this.cart.filter(i => i.temp_id !== item.temp_id); },
+
+        addTintItemsToCart(detail) {
+            const items = Array.isArray(detail?.items) ? detail.items : [];
+            if (!items.length) return;
+            this.cart.push(...items);
+            this.search = '';
+            this.$nextTick(() => this.$refs.searchInput?.focus());
+            Swal.fire({
+                title: 'تمت الإضافة',
+                text: 'أضيفت عملية التضليل إلى سلة البيع.',
+                icon: 'success',
+                timer: 1200,
+                showConfirmButton: false,
+            });
+        },
+
+        isFirstTintGroupItem(item, index) {
+            if (!item.tint_group_id) return false;
+            return this.cart.findIndex(candidate => candidate.tint_group_id === item.tint_group_id) === index;
+        },
+
+        removeTintGroup(groupId) {
+            this.cart = this.cart.filter(item => item.tint_group_id !== groupId);
+        },
 
         get items_total() { return this.cart.reduce((sum, item) => sum + (Math.round(item.total) || 0), 0); },
         get tax_value() { return (this.items_total * this.tax_rate) / 100; },
