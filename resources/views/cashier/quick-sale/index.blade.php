@@ -12,10 +12,6 @@
             <h1 class="text-lg md:text-xl font-bold text-white">تسجيل بيع جديد</h1>
         </div>
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-            <a href="{{ route('accountant.quick-sale.tint-preview') }}" target="_blank" rel="noopener"
-               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg border border-indigo-400/40 text-sm font-black text-center transition whitespace-nowrap">
-                تضليل
-            </a>
             <div class="text-gray-400 text-sm bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700 text-center font-sans">
                 المحاسب: <span class="font-bold text-blue-400">{{ auth('accountant')->user()->name }}</span>
             </div>
@@ -26,6 +22,22 @@
 
         {{-- العمود الأيمن: البحث والسلة --}}
         <div class="lg:col-span-2 space-y-6">
+            {{-- إجراء سريع في موضع البيع الفعلي، بدل وضعه بجانب بيانات المحاسب. --}}
+            <div class="rounded-2xl border border-indigo-500/30 bg-gradient-to-l from-indigo-950/80 to-gray-900 p-3 shadow-lg sm:p-4">
+                <button type="button"
+                        @click="window.dispatchEvent(new CustomEvent('open-tint-sale-modal'))"
+                        class="flex w-full items-center justify-between gap-3 rounded-xl border border-indigo-400/30 bg-indigo-600 px-4 py-3 text-right text-white shadow-lg shadow-indigo-950/30 transition hover:bg-indigo-500 active:scale-[0.99] sm:py-4">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl">◩</span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-black sm:text-base">تضليل</span>
+                            <span class="mt-0.5 block text-[10px] text-indigo-100/80 sm:text-xs">افتح نافذة اختيار نوع التضليل والعمل والحجم والدرجة</span>
+                        </span>
+                    </span>
+                    <span class="shrink-0 text-lg" aria-hidden="true">←</span>
+                </button>
+            </div>
+
             {{-- البحث المرن مع التولتيب --}}
             <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl shadow-lg relative group">
                 <div class="flex items-center justify-between mb-1">
@@ -545,6 +557,8 @@
         </div>
     </div>
 </div>
+
+@include('cashier.quick-sale.partials.tint-modal')
 @endsection
 
 @section('scripts')
