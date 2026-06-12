@@ -180,7 +180,8 @@
 
             <footer class="flex shrink-0 gap-2 border-t border-gray-800 bg-gray-900 p-3 sm:justify-end sm:px-5">
                 <button type="button" @click="resetBuilder()" class="flex-1 rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-xs font-black text-gray-200 sm:flex-none">بدء جديد</button>
-                <button type="button" @click="addToQuickSaleCart()" :disabled="!resolvedParts.length || stockErrors(resolvedParts).length" class="flex-[2] rounded-xl bg-green-600 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:min-w-48">إضافة إلى السلة</button>
+                {{-- يبقى الزر قابلاً للضغط دائمًا؛ دالة الإضافة تعرض سبب المنع بوضوح بدل تعطيله بصمت. --}}
+                <button type="button" @click="addToQuickSaleCart()" class="flex-[2] rounded-xl bg-green-600 px-4 py-3 text-sm font-black text-white transition hover:bg-green-500 active:scale-[0.99] sm:flex-none sm:min-w-48">إضافة إلى السلة</button>
             </footer>
         </div>
     </div>
