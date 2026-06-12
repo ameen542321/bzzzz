@@ -186,11 +186,21 @@ class QuickSaleController extends Controller
         $productsTotal = 0;
         $productErrors = [];
         $itemsWithDeductions = [];
+        // قد تتضمن عملية التضليل أكثر من سطر يستخدم الرول نفسه (أمامي + خلفي مثلاً).
+        // نجمع المحجوز لكل منتج قبل الخصم الفعلي حتى لا ينجح كل سطر منفرداً ويتجاوز
+        // مجموع الأسطر المخزون المتاح. lockForUpdate يمنع عمليتي بيع متزامنتين من حجز الرول نفسه.
+        $reservedQuantityByProduct = [];
 
         foreach ($items as $index => $item) {
-            $product = Product::where('id', $item['product_id'])->where('store_id', $storeId)->first();
-            if (!$product) {
-                Log::warning('⚠️ منتج غير موجود', ['product_id' => $item['product_id']]);
+            $productId = (int) ($item['product_id'] ?? 0);
+            $product = Product::query()
+                ->where('id', $productId)
+                ->where('store_id', $storeId)
+                ->lockForUpdate()
+                ->first();
+            if (! $product) {
+                $productErrors[] = "تعذر العثور على أحد منتجات البيع داخل المتجر (رقم {$productId}).";
+                Log::warning('⚠️ منتج غير موجود', ['product_id' => $productId, 'store_id' => $storeId]);
                 continue;
             }
 
@@ -220,14 +230,18 @@ class QuickSaleController extends Controller
                     $quantityToDecrement = $product->calculateFinalDeduction($customMeters, 'custom');
                 } elseif ($fractionId && $fractionId !== '0') {
                     $fraction = $product->fractions()->find($fractionId);
-                    if ($fraction) {
-                        // مهم: قيمة deduction_value في خيارات الرول تمثل الأمتار الفعلية المستهلكة.
-                        // مثال: خيار "زجاج أمامي" بقيمة 1.5 مع رول طوله 30م يخصم 1.5م فقط،
-                        // وليس 1.5 × 30م. لذلك نمرر unitType = meter حتى لا تُعامل القيمة كنسبة من الرول.
-                        $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'meter');
+                    if (! $fraction) {
+                        $productErrors[] = "{$product->name}: خيار التجزئة المحدد غير موجود أو لا يتبع هذا المنتج.";
+                        continue;
                     }
+
+                    // مهم: قيمة deduction_value في خيارات الرول تمثل الأمتار الفعلية المستهلكة.
+                    // مثال: خيار "زجاج أمامي" بقيمة 1.5 مع رول طوله 30م يخصم 1.5م فقط،
+                    // وليس 1.5 × 30م. لذلك نمرر unitType = meter حتى لا تُعامل القيمة كنسبة من الرول.
+                    $quantityToDecrement = $product->calculateFinalDeduction($fraction->deduction_value, 'meter');
                 } else {
-                    $quantityToDecrement = (float) $item['quantity'];
+                    $productErrors[] = "{$product->name}: يجب تحديد خيار التجزئة أو اختيار قص مخصص.";
+                    continue;
                 }
             }
             // 2. إذا كان نظام أطقم وتم البيع "بالحبة"
@@ -239,16 +253,28 @@ class QuickSaleController extends Controller
                 $quantityToDecrement = (float) $item['quantity'];
             }
 
-            // التحقق من المخزون
-            if (round($product->quantity, 4) < round($quantityToDecrement, 4)) {
-                $productErrors[] = "{$product->name}: المخزون غير كافٍ. المتوفر: " . number_format($product->quantity, 3);
+            if ($quantityToDecrement <= 0) {
+                $productErrors[] = "{$product->name}: كمية الخصم المحسوبة يجب أن تكون أكبر من صفر.";
+                continue;
+            }
+
+            // التحقق من مجموع ما حُجز من المنتج داخل العملية نفسها، وليس من السطر منفرداً فقط.
+            $alreadyReserved = (float) ($reservedQuantityByProduct[$product->id] ?? 0);
+            $requiredForProduct = $alreadyReserved + $quantityToDecrement;
+            if (round((float) $product->quantity, 4) < round($requiredForProduct, 4)) {
+                $productErrors[] = "{$product->name}: المخزون غير كافٍ. المتوفر: "
+                    . number_format((float) $product->quantity, 3)
+                    . "، المطلوب للعملية: " . number_format($requiredForProduct, 3);
                 Log::warning('⚠️ مخزون غير كاف', [
                     'product' => $product->name,
                     'available' => $product->quantity,
-                    'required' => $quantityToDecrement
+                    'already_reserved' => $alreadyReserved,
+                    'line_required' => $quantityToDecrement,
+                    'operation_required' => $requiredForProduct,
                 ]);
                 continue;
             }
+            $reservedQuantityByProduct[$product->id] = $requiredForProduct;
 
             $itemUnitPrice = (float) ($item['price'] ?? 0);
             $itemQuantityForSale = $product->product_type === 'fractional' ? 1.0 : $requestedQuantity;
@@ -280,7 +306,13 @@ class QuickSaleController extends Controller
             $itemsWithDeductions[] = [
                 'product' => $product,
                 'quantity_to_subtract' => $quantityToDecrement,
-                'note' => ($product->is_splittable && $saleUnit === 'piece') ? "بيع حبة من طقم (عدد {$requestedQuantity})" : ($isCustom ? "قص مخصص: $customMeters متر" : "بيع عادي"),
+                'note' => ($product->is_splittable && $saleUnit === 'piece')
+                    ? "بيع حبة من طقم (عدد {$requestedQuantity})"
+                    : ($isCustom
+                        ? "قص مخصص: $customMeters متر"
+                        : ($product->product_type === 'fractional'
+                            ? "خيار رول: {$fraction->option_label}"
+                            : "بيع عادي")),
                 'row_data' => [
                     'product_id'          => $item['product_id'],
                     'fraction_id'         => ($isCustom || !$fractionId) ? null : $fractionId,
