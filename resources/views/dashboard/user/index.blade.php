@@ -3,6 +3,29 @@
 @section('title', 'لوحة التحكم')
 
 @section('content')
+@php
+    /*
+     * قيم توافق آمنة لنسخة واجهة لوحة المالك الموسعة.
+     * تبقى الواجهة قابلة للعمل مع الكنترولر الأصلي، وتعرض القيم الفارغة فقط
+     * للبيانات الإضافية التي لا يرسلها الكنترولر بدل ظهور Undefined variable.
+     */
+    $selectedSummaryStore = $selectedSummaryStore ?? null;
+    $dailySalesOperationsCount = $dailySalesOperationsCount ?? 0;
+    $dailyCashSales = $dailyCashSales ?? 0;
+    $dailyCardSales = $dailyCardSales ?? 0;
+    $productsCostMonth = $productsCostMonth ?? 0;
+    $longOpenShifts = $longOpenShifts ?? collect();
+    $employeesWithoutSalaryCount = $employeesWithoutSalaryCount ?? 0;
+    $employeesWithoutSalary = $employeesWithoutSalary ?? collect();
+    $lowStockCount = $lowStockCount ?? 0;
+    $lowStockProducts = $lowStockProducts ?? collect();
+    $topSellingProducts = $topSellingProducts ?? collect();
+    $bestStorePerformance = $bestStorePerformance ?? null;
+    $worstStorePerformance = $worstStorePerformance ?? null;
+    $chartProductCosts = $chartProductCosts ?? [];
+    $employeeMonthlyWithdrawals = $employeeMonthlyWithdrawals ?? [];
+    $employeeSalaryRemainders = $employeeSalaryRemainders ?? [];
+@endphp
 <div class="p-6 space-y-10">
 
     {{-- ========================================================= --}}
