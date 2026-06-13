@@ -21,6 +21,11 @@ class UserDashboardController extends Controller
         $stores = $user->stores;
         $storeIds = $stores->pluck('id');
 
+        // قيمة افتراضية آمنة للمتجر المعروض في ملخص اللوحة.
+        // بعض نسخ واجهة لوحة المالك تستخدم هذا المتغير لاختيار متجر الملخص،
+        // لذلك يجب إرساله دائمًا حتى عند عدم تمرير اختيار صريح من الطلب.
+        $selectedSummaryStore = $stores->first();
+
         // حالة المتاجر 0: إذا لم يكن هناك متاجر، نرسل بيانات صفرية لتجنب أخطاء SQL
         if ($storeIds->isEmpty()) {
             return view('dashboard.user.index', $this->emptyStateData($user, $stores));
@@ -293,6 +298,7 @@ class UserDashboardController extends Controller
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
+            'selectedSummaryStore',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
     }
@@ -386,6 +392,7 @@ class UserDashboardController extends Controller
             'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0, 'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
             'metricStoreBreakdowns' => [],
+            'selectedSummaryStore' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
         ];
