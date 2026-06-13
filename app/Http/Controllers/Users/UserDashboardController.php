@@ -65,6 +65,16 @@ class UserDashboardController extends Controller
             ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
             ->value('products_cost');
 
+        // عندما تكون تكلفة أسطر البيع محفوظة نستخدمها مباشرة، خصوصاً للرولات
+        // التي يحتوي cost_price فيها على تكلفة الرول الكامل وليس تكلفة المتر.
+        $productsCostToday = $this->calculateSavedSaleItemsCost(
+            $storeIds,
+            today()->startOfDay(),
+            today()->endOfDay(),
+            $includedSaleTypes,
+            (float) $productsCostToday
+        );
+
 
         // مبيعات الشهر (محصّل فعلي) مع استبعاد الفواتير اليدوية من المؤشر
         $salesMonth = Sale::whereIn('store_id', $storeIds)
@@ -186,6 +196,14 @@ class UserDashboardController extends Controller
                 ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as products_cost')
                 ->value('products_cost');
 
+            $storeProductsCostToday = $this->calculateSavedSaleItemsCost(
+                [$storeId],
+                today()->startOfDay(),
+                today()->endOfDay(),
+                $includedSaleTypes,
+                (float) $storeProductsCostToday
+            );
+
             $storeExpensesToday = Expense::where('store_id', $storeId)
                 ->whereDate('created_at', today())
                 ->sum('amount');
@@ -277,6 +295,57 @@ class UserDashboardController extends Controller
             'creditOpen', 'metricStoreBreakdowns',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
+    }
+
+    /**
+     * يجمع تكلفة أسطر البيع المحفوظة دون تغيير معادلات اللوحة الأخرى.
+     * إذا وُجدت عملية لا تحتوي total_cost لجميع أسطرها نضيف تكلفتها القديمة
+     * من sales بدلاً من إسقاطها من الإجمالي.
+     */
+    private function calculateSavedSaleItemsCost($storeIds, $start, $end, array $saleTypes, float $legacyFallback): float
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('sale_items', 'total_cost')) {
+            return $legacyFallback;
+        }
+
+        $storeIds = collect($storeIds)->map(fn ($id) => (int) $id)->filter()->values()->all();
+        if (empty($storeIds)) {
+            return 0.0;
+        }
+
+        $salesCosts = DB::table('sales')
+            ->leftJoin('sale_items', 'sales.id', '=', 'sale_items.sale_id')
+            ->whereIn('sales.store_id', $storeIds)
+            ->whereBetween('sales.created_at', [$start, $end])
+            ->whereIn('sales.sale_type', $saleTypes)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
+            ->groupBy(
+                'sales.id',
+                'sales.products_total',
+                'sales.labor_total',
+                'sales.profit'
+            )
+            ->selectRaw('sales.id')
+            ->selectRaw('COUNT(sale_items.id) as items_count')
+            ->selectRaw('SUM(CASE WHEN sale_items.total_cost IS NOT NULL THEN 1 ELSE 0 END) as costed_items_count')
+            ->selectRaw('COALESCE(SUM(sale_items.total_cost), 0) as saved_items_cost')
+            ->selectRaw('COALESCE((sales.products_total + sales.labor_total) - sales.profit, 0) as legacy_cost');
+
+        return (float) DB::query()
+            ->fromSub($salesCosts, 'sales_costs')
+            ->selectRaw(
+                'COALESCE(SUM(
+                    CASE
+                        WHEN items_count > 0 AND items_count = costed_items_count
+                        THEN saved_items_cost
+                        ELSE legacy_cost
+                    END
+                ), 0) as total_cost'
+            )
+            ->value('total_cost');
     }
 
     private function prepareChartData($storeIds)
