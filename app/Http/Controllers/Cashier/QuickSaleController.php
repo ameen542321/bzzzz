@@ -227,6 +227,11 @@ class QuickSaleController extends Controller
 
             // 1. إذا كان منتج رول (مجزأ)
             if ($product->product_type === 'fractional') {
+                if ((float) $product->roll_length <= 0) {
+                    $productErrors[] = "{$product->name}: طول الرول غير مضبوط، ولا يمكن حساب تكلفة الأمتار المباعة.";
+                    continue;
+                }
+
                 if (abs($requestedQuantity - 1.0) > 0.0001) {
                     $productErrors[] = "{$product->name}: منتجات الرول تُباع كسطر مستقل لكل خيار، ولا يمكن تغيير الكمية.";
                     continue;
@@ -308,11 +313,26 @@ class QuickSaleController extends Controller
                 $costQuantity = $requestedQuantity;
             }
 
-            $itemCostTotal = ProductProfitCostCalculator::calculateItemCost($product, [
-                'quantity' => $costQuantity,
-                'unit_type' => $costUnitType,
-                'custom_consumption' => $costConsumedMeters,
-            ]);
+            if ($product->product_type === 'fractional') {
+                // هذه هي نقطة احتساب تكلفة الرول الوحيدة وقت البيع:
+                // تكلفة السطر = (تكلفة الرول الكامل ÷ طول الرول) × الأمتار المخصومة بعد الهالك.
+                // نحفظ الناتج في total_cost حتى لا تعيد كل صفحة تقرير تفسير تكلفة الرول بطريقتها.
+                $itemCostTotal = (
+                    (float) ($product->cost_price ?? 0)
+                    / (float) $product->roll_length
+                ) * $quantityToDecrement;
+            } else {
+                $itemCostTotal = ProductProfitCostCalculator::calculateItemCost($product, [
+                    'quantity' => $costQuantity,
+                    'unit_type' => $costUnitType,
+                    'custom_consumption' => $costConsumedMeters,
+                ]);
+            }
+
+            // حقول التكلفة في sale_items من نوع decimal(10,2)، لذلك نوحد الربح المحفوظ
+            // مع القيمة التي ستقرأها التقارير من قاعدة البيانات.
+            // الإضافة الصغيرة تمنع تمثيل الأعداد العشرية الثنائية من تحويل 39.545 مثلاً إلى 39.54.
+            $itemCostTotal = round($itemCostTotal + 1e-9, 2, PHP_ROUND_HALF_UP);
             $totalProfit += ($itemLineTotal - $itemCostTotal);
 
             $itemsWithDeductions[] = [
