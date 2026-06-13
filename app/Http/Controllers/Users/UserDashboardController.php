@@ -292,6 +292,12 @@ class UserDashboardController extends Controller
             ];
         }
 
+        // بعض نسخ واجهة لوحة المالك تعرض المتجر الأفضل أداءً بصورة مستقلة.
+        // نجهز بياناته من نفس ملخص المتاجر حتى لا تعتمد الواجهة على متغير غير مرسل.
+        $bestStorePerformance = collect($metricStoreBreakdowns)
+            ->sortByDesc('profit_month')
+            ->first();
+
         return view('dashboard.user.index', array_merge(compact(
             'stores', 'accountantsCount', 'employeesCount', 'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
             'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
@@ -299,6 +305,7 @@ class UserDashboardController extends Controller
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
             'creditOpen', 'metricStoreBreakdowns',
             'selectedSummaryStore',
+            'bestStorePerformance',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
     }
@@ -393,6 +400,7 @@ class UserDashboardController extends Controller
             'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0, 'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
             'metricStoreBreakdowns' => [],
             'selectedSummaryStore' => null,
+            'bestStorePerformance' => null,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [], 'chartCredit' => []
         ];
