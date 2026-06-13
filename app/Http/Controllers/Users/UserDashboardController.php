@@ -218,7 +218,10 @@ class UserDashboardController extends Controller
 
         $employeeMonthlyWithdrawals = DB::table('employees')
             ->leftJoin('employee_withdrawals', function ($join) {
-                $join->on('employees.id', '=', 'employee_withdrawals.employee_id')
+                // جدول السحوبات حُوّل إلى علاقة polymorphic؛ الموظف محفوظ في
+                // person_id وليس employee_id، مع تحديد نوعه في person_type.
+                $join->on('employees.id', '=', 'employee_withdrawals.person_id')
+                    ->where('employee_withdrawals.person_type', Employee::class)
                     ->whereYear('employee_withdrawals.created_at', now()->year)
                     ->whereMonth('employee_withdrawals.created_at', now()->month);
             })
