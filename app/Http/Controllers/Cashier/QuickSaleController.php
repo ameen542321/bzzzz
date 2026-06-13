@@ -198,6 +198,7 @@ class QuickSaleController extends Controller
         $productsTotal = 0;
         $productErrors = [];
         $itemsWithDeductions = [];
+        $hasFractionalItems = false;
         // قد تتضمن عملية التضليل أكثر من سطر يستخدم الرول نفسه (أمامي + خلفي مثلاً).
         // نجمع المحجوز لكل منتج قبل الخصم الفعلي حتى لا ينجح كل سطر منفرداً ويتجاوز
         // مجموع الأسطر المخزون المتاح. lockForUpdate يمنع عمليتي بيع متزامنتين من حجز الرول نفسه.
@@ -227,6 +228,8 @@ class QuickSaleController extends Controller
 
             // 1. إذا كان منتج رول (مجزأ)
             if ($product->product_type === 'fractional') {
+                $hasFractionalItems = true;
+
                 if ((float) $product->roll_length <= 0) {
                     $productErrors[] = "{$product->name}: طول الرول غير مضبوط، ولا يمكن حساب تكلفة الأمتار المباعة.";
                     continue;
@@ -441,6 +444,24 @@ class QuickSaleController extends Controller
                 ->withInput();
         }
 
+        if ($hasFractionalItems) {
+            // تثبيت خاص بالعمليات التي تحتوي رول/تضليل فقط:
+            // الربح النهائي للمنتجات يجب أن يطابق مجموع total_cost الذي سيُحفظ فعلياً
+            // في sale_items، حتى لا تنشأ أي قيمة مختلفة في sales.profit.
+            $storedItemsCost = array_sum(array_map(
+                fn (array $itemData) => (float) ($itemData['row_data']['total_cost'] ?? 0),
+                $itemsWithDeductions
+            ));
+
+            $totalProfit = round(
+                ($productsTotal - $storedItemsCost) + 1e-9,
+                2,
+                PHP_ROUND_HALF_UP
+            );
+        }
+
+        // أجرة اليد تبقى كما هي في النظام الحالي. وعملية أجرة اليد دون منتجات
+        // لا تدخل شرط الرول أعلاه، لذلك لا يتغير مسارها أو احتسابها.
         $totalProfit += $request->labor_total;
 
         // إنشاء سجل البيع مع احترام تاريخ العملية المثبت في واجهة البيع السريع.
