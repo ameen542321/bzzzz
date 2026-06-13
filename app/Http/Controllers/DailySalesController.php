@@ -9,6 +9,7 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
+use App\Support\ProductProfitCostCalculator;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,8 @@ class DailySalesController extends Controller
                 'sale_items.quantity as item_quantity',
                 'sale_items.price as item_price',
                 'sale_items.total as item_total',
+                'sale_items.cost_price as item_cost_price',
+                'sale_items.total_cost as item_total_cost',
                 'sale_items.is_custom',
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
@@ -152,6 +155,8 @@ class DailySalesController extends Controller
                     'quantity' => $row->item_quantity,
                     'price' => $row->item_price,
                     'total' => $row->item_total,
+                    'cost_price_at_sale' => $row->item_cost_price,
+                    'total_cost_at_sale' => $row->item_total_cost,
                     'is_custom' => $row->is_custom,
                     'custom_name' => $row->custom_name,
                     'custom_consumption' => $row->custom_consumption,
@@ -506,6 +511,8 @@ class DailySalesController extends Controller
                 'sale_items.quantity as item_quantity',
                 'sale_items.price as item_price',
                 'sale_items.total as item_total',
+                'sale_items.cost_price as item_cost_price',
+                'sale_items.total_cost as item_total_cost',
                 'sale_items.is_custom',
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
@@ -541,6 +548,8 @@ class DailySalesController extends Controller
                 'quantity' => $row->item_quantity,
                 'price' => $row->item_price,
                 'total' => $row->item_total,
+                'cost_price_at_sale' => $row->item_cost_price,
+                'total_cost_at_sale' => $row->item_total_cost,
                 'is_custom' => $row->is_custom,
                 'custom_name' => $row->custom_name,
                 'custom_consumption' => $row->custom_consumption,
@@ -989,6 +998,7 @@ class DailySalesController extends Controller
                 ->forceDelete();
 
             $sale->items()->delete();
+            // Sale لا يستخدم SoftDeletes حالياً؛ delete هنا حذف نهائي من جدول sales.
             $sale->delete();
         });
 
@@ -1032,7 +1042,28 @@ class DailySalesController extends Controller
             $itemTotal = $item->total ?? ($item->price * $item->quantity);
 
             // تكلفة المنتج
-            $itemCost = $item->cost_price * $stockQuantity;
+            $costPrice = (float) (((float) ($item->cost_price_at_sale ?? 0) > 0)
+                ? $item->cost_price_at_sale
+                : ($item->cost_price ?? 0));
+
+            if ((float) ($item->total_cost_at_sale ?? 0) > 0) {
+                // التكلفة حُسبت وحُفظت وقت البيع؛ لا نعيد تفسيرها في صفحة المبيعات.
+                $itemCost = (float) $item->total_cost_at_sale;
+            } elseif (($item->product_type ?? null) === 'fractional') {
+                // fallback للعمليات القديمة فقط التي لا تحتوي total_cost.
+                $itemCost = ProductProfitCostCalculator::calculateItemCost([
+                    'cost_price' => $costPrice,
+                    'product_type' => $item->product_type,
+                    'roll_length' => $item->roll_length,
+                ], [
+                    'quantity' => $item->quantity,
+                    'custom_consumption' => $stockQuantity,
+                    'unit_type' => 'meter',
+                ]);
+            } else {
+                // العمليات القديمة قبل أعمدة التكلفة تُحسب بالطريقة السابقة: تكلفة الوحدة × الكمية.
+                $itemCost = $costPrice * $stockQuantity;
+            }
 
             // ربح المنتج
             $itemProfit = $itemTotal - $itemCost;

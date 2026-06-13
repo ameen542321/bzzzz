@@ -865,54 +865,29 @@ class DashboardController extends Controller
     }
 }
 
-  private function calculateProductsProfit($storeId, $startTime, $endTime)
-{
-    $totalSalesValue = 0;
-    $totalCostValue = 0;
+    private function calculateProductsProfit($storeId, $startTime, $endTime)
+    {
+        $summary = Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$startTime, $endTime])
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->selectRaw('COALESCE(SUM(products_total), 0) as sales_value')
+            // الربح يُحسب ويحفظ وقت البيع من تكلفة كل سطر. لذلك نستخرج التكلفة
+            // من سجل العملية نفسه ولا نعيد حساب الرولات من جدول المنتجات الحالي.
+            ->selectRaw('COALESCE(SUM((products_total + labor_total) - profit), 0) as cost_value')
+            ->first();
 
-    Sale::where('store_id', $storeId)
-        ->whereBetween('created_at', [$startTime, $endTime])
-        ->where(function ($query) {
-            $query->whereNull('description')
-                ->orWhere('description', '!=', 'manual_invoice_entry');
-        })
-        ->with(['items' => function($query) {
-            $query->select('sale_id', 'product_id', 'quantity', 'price');
-        }])
-        ->select('id')
-        ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
-            foreach ($salesChunk as $sale) {
-                foreach ($sale->items as $item) {
-                    $totalSalesValue += $item->quantity * $item->price;
+        $totalSalesValue = (float) ($summary->sales_value ?? 0);
+        $totalCostValue = max(0, (float) ($summary->cost_value ?? 0));
 
-                    $product = DB::table('products')
-                        ->where('id', $item->product_id)
-                        ->select('cost_price', 'is_splittable', 'items_per_unit')
-                        ->first();
-
-                    if ($product && $product->cost_price) {
-                        // إذا كان المنتج طقماً وتم بيعه بالحبة
-                        if ($product->is_splittable == 1 && $product->items_per_unit > 0) {
-                            // تكلفة الحبة = تكلفة الطقم ÷ عدد الحبات
-                            $costPerPiece = $product->cost_price / $product->items_per_unit;
-                            $itemCost = $item->quantity * $costPerPiece;
-                        } else {
-                            // منتج عادي أو طقم كامل
-                            $itemCost = $item->quantity * $product->cost_price;
-                        }
-
-                        $totalCostValue += $itemCost;
-                    }
-                }
-            }
-        });
-
-    return [
-        'sales_value' => $totalSalesValue,
-        'cost_value' => $totalCostValue,
-        'profit' => $totalSalesValue - $totalCostValue,
-    ];
-}
+        return [
+            'sales_value' => $totalSalesValue,
+            'cost_value' => $totalCostValue,
+            'profit' => $totalSalesValue - $totalCostValue,
+        ];
+    }
     private function generateReportAndWhatsApp($store, $accountant, $reportData)
     {
         // 1. التحقق من الحد اليومي
