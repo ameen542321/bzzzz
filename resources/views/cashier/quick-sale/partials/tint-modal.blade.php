@@ -40,8 +40,21 @@
                     </section>
 
                     <section x-show="fullMode" class="space-y-3">
+                        <div class="grid grid-cols-3 gap-2 rounded-2xl border border-indigo-500/25 bg-gray-900/80 p-2">
+                            <template x-for="component in fullComponents" :key="'tab-' + component.id">
+                                <button
+                                    type="button"
+                                    @click="activeWork = component.id"
+                                    :class="activeWork === component.id ? activeButton : idleButton"
+                                    class="rounded-xl border px-2 py-2.5 text-[11px] font-black transition sm:text-xs"
+                                >
+                                    <span x-text="component.shortLabel"></span>
+                                    <span x-show="isFullComponentComplete(component)" class="mr-1 text-emerald-200">✓</span>
+                                </button>
+                            </template>
+                        </div>
                         <template x-for="component in fullComponents" :key="component.id">
-                            <div :id="'tint-full-' + component.id" class="scroll-mt-3 rounded-2xl border border-indigo-500/25 bg-gray-900/80 p-3 sm:p-4">
+                            <div x-show="activeWork === component.id" :id="'tint-full-' + component.id" class="rounded-2xl border border-indigo-500/25 bg-gray-900/80 p-3 sm:p-4">
                                 <div class="mb-3 flex items-center justify-between gap-2">
                                     <div>
                                         <h3 class="text-sm font-black text-white" x-text="component.label"></h3>
@@ -70,7 +83,7 @@
                                         <span class="mb-1.5 block text-[10px] font-bold text-gray-400">الدرجة</span>
                                         <div class="flex flex-wrap gap-2">
                                             <template x-for="grade in gradesFor(component.work, fullSelections[component.id].type, fullSelections[component.id].size)" :key="grade">
-                                                <button type="button" @click="selectGrade(fullSelections[component.id], grade)" :class="fullSelections[component.id].grade === grade ? activeButton : idleButton" class="rounded-lg border px-3 py-2 text-xs font-black" x-text="grade"></button>
+                                                <button type="button" @click="selectGrade(fullSelections[component.id], grade); advanceFullComponent(component.id)" :class="fullSelections[component.id].grade === grade ? activeButton : idleButton" class="rounded-lg border px-3 py-2 text-xs font-black" x-text="grade"></button>
                                             </template>
                                         </div>
                                     </div>
@@ -82,10 +95,10 @@
 
                     <section x-show="!fullMode && selectedWorks.length" class="space-y-3">
                         <template x-for="work in selectedWorks" :key="work">
-                            <div :id="'tint-work-' + work" class="scroll-mt-3 rounded-2xl border border-gray-800 bg-gray-900/80 p-3 sm:p-4">
+                            <div x-show="activeWork === work" :id="'tint-work-' + work" class="rounded-2xl border border-gray-800 bg-gray-900/80 p-3 sm:p-4">
                                 <div class="mb-3 flex items-center justify-between gap-2">
                                     <h3 class="text-sm font-black text-white" x-text="workLabel(work) + (work === 'window' ? ' × ' + windowCount : '')"></h3>
-                                    <button type="button" @click="toggleWork(work)" class="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300">إلغاء</button>
+                                    <button type="button" @click="removeWork(work)" class="rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-300">إلغاء</button>
                                 </div>
                                 <div class="space-y-3">
                                     <div>
@@ -108,7 +121,7 @@
                                         <span class="mb-1.5 block text-[10px] font-bold text-gray-400">الدرجة</span>
                                         <div class="flex flex-wrap gap-2">
                                             <template x-for="grade in gradesFor(work, workSelections[work]?.type, workSelections[work]?.size)" :key="grade">
-                                                <button type="button" @click="selectGrade(workSelections[work], grade)" :class="workSelections[work]?.grade === grade ? activeButton : idleButton" class="rounded-lg border px-3 py-2 text-xs font-black" x-text="grade"></button>
+                                                <button type="button" @click="selectGrade(workSelections[work], grade); advanceSelectedWork(work)" :class="workSelections[work]?.grade === grade ? activeButton : idleButton" class="rounded-lg border px-3 py-2 text-xs font-black" x-text="grade"></button>
                                             </template>
                                         </div>
                                     </div>
@@ -193,15 +206,15 @@ function tintSaleModal(config) {
     return {
         open: false,
         products: [], types: [], sizes: [],
-        fullMode: false, selectedWorks: [], workSelections: {},
+        fullMode: false, selectedWorks: [], workSelections: {}, activeWork: '',
         fullSelections: { front: { type: '', size: '', grade: '' }, rear: { type: '', size: '', grade: '' }, windows: { type: '', size: '', grade: '' } },
         windowCount: 1, customOpen: false, customRows: [], customSequence: 0, finalPrice: 0,
         activeButton: 'border-blue-400 bg-blue-600 text-white ring-1 ring-blue-300',
         idleButton: 'border-gray-700 bg-gray-800 text-gray-200 hover:border-blue-500/60 hover:bg-gray-700',
         fullComponents: [
-            { id: 'front', work: 'front', label: 'الأمامي', hint: 'المقاس المعتاد: كبير.', quantity: 1 },
-            { id: 'rear', work: 'rear', label: 'الخلفي', hint: 'المقاس المعتاد: كبير.', quantity: 1 },
-            { id: 'windows', work: 'window', label: 'الجوانب والدرايش', hint: 'المقاس المعتاد: صغير.', quantity: 4 },
+            { id: 'front', work: 'front', shortLabel: 'أمامي', label: 'الأمامي', hint: 'المقاس المعتاد: كبير.', quantity: 1 },
+            { id: 'rear', work: 'rear', shortLabel: 'خلفي', label: 'الخلفي', hint: 'المقاس المعتاد: كبير.', quantity: 1 },
+            { id: 'windows', work: 'window', shortLabel: 'درايش', label: 'الجوانب والدرايش', hint: 'المقاس المعتاد: صغير.', quantity: 4 },
         ],
 
         init() {
@@ -256,13 +269,40 @@ function tintSaleModal(config) {
         selectFullWork() {
             this.fullMode = true; this.selectedWorks = []; this.workSelections = {};
             this.fullSelections = { front: this.emptySelection(), rear: this.emptySelection(), windows: this.emptySelection() };
-            this.syncPrice(); this.$nextTick(() => document.getElementById('tint-full-front')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            this.activeWork = 'front';
+            this.syncPrice();
         },
         toggleWork(work) {
             this.fullMode = false; this.fullSelections = { front: this.emptySelection(), rear: this.emptySelection(), windows: this.emptySelection() };
-            if (this.selectedWorks.includes(work)) { this.selectedWorks = this.selectedWorks.filter(item => item !== work); delete this.workSelections[work]; }
-            else { this.selectedWorks.push(work); this.workSelections[work] = this.emptySelection(); this.$nextTick(() => document.getElementById(`tint-work-${work}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }
+            if (this.selectedWorks.includes(work)) {
+                // الضغط على عمل محدد ينقلك إلى حقوله، وزر «إلغاء» داخل البطاقة هو المسؤول عن حذفه.
+                this.activeWork = work;
+            } else {
+                this.selectedWorks.push(work);
+                this.workSelections[work] = this.emptySelection();
+                this.activeWork = work;
+            }
             this.syncPrice();
+        },
+        removeWork(work) {
+            this.selectedWorks = this.selectedWorks.filter(item => item !== work);
+            delete this.workSelections[work];
+            this.activeWork = this.selectedWorks[0] || '';
+            this.syncPrice();
+        },
+        isFullComponentComplete(component) {
+            const selection = this.fullSelections[component.id];
+            return Boolean(selection?.type && selection?.size && selection?.grade);
+        },
+        advanceFullComponent(componentId) {
+            const currentIndex = this.fullComponents.findIndex(component => component.id === componentId);
+            const nextComponent = this.fullComponents[currentIndex + 1];
+            if (nextComponent) this.activeWork = nextComponent.id;
+        },
+        advanceSelectedWork(work) {
+            const currentIndex = this.selectedWorks.indexOf(work);
+            const nextWork = this.selectedWorks[currentIndex + 1];
+            if (nextWork) this.activeWork = nextWork;
         },
         productsFor(work, typeId = '', size = '', grade = '') {
             return this.products.filter(product => (!typeId || product.typeId === typeId) && (!size || product.size === size) && (!grade || product.grade === grade) && product.fractions.some(fraction => fraction.work === work));
@@ -307,7 +347,7 @@ function tintSaleModal(config) {
         customHasStock(row) { const product = this.customProduct(row); if (!product || Number(row.meters) <= 0) return true; return Number(row.meters) * (1 + product.waste / 100) <= product.stock + 0.0001; },
         customStockMessage(row) { const product = this.customProduct(row); if (!product || Number(row.meters) <= 0) return ''; const required = Number(row.meters) * (1 + product.waste / 100); return this.customHasStock(row) ? `متوفر: يحتاج ${required.toFixed(2)}م من ${product.stock.toFixed(2)}م.` : `الكمية لا تكفي: يحتاج ${required.toFixed(2)}م والمتوفر ${product.stock.toFixed(2)}م.`; },
         partDisplayRegistration(part) { return part.work === 'custom' ? `مخصص — ${part.sourceFractionLabel} — ${part.customMeters}م` : `${part.fraction.label} — ${part.fraction.meters}م${part.quantity > 1 ? ` × ${part.quantity}` : ''}`; },
-        resetBuilder() { this.fullMode = false; this.selectedWorks = []; this.workSelections = {}; this.fullSelections = { front: this.emptySelection(), rear: this.emptySelection(), windows: this.emptySelection() }; this.windowCount = 1; this.customOpen = false; this.customRows = []; this.finalPrice = 0; },
+        resetBuilder() { this.fullMode = false; this.selectedWorks = []; this.workSelections = {}; this.activeWork = ''; this.fullSelections = { front: this.emptySelection(), rear: this.emptySelection(), windows: this.emptySelection() }; this.windowCount = 1; this.customOpen = false; this.customRows = []; this.finalPrice = 0; },
         money(value) { return Number(value || 0).toFixed(2) + ' ر.س'; },
         distributeFinalPrice(parts) {
             const target = Number(this.finalPrice || 0), recorded = parts.reduce((sum, part) => sum + part.unitPrice, 0); let remaining = target;

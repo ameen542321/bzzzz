@@ -62,6 +62,8 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
+                'sale_items.roll_length_at_sale',
+                'sale_items.unit_type as item_unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
                 'products.product_type as product_type',
@@ -161,6 +163,8 @@ class DailySalesController extends Controller
                     'custom_name' => $row->custom_name,
                     'custom_consumption' => $row->custom_consumption,
                     'custom_meters' => $row->custom_meters,
+                    'roll_length_at_sale' => $row->roll_length_at_sale,
+                    'unit_type' => $row->item_unit_type,
                     'product_name' => $row->product_name ?? 'منتج غير معروف',
                     'cost_price' => $row->product_cost_price ?? 0,
                     'product_type' => $row->product_type,
@@ -517,6 +521,8 @@ class DailySalesController extends Controller
                 'sale_items.custom_name',
                 'sale_items.custom_consumption',
                 'sale_items.custom_meters',
+                'sale_items.roll_length_at_sale',
+                'sale_items.unit_type as item_unit_type',
                 'products.name as product_name',
                 'products.cost_price as product_cost_price',
                 'products.product_type as product_type',
@@ -554,6 +560,8 @@ class DailySalesController extends Controller
                 'custom_name' => $row->custom_name,
                 'custom_consumption' => $row->custom_consumption,
                 'custom_meters' => $row->custom_meters,
+                'roll_length_at_sale' => $row->roll_length_at_sale,
+                'unit_type' => $row->item_unit_type,
                 'product_name' => $row->product_name ?? 'منتج غير معروف',
                 'cost_price' => $row->product_cost_price ?? 0,
                 'product_type' => $row->product_type,
@@ -1046,20 +1054,23 @@ class DailySalesController extends Controller
                 ? $item->cost_price_at_sale
                 : ($item->cost_price ?? 0));
 
-            if ((float) ($item->total_cost_at_sale ?? 0) > 0) {
-                // عند توفر تكلفة وقت البيع نستخدمها حتى لا تتغير أرباح العمليات القديمة عند تغيير تكلفة المنتج لاحقاً.
-                $itemCost = (float) $item->total_cost_at_sale;
-            } elseif (($item->product_type ?? null) === 'fractional') {
-                // إذا كانت تكلفة السطر فارغة نحسب الرول من تكلفة وقت البيع إن وجدت، وإلا من تكلفة المنتج الحالية.
+            if (($item->product_type ?? null) === 'fractional') {
+                // تكلفة الرول تُحسب دائماً من الأمتار الفعلية المحفوظة، حتى لو احتوى
+                // total_cost لسطر قديم على تكلفة الرول الكامل بالخطأ.
                 $itemCost = ProductProfitCostCalculator::calculateItemCost([
                     'cost_price' => $costPrice,
                     'product_type' => $item->product_type,
-                    'roll_length' => $item->roll_length,
+                    'roll_length' => (float) (($item->roll_length_at_sale ?? 0) > 0
+                        ? $item->roll_length_at_sale
+                        : $item->roll_length),
                 ], [
                     'quantity' => $item->quantity,
                     'custom_consumption' => $stockQuantity,
                     'unit_type' => 'meter',
                 ]);
+            } elseif ((float) ($item->total_cost_at_sale ?? 0) > 0) {
+                // عند توفر تكلفة وقت البيع نستخدمها للمنتجات غير الكسرية.
+                $itemCost = (float) $item->total_cost_at_sale;
             } else {
                 // العمليات القديمة قبل أعمدة التكلفة تُحسب بالطريقة السابقة: تكلفة الوحدة × الكمية.
                 $itemCost = $costPrice * $stockQuantity;

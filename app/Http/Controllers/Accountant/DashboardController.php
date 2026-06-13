@@ -18,6 +18,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use App\Support\ArabicPdf as PDF;
+use App\Support\ProductProfitCostCalculator;
 
 class DashboardController extends Controller
 {
@@ -865,54 +866,87 @@ class DashboardController extends Controller
     }
 }
 
-  private function calculateProductsProfit($storeId, $startTime, $endTime)
-{
-    $totalSalesValue = 0;
-    $totalCostValue = 0;
+    private function calculateProductsProfit($storeId, $startTime, $endTime)
+    {
+        $totalSalesValue = 0;
+        $totalCostValue = 0;
 
-    Sale::where('store_id', $storeId)
-        ->whereBetween('created_at', [$startTime, $endTime])
-        ->where(function ($query) {
-            $query->whereNull('description')
-                ->orWhere('description', '!=', 'manual_invoice_entry');
-        })
-        ->with(['items' => function($query) {
-            $query->select('sale_id', 'product_id', 'quantity', 'price');
-        }])
-        ->select('id')
-        ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
-            foreach ($salesChunk as $sale) {
-                foreach ($sale->items as $item) {
-                    $totalSalesValue += $item->quantity * $item->price;
+        Sale::where('store_id', $storeId)
+            ->whereBetween('created_at', [$startTime, $endTime])
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
+            ->with(['items.product'])
+            ->select('id')
+            ->chunk(100, function ($salesChunk) use (&$totalSalesValue, &$totalCostValue) {
+                foreach ($salesChunk as $sale) {
+                    foreach ($sale->items as $item) {
+                        $itemSalesValue = (float) ($item->total ?? ((float) $item->quantity * (float) $item->price));
+                        $totalSalesValue += $itemSalesValue;
 
-                    $product = DB::table('products')
-                        ->where('id', $item->product_id)
-                        ->select('cost_price', 'is_splittable', 'items_per_unit')
-                        ->first();
-
-                    if ($product && $product->cost_price) {
-                        // إذا كان المنتج طقماً وتم بيعه بالحبة
-                        if ($product->is_splittable == 1 && $product->items_per_unit > 0) {
-                            // تكلفة الحبة = تكلفة الطقم ÷ عدد الحبات
-                            $costPerPiece = $product->cost_price / $product->items_per_unit;
-                            $itemCost = $item->quantity * $costPerPiece;
-                        } else {
-                            // منتج عادي أو طقم كامل
-                            $itemCost = $item->quantity * $product->cost_price;
+                        $product = $item->product;
+                        if (! $product) {
+                            // إذا حُذف المنتج لاحقاً نبقي تكلفة وقت البيع المحفوظة.
+                            $totalCostValue += (float) ($item->total_cost ?? 0);
+                            continue;
                         }
 
-                        $totalCostValue += $itemCost;
+                        // نحسب تكلفة الرول دائماً من تكلفة الرول وطوله والأمتار المحفوظة.
+                        // هذا يمنع أي سطر قديم حُفظت فيه total_cost خطأً بتكلفة الرول الكامل.
+                        if ($product->product_type === 'fractional') {
+                            $consumedMeters = (float) ($item->custom_consumption ?? 0);
+                            $totalCostValue += ProductProfitCostCalculator::calculateItemCost([
+                                'cost_price' => (float) (($item->cost_price ?? 0) > 0
+                                    ? $item->cost_price
+                                    : ($product->cost_price ?? 0)),
+                                'product_type' => 'fractional',
+                                'roll_length' => (float) (($item->roll_length_at_sale ?? 0) > 0
+                                    ? $item->roll_length_at_sale
+                                    : ($product->roll_length ?? 0)),
+                            ], [
+                                'quantity' => $consumedMeters,
+                                'custom_consumption' => $consumedMeters,
+                                'unit_type' => 'meter',
+                            ]);
+                            continue;
+                        }
+
+                        // المنتجات غير الكسرية الجديدة تستخدم تكلفة السطر الثابتة وقت البيع.
+                        if ((float) ($item->total_cost ?? 0) > 0) {
+                            $totalCostValue += (float) $item->total_cost;
+                            continue;
+                        }
+
+                        // توافق المبيعات القديمة التي سبقت حفظ total_cost:
+                        // المنتج العادي أو الطقم يُحسب من الكمية ووحدة البيع.
+                        $consumedQuantity = (float) ($item->custom_consumption ?? $item->quantity ?? 0);
+                        $totalCostValue += ProductProfitCostCalculator::calculateItemCost([
+                            'cost_price' => (float) (($item->cost_price ?? 0) > 0
+                                ? $item->cost_price
+                                : ($product->cost_price ?? 0)),
+                            'product_type' => $product->product_type,
+                            'roll_length' => (float) (($item->roll_length_at_sale ?? 0) > 0
+                                ? $item->roll_length_at_sale
+                                : ($product->roll_length ?? 0)),
+                            'is_splittable' => $product->is_splittable,
+                            'items_per_unit' => $product->items_per_unit,
+                        ], [
+                            'quantity' => $consumedQuantity,
+                            'custom_consumption' => null,
+                            'unit_type' => $item->unit_type
+                                ?: ($product->product_type === 'fractional' ? 'meter' : 'unit'),
+                        ]);
                     }
                 }
-            }
-        });
+            });
 
-    return [
-        'sales_value' => $totalSalesValue,
-        'cost_value' => $totalCostValue,
-        'profit' => $totalSalesValue - $totalCostValue,
-    ];
-}
+        return [
+            'sales_value' => $totalSalesValue,
+            'cost_value' => $totalCostValue,
+            'profit' => $totalSalesValue - $totalCostValue,
+        ];
+    }
     private function generateReportAndWhatsApp($store, $accountant, $reportData)
     {
         // 1. التحقق من الحد اليومي
