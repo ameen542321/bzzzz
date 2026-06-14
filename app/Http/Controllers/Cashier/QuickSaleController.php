@@ -505,7 +505,6 @@ class QuickSaleController extends Controller
             'has_partial_credit' => $hasPartialCredit,
             'has_invoice'      => $request->has_invoice == 1,
             'description'      => $saleDescription,
-            'operation_name'   => $operationName !== '' ? $operationName : null,
             'profit'           => $totalProfit,
         ]);
         $sale->created_at = $operationTimestamp;

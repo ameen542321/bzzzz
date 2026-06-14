@@ -710,10 +710,11 @@ class DashboardController extends Controller
         }
                 return [
                     'id' => $s->id,
-                    'operation_name' => $s->operation_name
-                        ?: ((mb_stripos((string) $s->description, 'تضليل') !== false || mb_stripos((string) $s->description, 'تظليل') !== false)
+                    // قيمة عرض داخل التقرير فقط، ولا تعتمد على أي عمود إضافي في قاعدة البيانات.
+                    'operation_name' => (mb_stripos((string) $s->description, 'تضليل') !== false
+                        || mb_stripos((string) $s->description, 'تظليل') !== false)
                             ? $s->description
-                            : null),
+                            : null,
                     'time' => $s->created_at->format('h:i A'),
                     'type' => $s->sale_type,
                     'received' => $s->paid_amount,

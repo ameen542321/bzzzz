@@ -1186,8 +1186,7 @@ class DailySalesController extends Controller
     {
         $totalCost = 0;
         $productsProfit = 0;
-        $sale->tint_operation_name = trim((string) ($sale->operation_name ?? ''))
-            ?: $this->extractTintOperationName((string) ($sale->description ?? ''));
+        $sale->tint_operation_name = $this->extractTintOperationName((string) ($sale->description ?? ''));
 
         foreach ($sale->items as $item) {
             // اسم المنتج

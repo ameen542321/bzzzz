@@ -28,7 +28,6 @@ class Sale extends Model
         'internal_notes',
         'has_invoice',     // هل العميل طلب فاتورة ضريبية؟
         'description',     // وصف أجور اليد أو ملاحظات عامة
-        'operation_name',  // الاسم الواضح للعملية المركبة مثل تضليل كامل
     ];
 
     /**
