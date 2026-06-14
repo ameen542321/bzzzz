@@ -1052,6 +1052,16 @@ class StoreController extends Controller
         $operationsCount = (int) (clone $salesQuery)->count();
         $cashSales = (float) (clone $salesQuery)->sum('cash_amount');
         $cardSales = (float) (clone $salesQuery)->sum('card_amount');
+        $tintOperations = (clone $salesQuery)
+            ->where(function ($query) {
+                $query->where('description', 'like', '%تضليل%')
+                    ->orWhere('description', 'like', '%تظليل%');
+            })
+            ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->latest('created_at')
+            ->get();
+        $tintOperationsCount = $tintOperations->count();
+        $tintOperationsTotal = (float) $tintOperations->sum('paid_amount');
 
         $internalUseSales = (float) Sale::where('store_id', $store->id)
             ->where('sale_type', 'internal_use')
@@ -1108,6 +1118,9 @@ class StoreController extends Controller
             'operationsCount',
             'cashSales',
             'cardSales',
+            'tintOperations',
+            'tintOperationsCount',
+            'tintOperationsTotal',
             'internalUseSales',
             'ownerPurchases',
             'monthlySoldProductsCost',
@@ -1156,6 +1169,16 @@ class StoreController extends Controller
             'withdrawalsTotal' => (float) \App\Models\Withdrawal::where('store_id', $store->id)->whereBetween('created_at', [$start, $end])->sum('amount'),
             'monthlySalaries' => (float) $store->employees()->sum('salary'),
         ];
+        $data['tintOperations'] = (clone $salesQuery)
+            ->where(function ($query) {
+                $query->where('description', 'like', '%تضليل%')
+                    ->orWhere('description', 'like', '%تظليل%');
+            })
+            ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->latest('created_at')
+            ->get();
+        $data['tintOperationsCount'] = $data['tintOperations']->count();
+        $data['tintOperationsTotal'] = (float) $data['tintOperations']->sum('paid_amount');
         $data['monthlySoldProductsCost'] = $this->calculateSoldProductsCostForPeriod(
             $store->id,
             $start,

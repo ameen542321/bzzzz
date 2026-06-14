@@ -184,6 +184,26 @@
             </table>
 
             <div class="section">
+                <div class="section-h">عمليات التضليل</div>
+                <table class="tbl">
+                    <tr>
+                        <th>عدد عمليات التضليل</th>
+                        <td>{{ number_format($tintOperationsCount ?? 0) }}</td>
+                    </tr>
+                    <tr>
+                        <th>إجمالي المبالغ المحصلة منها</th>
+                        <td>{{ number_format($tintOperationsTotal ?? 0, 2) }} ر.س</td>
+                    </tr>
+                    @foreach(($tintOperations ?? collect()) as $operation)
+                        <tr>
+                            <th>#{{ $operation->id }} — {{ $operation->description ?: 'تضليل' }}</th>
+                            <td>{{ number_format($operation->paid_amount, 2) }} ر.س</td>
+                        </tr>
+                    @endforeach
+                </table>
+            </div>
+
+            <div class="section">
                 <div class="section-h">التكاليف والاستهلاك</div>
                 <table class="tbl">
                     <tr>

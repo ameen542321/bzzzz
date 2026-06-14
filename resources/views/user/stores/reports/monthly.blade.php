@@ -50,6 +50,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4 text-sm">
         <div class="bg-gray-900/40 border border-gray-700 rounded-xl p-3"><p class="text-gray-400">إجمالي المبيعات</p><p class="text-green-400 font-bold">{{ number_format($totalSales, 2) }} ر.س</p></div>
         <div class="bg-gray-900/40 border border-gray-700 rounded-xl p-3"><p class="text-gray-400">عمليات / كاش / شبكة</p><p class="text-cyan-300 font-bold">{{ number_format($operationsCount) }} / {{ number_format($cashSales, 2) }} / {{ number_format($cardSales, 2) }}</p></div>
+        <div class="bg-gray-900/40 border border-indigo-700/60 rounded-xl p-3"><p class="text-gray-400">عمليات التضليل</p><p class="text-indigo-300 font-bold">{{ number_format($tintOperationsCount) }} عملية / {{ number_format($tintOperationsTotal, 2) }} ر.س محصل</p></div>
         <div class="bg-gray-900/40 border border-gray-700 rounded-xl p-3"><p class="text-gray-400">الاستهلاك الداخلي (المحاسب)</p><p class="text-yellow-300 font-bold">{{ number_format($internalUseSales, 2) }} ر.س</p></div>
         <div class="bg-gray-900/40 border border-gray-700 rounded-xl p-3"><p class="text-gray-400">تكلفة المنتجات المباعة (تخصم من الربح)</p><p class="text-rose-300 font-bold">{{ number_format($profitDeductionTotal ?? $monthlySoldProductsCost ?? 0, 2) }} ر.س</p><p class="text-gray-500 text-xs mt-1">هي تكلفة البضاعة التي تم بيعها خلال الشهر، وليست خصماً منفصلاً.</p></div>
         <div class="bg-gray-900/40 border border-gray-700 rounded-xl p-3"><p class="text-gray-400">مصروفات + مشتريات المالك للاستهلاك</p><p class="text-orange-300 font-bold">{{ number_format($expensesTotal, 2) }} + {{ number_format($ownerPurchases, 2) }} ر.س</p></div>
@@ -62,6 +63,40 @@
     <p class="mb-4 text-xs text-gray-400">
         طريقة الحساب: صافي النتيجة = المحصل - (تكلفة المنتجات المباعة + الاستهلاك الداخلي + مشتريات المالك للاستهلاك + المصروفات). الرواتب وسحبيات الموظفين تظهر للتوضيح فقط ولا تدخل في معادلة الربح.
     </p>
+
+    <div class="mb-4 bg-gray-900/40 border border-indigo-700/50 rounded-2xl overflow-hidden">
+        <div class="flex items-center justify-between gap-3 bg-indigo-500/10 border-b border-indigo-700/40 p-4">
+            <div>
+                <h2 class="text-indigo-200 font-bold">سجل عمليات التضليل</h2>
+                <p class="text-gray-400 text-xs mt-1">يعرض اسم العملية التلقائي مثل: تضليل كامل، تضليل أمامي وثلاث درايش.</p>
+            </div>
+            <span class="text-xs text-indigo-200 bg-indigo-500/10 border border-indigo-500/30 rounded-full px-3 py-1">{{ number_format($tintOperationsCount) }} عملية</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-800/80 text-gray-300">
+                    <tr>
+                        <th class="p-3 text-right">رقم العملية</th>
+                        <th class="p-3 text-right">اسم عملية التضليل</th>
+                        <th class="p-3 text-right">التاريخ</th>
+                        <th class="p-3 text-right">المحصل</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($tintOperations as $operation)
+                        <tr class="border-t border-gray-700/70 text-gray-200">
+                            <td class="p-3">#{{ $operation->id }}</td>
+                            <td class="p-3 text-indigo-200 font-semibold">{{ $operation->description ?: 'تضليل' }}</td>
+                            <td class="p-3">{{ $operation->created_at?->format('Y-m-d h:i A') }}</td>
+                            <td class="p-3 text-green-400 font-bold">{{ number_format($operation->paid_amount, 2) }} ر.س</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="p-6 text-center text-gray-400">لا توجد عمليات تضليل مسجلة في هذا الشهر.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <div class="bg-gray-900/40 border border-gray-700 rounded-2xl overflow-hidden">
         <table class="w-full text-sm">

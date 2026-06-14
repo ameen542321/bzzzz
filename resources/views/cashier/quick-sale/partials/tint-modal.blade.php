@@ -353,10 +353,39 @@ function tintSaleModal(config) {
             const target = Number(this.finalPrice || 0), recorded = parts.reduce((sum, part) => sum + part.unitPrice, 0); let remaining = target;
             return parts.map((part, index) => { const price = index === parts.length - 1 ? Number(remaining.toFixed(2)) : Number((recorded > 0 ? target * (part.unitPrice / recorded) : target / parts.length).toFixed(2)); remaining -= price; return { ...part, distributedPrice: price }; });
         },
+        windowCountLabel(count) {
+            const labels = {
+                1: 'دريشة',
+                2: 'دريشتين',
+                3: 'ثلاث درايش',
+                4: 'أربع درايش',
+                5: 'خمس درايش',
+                6: 'ست درايش',
+                7: 'سبع درايش',
+                8: 'ثمان درايش',
+            };
+
+            return labels[Number(count)] || `${Number(count) || 0} درايش`;
+        },
+        joinOperationParts(parts) {
+            if (parts.length <= 1) return parts[0] || '';
+            if (parts.length === 2) return `${parts[0]} و${parts[1]}`;
+            return `${parts.slice(0, -1).join('، ')} و${parts[parts.length - 1]}`;
+        },
         groupTitle() {
             if (this.fullMode) return 'تضليل كامل';
-            const labels = this.resolvedParts.map(part => part.label);
-            return labels.length ? `تضليل — ${labels.join(' + ')}` : 'تضليل';
+
+            const labels = [];
+            if (this.selectedWorks.includes('front')) labels.push('أمامي');
+            if (this.selectedWorks.includes('rear')) labels.push('خلفي');
+            if (this.selectedWorks.includes('window')) labels.push(this.windowCountLabel(this.windowCount));
+
+            this.customRows
+                .filter(row => row.name && Number(row.meters) > 0 && Number(row.price) > 0)
+                .forEach(row => labels.push(row.name));
+
+            const operationName = this.joinOperationParts(labels);
+            return operationName ? `تضليل ${operationName}` : 'تضليل';
         },
         groupDetails() {
             return this.resolvedParts.map(part => ({
@@ -390,7 +419,14 @@ function tintSaleModal(config) {
             if (standardCount < expectedCount) return Swal.fire({ title: 'تنبيه', text: 'أكمل نوع التضليل والحجم والدرجة لجميع الأعمال المحددة.', icon: 'warning' });
             if (Number(this.finalPrice || 0) <= 0) return Swal.fire({ title: 'تنبيه', text: 'سعر العملية النهائي يجب أن يكون أكبر من صفر.', icon: 'warning' });
             const errors = this.stockErrors(parts); if (errors.length) return Swal.fire({ title: 'المخزون غير كافٍ', html: errors.join('<br>'), icon: 'error' });
-            const items = this.buildCartItems(); this.$dispatch('tint-items-ready', { items, groupId: items[0]?.tint_group_id }); this.closeModal(); this.resetBuilder();
+            const items = this.buildCartItems();
+            this.$dispatch('tint-items-ready', {
+                items,
+                groupId: items[0]?.tint_group_id,
+                label: items[0]?.tint_group_label,
+            });
+            this.closeModal();
+            this.resetBuilder();
         },
     };
 }
