@@ -193,14 +193,9 @@ class DailySalesController extends Controller
             $shiftSales = $sales->filter(fn($sale) => ($sale->shift_key ?? 'default_shift') === $window['key']);
             $shiftSaleOperations = $shiftSales->filter(fn($sale) => ($sale->operation_kind ?? null) !== 'collection');
             $shiftCollectionOperations = $shiftSales->filter(fn($sale) => ($sale->operation_kind ?? null) === 'collection');
-            $tadlilOperations = $shiftSaleOperations->filter(function ($sale) {
-                $description = trim((string) ($sale->description ?? ''));
-                if ($description === '') {
-                    return false;
-                }
-
-                return mb_stripos($description, 'تضليل') !== false || mb_stripos($description, 'تظليل') !== false;
-            });
+            $tadlilOperations = $shiftSaleOperations->filter(
+                fn ($sale) => !empty($sale->tint_operation_name)
+            );
 
             $cashFromSales = $shiftSaleOperations->sum(function ($sale) {
                 $cash = (float) ($sale->cash_paid ?? 0);
@@ -267,6 +262,11 @@ class DailySalesController extends Controller
                     return max(0, $operationTotal - $productsTotal);
                 }),
                 'tadlil_count' => $tadlilOperations->count(),
+                'tadlil_names' => $tadlilOperations
+                    ->pluck('tint_operation_name')
+                    ->filter()
+                    ->unique()
+                    ->values(),
                 'collected_total' => $shiftSales->sum('paid_amount'),
                 'expenses' => (float) $expenses,
                 'withdrawals' => (float) $withdrawals,
@@ -305,6 +305,11 @@ class DailySalesController extends Controller
             'card_sales' => $shiftSummaries->sum(fn($s) => $s['stats']['card_sales']),
             'tadlil_total' => $shiftSummaries->sum(fn($s) => $s['stats']['tadlil_total'] ?? 0),
             'tadlil_count' => $shiftSummaries->sum(fn($s) => $s['stats']['tadlil_count'] ?? 0),
+            'tadlil_names' => $shiftSummaries
+                ->flatMap(fn($summary) => $summary['stats']['tadlil_names'] ?? collect())
+                ->filter()
+                ->unique()
+                ->values(),
             'collected_total' => $shiftSummaries->sum(fn($s) => $s['stats']['collected_total']),
             'expenses' => $shiftSummaries->sum(fn($s) => $s['stats']['expenses']),
             'withdrawals' => $shiftSummaries->sum(fn($s) => $s['stats']['withdrawals']),
@@ -1181,6 +1186,7 @@ class DailySalesController extends Controller
     {
         $totalCost = 0;
         $productsProfit = 0;
+        $sale->tint_operation_name = $this->extractTintOperationName((string) ($sale->description ?? ''));
 
         foreach ($sale->items as $item) {
             // اسم المنتج
@@ -1282,5 +1288,21 @@ class DailySalesController extends Controller
         // final_total = products_total + labor_total + tax
 
         return $sale;
+    }
+
+    /**
+     * استخراج اسم عملية التضليل المحفوظ في وصف البيع لعرضه كاسم العملية.
+     */
+    private function extractTintOperationName(string $description): ?string
+    {
+        $tintParts = collect(explode(' - ', trim($description)))
+            ->map(fn ($part) => trim($part))
+            ->filter(function ($part) {
+                return mb_stripos($part, 'تضليل') !== false
+                    || mb_stripos($part, 'تظليل') !== false;
+            })
+            ->values();
+
+        return $tintParts->isEmpty() ? null : $tintParts->implode(' - ');
     }
 }

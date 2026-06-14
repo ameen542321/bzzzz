@@ -123,6 +123,9 @@
             <p class="text-gray-400">سجل التضليل (خصم المنتجات)</p>
             <p class="text-cyan-300 font-bold">{{ number_format($stats['tadlil_count'] ?? 0) }} عملية</p>
             <p class="text-emerald-300 font-bold">{{ number_format($stats['tadlil_total'] ?? 0, 2) }} ر.س</p>
+            @if(($stats['tadlil_names'] ?? collect())->isNotEmpty())
+                <p class="mt-1 text-[10px] text-indigo-200 leading-relaxed">{{ ($stats['tadlil_names'] ?? collect())->implode('، ') }}</p>
+            @endif
             <p class="text-[11px] text-gray-500">
                 @if($selectedShift)
                     شفتات معتمدة
@@ -196,6 +199,9 @@
                 @endif
                 <span class="text-gray-400">سجل التضليل (خصم المنتجات):</span><span class="text-cyan-300 font-bold">{{ number_format($shift['stats']['tadlil_count'] ?? 0) }} عملية</span>
                 <span class="text-gray-400">إجمالي التضليل (خصم المنتجات):</span><span class="text-emerald-300 font-bold">{{ number_format($shift['stats']['tadlil_total'] ?? 0, 2) }} ر.س</span>
+                @if(($shift['stats']['tadlil_names'] ?? collect())->isNotEmpty())
+                    <span class="text-gray-400">أسماء عمليات التضليل:</span><span class="text-indigo-200 font-bold">{{ ($shift['stats']['tadlil_names'] ?? collect())->implode('، ') }}</span>
+                @endif
                 <span class="text-gray-400">منصرفات:</span><span class="text-red-400 font-bold">{{ number_format($shift['stats']['outgoing_total'], 2) }}</span>
                 <span class="text-gray-400">عمليات:</span><span class="text-purple-400 font-bold">{{ number_format($shift['stats']['count']) }}</span>
                 @if(($shift['stats']['deferred_profit'] ?? 0) > 0)
@@ -251,9 +257,10 @@
                             $bgColor = $loop->iteration % 2 == 0 ? 'bg-gray-800/30' : 'bg-gray-800/60';
                             $isCollectionOperation = ($sale->operation_kind ?? null) === 'collection';
                             $productsCost = $sale->items->sum('calculated_cost');
+                            $tintOperationName = $sale->tint_operation_name ?? null;
                             $visibleProducts = $isCollectionOperation
                                 ? ($sale->employee_name ?? 'غير معروف')
-                                : $sale->items->take(2)->pluck('display_name')->filter()->implode(' - ');
+                                : ($tintOperationName ?: $sale->items->take(2)->pluck('display_name')->filter()->implode(' - '));
                             $operationAmount = max((float) ($sale->final_total ?? 0), (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0)));
                             $hasOutstandingCredit = (float) ($sale->remaining_amount ?? 0) > 0;
                             $hasCreditComponent = $sale->sale_type === 'credit' || (int) ($sale->has_partial_credit ?? 0) === 1;
@@ -278,11 +285,11 @@
                                 <div class="flex items-center gap-3 flex-wrap">
                                     <span class="text-white font-bold bg-gray-900 w-8 h-8 rounded-lg flex items-center justify-center text-sm">#{{ $loop->iteration }}</span>
                                     <span class="px-2 py-1 rounded-full text-[10px] {{ $isCollectionOperation ? 'bg-emerald-500/20 text-emerald-300' : ($sale->items->isNotEmpty() ? 'bg-purple-500/20 text-purple-400' : 'bg-yellow-500/20 text-yellow-400') }}">
-                                        {{ $isCollectionOperation ? 'تحصيل آجل' : ($sale->items->isNotEmpty() ? 'منتجات' : 'شغل يد') }}
+                                        {{ $isCollectionOperation ? 'تحصيل آجل' : ($tintOperationName ? 'عملية تضليل' : ($sale->items->isNotEmpty() ? 'منتجات' : 'شغل يد')) }}
                                     </span>
                                     @if($visibleProducts)
                                         <div class="flex flex-col gap-0.5">
-                                            <span class="text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded">{{ $visibleProducts }}</span>
+                                            <span class="text-xs {{ $tintOperationName ? 'text-indigo-200 bg-indigo-500/10 border-indigo-500/30' : 'text-blue-300 bg-blue-500/10 border-blue-500/20' }} border px-2 py-1 rounded font-bold">{{ $visibleProducts }}</span>
                                             <span class="text-[10px] text-gray-500">{{ $effectiveTimestamp->format('Y-m-d h:i A') }}</span>
                                             @if($sale->updated_at && $sale->updated_at->ne($sale->created_at))
                                                 <span class="text-[10px] text-amber-300">آخر تعديل: {{ $sale->updated_at->format('h:i A') }}</span>
