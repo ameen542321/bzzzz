@@ -3,6 +3,24 @@
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-6 text-right" dir="rtl">
 
+    {{-- رسائل تعديل تاريخ الشفت تظهر داخل الصفحة حتى لا يبدو أن الزر لم ينفذ شيئاً. --}}
+    @if($errors->any() && !session('edit_sale_modal'))
+        <div class="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div class="font-bold mb-1"><i class="fa-solid fa-circle-exclamation ml-1"></i>تعذر تنفيذ التعديل</div>
+            <ul class="list-disc list-inside space-y-1">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @if(session('success'))
+        <div class="mb-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
+            <i class="fa-solid fa-circle-check ml-1"></i>{{ session('success') }}
+        </div>
+    @endif
+
     {{-- ===== شريط العنوان والبحث المتقدم ===== --}}
     <div class="mb-6 bg-gray-800/50 p-4 rounded-2xl border border-gray-700">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -473,8 +491,18 @@
                     'cash_amount' => (float) ($sale->cash_amount ?? 0),
                     'card_amount' => (float) ($sale->card_amount ?? 0),
                     'labor_total' => (float) ($sale->labor_total ?? 0),
+                    'tax_rate' => (float) ($sale->tax_rate ?? 0),
                     'employee_id' => $sale->employee_id ? (int) $sale->employee_id : null,
                     'description' => (string) ($sale->description ?? ''),
+                    'items' => ($sale->items ?? collect())->map(fn ($item) => [
+                        'id' => (int) $item->id,
+                        'name' => (string) ($item->display_name ?? $item->product_name ?? 'منتج غير معروف'),
+                        'quantity' => (float) ($item->quantity ?? 0),
+                        'price' => (float) ($item->price ?? 0),
+                        'total' => (float) ($item->total ?? 0),
+                        'unit' => (string) ($item->display_unit ?? 'وحدة'),
+                        'is_fractional' => ($item->product_type ?? null) === 'fractional',
+                    ])->values(),
                 ],
             ]);
         $failedEditSaleId = session('edit_sale_modal');
@@ -498,6 +526,20 @@
                     </ul>
                 </div>
                 @endif
+
+                <div id="edit-sale-items-section" class="hidden rounded-xl border border-gray-700 bg-gray-800/40 p-3">
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                        <div>
+                            <h4 class="text-white font-bold text-sm">تعديل المنتجات</h4>
+                            <p class="text-xs text-gray-500 mt-1">يمكن تعديل الكمية وسعر البيع، ويُحدّث المخزون بالفارق فقط.</p>
+                        </div>
+                        <span class="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">راجع الكميات قبل الحفظ</span>
+                    </div>
+                    <div id="edit-sale-items-list" class="space-y-3"></div>
+                    <p class="mt-3 text-[11px] text-cyan-300">
+                        منتجات الرول والتضليل: يمكن تعديل سعر البيع، أما كمية الاستهلاك فتبقى كما سُجلت لحماية المخزون والتكلفة.
+                    </p>
+                </div>
 
                 <div>
                     <label class="text-sm text-gray-300 block mb-1">نوع البيع</label>
@@ -555,7 +597,7 @@
 
                 <div>
                     <label class="text-sm text-gray-300 block mb-1">شغل اليد</label>
-                    <input id="edit-labor-total-input" type="number" step="0.01" min="0" name="labor_total"
+                    <input id="edit-labor-total-input" type="number" step="0.01" min="0" name="labor_total" oninput="syncEditedOperationTotal()"
                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
                 </div>
 
@@ -668,6 +710,7 @@ function updateEditSaleFields() {
         mixedConversionWarning.innerHTML = `عند التحويل إلى ميكس من آجل محصّل جزئيًا: تم تحصيل <span class="font-bold">${originalPaidAmount.toFixed(2)}</span> سابقًا، والمتبقي الآن <span class="font-bold">${originalRemainingAmount.toFixed(2)}</span>. أدخل القيم بحيث يكون <span class="font-bold">كاش + شبكة + مديونية = ${originalRemainingAmount.toFixed(2)}</span>.`;
     }
 
+    syncEditedOperationTotal();
 }
 
 function fillEditSaleForm(sale, oldValues = null) {
@@ -685,6 +728,98 @@ function fillEditSaleForm(sale, oldValues = null) {
     setValue('edit-card-amount-input', values.card_amount);
     setValue('edit-labor-total-input', values.labor_total);
     setValue('edit-description-input', values.description);
+    renderEditSaleItems(sale.items || [], oldValues);
+}
+
+function escapeEditSaleHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function renderEditSaleItems(items, oldValues = null) {
+    const section = document.getElementById('edit-sale-items-section');
+    const list = document.getElementById('edit-sale-items-list');
+    if (!section || !list) return;
+
+    if (!items.length) {
+        list.innerHTML = '';
+        section.classList.add('hidden');
+        return;
+    }
+
+    const oldIds = Array.isArray(oldValues?.item_ids) ? oldValues.item_ids.map(String) : [];
+    const oldQuantities = Array.isArray(oldValues?.item_quantities) ? oldValues.item_quantities : [];
+    const oldPrices = Array.isArray(oldValues?.item_prices) ? oldValues.item_prices : [];
+
+    list.innerHTML = items.map((item, index) => {
+        const oldIndex = oldIds.indexOf(String(item.id));
+        const quantity = oldIndex >= 0 ? oldQuantities[oldIndex] : item.quantity;
+        const price = oldIndex >= 0 ? oldPrices[oldIndex] : item.price;
+        const quantityLock = item.is_fractional
+            ? 'readonly aria-readonly="true" title="كمية الرول محفوظة حسب الاستهلاك بالأمتار ولا تعدل من هنا"'
+            : '';
+        const quantityStyle = item.is_fractional ? 'opacity-60 cursor-not-allowed' : '';
+
+        return `
+            <div class="rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+                <input type="hidden" name="item_ids[]" value="${Number(item.id)}">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                        <p class="text-sm font-bold text-white">${escapeEditSaleHtml(item.name)}</p>
+                        <p class="text-[11px] text-gray-500">الوحدة المعروضة: ${escapeEditSaleHtml(item.unit)} — الإجمالي الحالي: ${Number(item.total || 0).toFixed(2)} ر.س</p>
+                    </div>
+                    <span class="text-[11px] text-gray-400">#${Number(item.id)}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-gray-300 block mb-1">الكمية</label>
+                        <input type="number" step="${item.is_fractional ? '0.01' : '1'}" min="${item.is_fractional ? '0.01' : '1'}"
+                               name="item_quantities[]" value="${escapeEditSaleHtml(quantity)}" ${quantityLock}
+                               oninput="syncEditedOperationTotal()"
+                               class="edit-sale-item-quantity w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white ${quantityStyle}">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-300 block mb-1">سعر البيع</label>
+                        <input type="number" step="0.01" min="0" name="item_prices[]" value="${escapeEditSaleHtml(price)}"
+                               oninput="syncEditedOperationTotal()"
+                               class="edit-sale-item-price w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    section.classList.remove('hidden');
+}
+
+function syncEditedOperationTotal() {
+    if (!activeEditSale) return;
+
+    const quantities = [...document.querySelectorAll('.edit-sale-item-quantity')];
+    const prices = [...document.querySelectorAll('.edit-sale-item-price')];
+    if (!quantities.length || quantities.length !== prices.length) return;
+
+    const productsTotal = quantities.reduce((total, quantityInput, index) => {
+        const quantity = Number(quantityInput.value || 0);
+        const price = Number(prices[index]?.value || 0);
+        return total + (quantity * price);
+    }, 0);
+    const taxRate = Number(activeEditSale.tax_rate || 0);
+    const laborTotal = Number(document.getElementById('edit-labor-total-input')?.value || 0);
+    const finalTotal = productsTotal + (productsTotal * taxRate / 100) + laborTotal;
+    const saleType = document.getElementById('edit-sale-type')?.value;
+
+    if (saleType === 'cash' || saleType === 'card') {
+        const paidInput = document.getElementById('edit-paid-amount-input');
+        if (paidInput) paidInput.value = finalTotal.toFixed(2);
+    } else if (saleType === 'credit') {
+        const debtInput = document.getElementById('edit-debt-amount-input');
+        if (debtInput) debtInput.value = finalTotal.toFixed(2);
+    }
 }
 
 function openEditSaleModal(saleId, oldValues = null) {
@@ -701,6 +836,7 @@ function openEditSaleModal(saleId, oldValues = null) {
     fillEditSaleForm(sale, oldValues);
     modal.classList.remove('hidden');
     updateEditSaleFields();
+    if (!oldValues) syncEditedOperationTotal();
 }
 
 function closeEditSaleModal() {

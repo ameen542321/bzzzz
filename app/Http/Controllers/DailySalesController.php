@@ -13,6 +13,7 @@ use App\Support\ProductProfitCostCalculator;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DailySalesController extends Controller
 {
@@ -666,10 +667,99 @@ class DailySalesController extends Controller
             'card_amount' => 'nullable|numeric|min:0',
             'employee_id' => 'nullable|exists:employees,id',
             'debt_amount' => 'nullable|numeric|min:0',
+            'item_ids' => 'nullable|array',
+            'item_ids.*' => 'required|integer|distinct',
+            'item_quantities' => 'nullable|array',
+            'item_quantities.*' => 'required|numeric|min:0.01',
+            'item_prices' => 'nullable|array',
+            'item_prices.*' => 'required|numeric|min:0',
         ]);
 
         $originalSaleType = $sale->sale_type;
+        $submittedItemIds = array_values($validated['item_ids'] ?? []);
+        $submittedQuantities = array_values($validated['item_quantities'] ?? []);
+        $submittedPrices = array_values($validated['item_prices'] ?? []);
+        $hasItemEdits = count($submittedItemIds) > 0;
+        $itemEditPlan = collect();
         $productsTotal = (float) ($sale->products_total ?? 0);
+        $productsCost = 0.0;
+
+        if ($hasItemEdits) {
+            if (count($submittedItemIds) !== count($submittedQuantities)
+                || count($submittedItemIds) !== count($submittedPrices)) {
+                return back()->withErrors([
+                    'item_ids' => 'بيانات المنتجات المرسلة غير مكتملة. أعد فتح نافذة التعديل وحاول مرة أخرى.',
+                ])->withInput()->with('edit_sale_modal', $sale->id);
+            }
+
+            $saleItems = $sale->items()
+                ->with('product')
+                ->whereIn('id', $submittedItemIds)
+                ->get()
+                ->keyBy('id');
+
+            if ($saleItems->count() !== count($submittedItemIds)) {
+                return back()->withErrors([
+                    'item_ids' => 'يوجد منتج لا يتبع هذه العملية أو لم يعد موجودًا.',
+                ])->withInput()->with('edit_sale_modal', $sale->id);
+            }
+
+            foreach ($submittedItemIds as $index => $itemId) {
+                $item = $saleItems->get((int) $itemId);
+                $product = $item?->product;
+                $newQuantity = (float) $submittedQuantities[$index];
+                $newPrice = round((float) $submittedPrices[$index], 2);
+                $isFractional = ($product?->product_type ?? null) === 'fractional';
+
+                if (!$product || (int) $product->store_id !== (int) $store->id) {
+                    return back()->withErrors([
+                        'item_ids' => 'تعذر العثور على المنتج المرتبط بأحد أسطر العملية داخل هذا المتجر.',
+                    ])->withInput()->with('edit_sale_modal', $sale->id);
+                }
+
+                if ($isFractional && abs($newQuantity - (float) $item->quantity) > 0.0001) {
+                    return back()->withErrors([
+                        'item_quantities' => 'لا يمكن تغيير كمية منتج رول/تضليل من هذه النافذة لأن استهلاكه محفوظ بالأمتار. يمكن تعديل سعر البيع فقط.',
+                    ])->withInput()->with('edit_sale_modal', $sale->id);
+                }
+
+                if (!$isFractional && abs($newQuantity - round($newQuantity)) > 0.0001) {
+                    return back()->withErrors([
+                        'item_quantities' => 'كمية المنتج العادي يجب أن تكون عددًا صحيحًا.',
+                    ])->withInput()->with('edit_sale_modal', $sale->id);
+                }
+
+                $storedQuantity = $isFractional ? (float) $item->quantity : (int) round($newQuantity);
+                $oldStoredQuantity = max((float) ($item->quantity ?? 0), 0.0001);
+                $oldStockQuantity = (float) ($item->custom_consumption ?? $item->quantity);
+                $stockPerSaleUnit = $oldStockQuantity / $oldStoredQuantity;
+                $stockQuantity = $isFractional
+                    ? $oldStockQuantity
+                    : $stockPerSaleUnit * $storedQuantity;
+                $lineTotal = round($newPrice * $storedQuantity, 2);
+                $lineCost = round(ProductProfitCostCalculator::calculateItemCost($product, [
+                    'quantity' => $storedQuantity,
+                    'custom_consumption' => $isFractional ? $stockQuantity : null,
+                    'unit_type' => $item->unit_type ?? 'unit',
+                ]), 2);
+
+                $itemEditPlan->push([
+                    'item' => $item,
+                    'product' => $product,
+                    'quantity' => $storedQuantity,
+                    'old_stock_quantity' => $oldStockQuantity,
+                    'new_stock_quantity' => $stockQuantity,
+                    'price' => $newPrice,
+                    'total' => $lineTotal,
+                    'cost_price' => (float) ($product->cost_price ?? 0),
+                    'total_cost' => $lineCost,
+                ]);
+            }
+
+            $productsTotal = round($itemEditPlan->sum('total'), 2);
+            $productsCost = round($itemEditPlan->sum('total_cost'), 2);
+        }
+
         $taxRate = (float) ($sale->tax_rate ?? 0);
         $laborTotal = (float) ($validated['labor_total'] ?? 0);
 
@@ -683,7 +773,7 @@ class DailySalesController extends Controller
         $cashAmount = 0.0;
         $cardAmount = 0.0;
         $storedOperationAmount = (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0));
-        $baseOperationAmount = max($finalTotal, $storedOperationAmount);
+        $baseOperationAmount = $hasItemEdits ? $finalTotal : max($finalTotal, $storedOperationAmount);
         $hasCollectedCreditConversion = $originalSaleType === 'credit'
             && (float) ($sale->paid_amount ?? 0) > 0
             && (float) ($sale->remaining_amount ?? 0) > 0
@@ -790,17 +880,80 @@ class DailySalesController extends Controller
             }
         }
 
-        DB::transaction(function () use ($sale, $store, $validated, $laborTotal, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix) {
+        try {
+            DB::transaction(function () use ($sale, $store, $validated, $laborTotal, $productsTotal, $productsCost, $finalTotal, $paidAmount, $remainingAmount, $cashAmount, $cardAmount, $hasPartialCredit, $selectedEmployeeId, $creditDescriptionSuffix, $itemEditPlan, $hasItemEdits) {
+            foreach ($itemEditPlan as $plannedItem) {
+                $item = $plannedItem['item'];
+                $product = Product::whereKey($plannedItem['product']->id)->lockForUpdate()->first();
+
+                if (!$product || (int) $product->store_id !== (int) $store->id) {
+                    throw ValidationException::withMessages([
+                        'item_ids' => 'تعذر قفل المنتج المرتبط بالعملية للتعديل.',
+                    ]);
+                }
+
+                $stockDifference = round(
+                    (float) $plannedItem['new_stock_quantity'] - (float) $plannedItem['old_stock_quantity'],
+                    4
+                );
+
+                if ($stockDifference > 0 && (float) $product->quantity + 0.0001 < $stockDifference) {
+                    throw ValidationException::withMessages([
+                        'item_quantities' => 'الكمية المتاحة من المنتج «' . $product->name . '» لا تكفي لزيادة كمية العملية.',
+                    ]);
+                }
+
+                if ($stockDifference > 0) {
+                    $product->decrement('quantity', $stockDifference);
+                    $movementType = 'decrease';
+                    $movementQuantity = $stockDifference;
+                } elseif ($stockDifference < 0) {
+                    $movementQuantity = abs($stockDifference);
+                    $product->increment('quantity', $movementQuantity);
+                    $movementType = 'increase';
+                } else {
+                    $movementType = null;
+                    $movementQuantity = 0;
+                }
+
+                if ($movementType) {
+                    $product->stockMovements()->create([
+                        'store_id' => $store->id,
+                        'user_id' => auth()->id(),
+                        'product_id' => $product->id,
+                        'type' => $movementType,
+                        'quantity' => $movementQuantity,
+                        'note' => 'تعديل كمية منتج في عملية مبيعات #' . $sale->id,
+                    ]);
+                }
+
+                $item->update([
+                    'quantity' => $plannedItem['quantity'],
+                    'price' => $plannedItem['price'],
+                    'total' => $plannedItem['total'],
+                    'custom_consumption' => $plannedItem['new_stock_quantity'],
+                    'cost_price' => $plannedItem['cost_price'],
+                    'total_cost' => $plannedItem['total_cost'],
+                ]);
+            }
+
+            $saleProfit = $hasItemEdits
+                ? round($finalTotal - $productsCost, 2)
+                : (float) ($sale->profit ?? 0);
+
             $sale->update([
                 'sale_type'          => $validated['sale_type'],
+                'products_total'     => $productsTotal,
                 'labor_total'        => $laborTotal,
                 'description'        => $validated['description'] ?? null,
                 'final_total'        => $finalTotal,
+                'total'              => $finalTotal,
                 'paid_amount'        => $paidAmount,
                 'remaining_amount'   => $remainingAmount,
                 'cash_amount'        => $cashAmount,
                 'card_amount'        => $cardAmount,
                 'has_partial_credit' => $hasPartialCredit,
+                'profit'             => $saleProfit,
                 'employee_id'        => ($validated['sale_type'] === 'credit' || $remainingAmount > 0)
                     ? $selectedEmployeeId
                     : null,
@@ -861,7 +1014,13 @@ class DailySalesController extends Controller
                     CreditSale::whereIn('id', $creditRows->pluck('id'))->delete();
                 }
             }
-        });
+            });
+        } catch (ValidationException $exception) {
+            return back()
+                ->withErrors($exception->errors())
+                ->withInput()
+                ->with('edit_sale_modal', $sale->id);
+        }
 
         return back()->with('success', 'تم تعديل العملية بنجاح.');
     }
