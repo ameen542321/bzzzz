@@ -278,11 +278,21 @@ class DailySalesController extends Controller
                 'label' => $window['label'],
                 'start' => $window['start'],
                 'end' => $window['end'],
+                'source' => $window['source'] ?? null,
                 // تمرير ملاحظة إغلاق الشفت للواجهة كما هي (إن وُجدت) لعرضها في ملخص الشفت.
                 'notes' => $window['notes'] ?? null,
                 'stats' => $stats,
             ];
-        });
+        })->sort(function ($first, $second) {
+            $firstIsOpen = ($first['source'] ?? null) === 'open_shift';
+            $secondIsOpen = ($second['source'] ?? null) === 'open_shift';
+
+            if ($firstIsOpen !== $secondIsOpen) {
+                return $firstIsOpen ? -1 : 1;
+            }
+
+            return $second['start']->getTimestamp() <=> $first['start']->getTimestamp();
+        })->values();
 
         // الإحصائيات العامة عبر كل الشفتات ضمن الفترة المختارة
         $stats = [
