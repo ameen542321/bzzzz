@@ -167,6 +167,21 @@ class QuickSaleController extends Controller
 
         Log::info('📦 المنتجات المرسلة', ['items_count' => count($items)]);
 
+        $tintOperationNames = collect($items)
+            ->pluck('tint_group_label')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($tintOperationNames->isEmpty() && $request->filled('tint_operation_names')) {
+            $tintOperationNames = collect(explode(' - ', (string) $request->tint_operation_names))
+                ->map(fn ($name) => trim($name))
+                ->filter()
+                ->unique()
+                ->values();
+        }
+
         // استخراج تفاصيل الدفع المختلط إذا وجدت
         $mixedCash = (float) ($request->mixed_cash ?? 0);
         $mixedCard = (float) ($request->mixed_card ?? 0);
@@ -465,8 +480,9 @@ class QuickSaleController extends Controller
         // لا تدخل شرط الرول أعلاه، لذلك لا يتغير مسارها أو احتسابها.
         $totalProfit += $request->labor_total;
 
+        $operationName = mb_substr($tintOperationNames->implode(' - '), 0, 500);
         $descriptionParts = collect([
-            trim((string) $request->tint_operation_names),
+            $operationName,
             trim((string) $request->description),
         ])->filter()->unique()->values();
         $saleDescription = mb_substr($descriptionParts->implode(' - '), 0, 500);
@@ -489,6 +505,7 @@ class QuickSaleController extends Controller
             'has_partial_credit' => $hasPartialCredit,
             'has_invoice'      => $request->has_invoice == 1,
             'description'      => $saleDescription,
+            'operation_name'   => $operationName !== '' ? $operationName : null,
             'profit'           => $totalProfit,
         ]);
         $sale->created_at = $operationTimestamp;

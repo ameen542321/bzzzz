@@ -1054,10 +1054,12 @@ class StoreController extends Controller
         $cardSales = (float) (clone $salesQuery)->sum('card_amount');
         $tintOperations = (clone $salesQuery)
             ->where(function ($query) {
-                $query->where('description', 'like', '%تضليل%')
+                $query->whereNotNull('operation_name')
+                    ->where('operation_name', '!=', '')
+                    ->orWhere('description', 'like', '%تضليل%')
                     ->orWhere('description', 'like', '%تظليل%');
             })
-            ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->select(['id', 'operation_name', 'description', 'paid_amount', 'final_total', 'created_at'])
             ->latest('created_at')
             ->get();
         $tintOperationsCount = $tintOperations->count();
@@ -1171,10 +1173,12 @@ class StoreController extends Controller
         ];
         $data['tintOperations'] = (clone $salesQuery)
             ->where(function ($query) {
-                $query->where('description', 'like', '%تضليل%')
+                $query->whereNotNull('operation_name')
+                    ->where('operation_name', '!=', '')
+                    ->orWhere('description', 'like', '%تضليل%')
                     ->orWhere('description', 'like', '%تظليل%');
             })
-            ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->select(['id', 'operation_name', 'description', 'paid_amount', 'final_total', 'created_at'])
             ->latest('created_at')
             ->get();
         $data['tintOperationsCount'] = $data['tintOperations']->count();

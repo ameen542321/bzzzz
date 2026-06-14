@@ -543,6 +543,7 @@
                     $hasProducts = is_array($products) && count($products) > 0;
                     $hasLaborOnly = !$hasProducts && ((float)($sale['labor_total'] ?? 0) > 0);
                     $saleProfit = (float) ($sale['profit'] ?? 0);
+                    $operationName = trim((string) ($sale['operation_name'] ?? ''));
                 @endphp
                 <tr>
                     <td class="text-center">{{ $sale['id'] ?? '-' }}</td>
@@ -559,8 +560,10 @@
                 </tr>
                 <tr class="sale-products-row">
                     <td colspan="11" class="sale-products-cell">
-                        <span class="sale-products-title">تفاصيل العملية:</span>
-                        @if($hasProducts)
+                        <span class="sale-products-title">{{ $operationName !== '' ? 'اسم العملية:' : 'تفاصيل العملية:' }}</span>
+                        @if($operationName !== '')
+                            <strong>{{ $operationName }}</strong>
+                        @elseif($hasProducts)
                             <ul class="products-list">
                                 @foreach($products as $product)
                                     <li>
