@@ -552,6 +552,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // تفاصيل كل بطاقة موزعة حسب المتجر، مرسلة من الكنترولر كـ JSON.
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
+    window.ownerDashboardStoreBreakdowns = storeBreakdowns;
     // تعريف العناوين والقيم والنص التوضيحي لكل بطاقة قابلة للنقر.
     const metricDefinitions = {
         profit_today: { title: 'صافي الربح اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
@@ -745,6 +746,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let latestOperationId = null;
     let consecutiveSnapshotFailures = 0;
     let snapshotTimer = null;
+    let activeSnapshotController = null;
+    let snapshotRequestSequence = 0;
 
     // تنسيق الأرقام الحية مع منزلتين كحد أقصى.
     function formatNumber(value) {
@@ -758,6 +761,26 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateCardValue(valueId, value) {
         const valueElement = document.getElementById(valueId);
         if (valueElement) valueElement.textContent = formatNumber(value);
+    }
+
+    // تحديث البطاقات فور اختيار المتجر من البيانات المحملة مع الصفحة،
+    // ثم يؤكد طلب snapshot القيم من الخادم.
+    function applyStoreBreakdown(storeId) {
+        const breakdowns = window.ownerDashboardStoreBreakdowns || [];
+        const selectedId = storeId ? Number(storeId) : null;
+        const selectedRows = selectedId
+            ? breakdowns.filter((store) => Number(store.store_id) === selectedId)
+            : breakdowns;
+
+        const sumMetric = (metric) => selectedRows.reduce(
+            (total, store) => total + Number(store[metric] || 0),
+            0
+        );
+
+        updateCardValue('daily-profit-value', sumMetric('profit_today'));
+        updateCardValue('daily-sales-value', sumMetric('sales_today'));
+        updateCardValue('daily-expenses-value', sumMetric('expenses_today'));
+        updateCardValue('daily-products-cost-value', sumMetric('products_cost_today'));
     }
 
     function updateConnectionStatus(isConnected, updatedAt = null) {
@@ -781,21 +804,35 @@ document.addEventListener('DOMContentLoaded', function () {
     async function refreshDailySnapshot() {
         if (document.hidden) return;
 
+        const requestSequence = ++snapshotRequestSequence;
+        const requestedStoreId = summaryStoreId ? Number(summaryStoreId) : null;
+        activeSnapshotController?.abort();
+        activeSnapshotController = new AbortController();
+
         try {
             const url = new URL(snapshotUrl, window.location.origin);
-            if (summaryStoreId) url.searchParams.set('summary_store_id', summaryStoreId);
+            if (requestedStoreId) url.searchParams.set('summary_store_id', requestedStoreId);
             url.searchParams.set('_', Date.now().toString());
 
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
                 credentials: 'same-origin',
                 cache: 'no-store',
+                signal: activeSnapshotController.signal,
             });
             if (!response.ok) {
                 throw new Error(`Snapshot request failed: ${response.status}`);
             }
 
             const data = await response.json();
+            const responseStoreId = data.summary_store_id ? Number(data.summary_store_id) : null;
+            if (
+                requestSequence !== snapshotRequestSequence
+                || responseStoreId !== (summaryStoreId ? Number(summaryStoreId) : null)
+            ) {
+                return;
+            }
+
             consecutiveSnapshotFailures = 0;
             updateCardValue('daily-profit-value', data.profit_today);
             updateCardValue('daily-sales-value', data.sales_today);
@@ -842,6 +879,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             updateConnectionStatus(true, data.updated_at);
         } catch (error) {
+            if (error.name === 'AbortError') return;
             consecutiveSnapshotFailures++;
             if (consecutiveSnapshotFailures >= 2) {
                 updateConnectionStatus(false);
@@ -852,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function () {
     storeFilter?.addEventListener('change', function () {
         summaryStoreId = this.value || null;
         latestOperationId = null;
+        applyStoreBreakdown(summaryStoreId);
         refreshDailySnapshot();
     });
 

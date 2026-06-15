@@ -81,7 +81,7 @@ class UserDashboardController extends Controller
     {
         $user = auth('web')->user();
         $stores = $user->stores;
-        [, $dailyStoreIds] = $this->resolveDailyStoreFilter($stores);
+        [$selectedStore, $dailyStoreIds] = $this->resolveDailyStoreFilter($stores);
         $filterKey = $dailyStoreIds->sort()->implode('-') ?: 'none';
         $cacheKey = "owner-dashboard:{$user->id}:daily-snapshot:".today()->toDateString().":{$filterKey}";
 
@@ -106,6 +106,7 @@ class UserDashboardController extends Controller
             ];
         });
 
+        $snapshot['summary_store_id'] = $selectedStore?->id;
         $snapshot['updated_at'] = now()->format('h:i:s A');
 
         return response()->json($snapshot)
