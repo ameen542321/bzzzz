@@ -40,6 +40,8 @@ Route::middleware(['owner.unified'])->prefix('user')->name('user.')->group(funct
 
     // --- 1. لوحة التحكم والتقارير العامة ---
     Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/daily-snapshot', [UserDashboardController::class, 'dailySnapshot'])
+        ->name('dashboard.daily-snapshot');
     Route::get('/send-all-reports', [AdminReportController::class, 'sendAllReports']);
     Route::post('/welcome/continue', function () {
         auth('web')->user()->update(['welcome_shown' => true]);
