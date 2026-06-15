@@ -145,29 +145,43 @@
         <button id="daily-profit-card" type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: صافي الربح اليومي حسب كل متجر">
             <x-stat-card title="صافي الربح اليوم"
                 value="{{ number_format($profitToday) }}"
+                value-id="daily-profit-value"
                 color="{{ $profitToday >= 0 ? 'emerald' : 'red' }}" />
         </button>
 
         {{-- [تعديل آمن] مبيعات اليوم محسوبة من المحصّل الفعلي --}}
         <button id="daily-sales-card" type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: مبيعات اليوم حسب كل متجر">
-            <x-stat-card title="مبيعات اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
+            <x-stat-card title="مبيعات اليوم" value="{{ number_format($salesToday) }}" value-id="daily-sales-value" color="emerald" />
         </button>
 
         {{-- مصروفات اليوم --}}
         <button id="daily-expenses-card" type="button" class="text-right metric-card" data-metric="expenses_today" title="للمزيد من التفاصيل اضغط: مصروفات اليوم حسب كل متجر">
-            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday) }}" color="red" />
+            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday) }}" value-id="daily-expenses-value" color="red" />
         </button>
 
         <button id="daily-products-cost-card" type="button" class="text-right metric-card" data-metric="products_cost_today" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة اليوم حسب كل متجر">
-            <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" color="yellow" />
+            <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" value-id="daily-products-cost-value" color="yellow" />
         </button>
 
-        <div id="live-operation-card" class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5 transition-colors duration-500">
-            <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-gray-400">آخر عملية مباشرة</p>
-                <i class="fa-solid fa-bolt text-[11px] text-cyan-400"></i>
+        <div id="live-operation-card" class="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-cyan-950/40 border border-cyan-900/50 rounded-2xl p-5 transition-colors duration-500">
+            <div class="absolute -left-6 -top-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-xl"></div>
+            <div class="relative flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center">
+                        <i class="fa-solid fa-receipt text-xs"></i>
+                    </span>
+                    <p class="text-xs font-semibold text-cyan-200">آخر عملية مباشرة</p>
+                </div>
+                <span id="live-operation-time" class="text-[10px] text-gray-500">--:--</span>
             </div>
-            <p id="live-latest-operation" class="text-sm font-bold text-white mt-2 leading-6">جاري متابعة العمليات...</p>
+            <div class="relative mt-3">
+                <p id="live-operation-product" class="text-sm font-bold text-white leading-6 truncate">جاري متابعة العمليات...</p>
+                <p id="live-operation-store" class="text-[11px] text-gray-400 mt-1">—</p>
+                <div class="flex items-end justify-between gap-3 mt-3 pt-3 border-t border-gray-800/80">
+                    <span class="text-[10px] text-gray-500">المبلغ المستلم</span>
+                    <strong id="live-operation-amount" class="text-xl text-emerald-300">0.00</strong>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -695,8 +709,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function updateCardValue(cardId, value) {
-        const valueElement = document.querySelector(`#${cardId} .text-2xl`);
+    function updateCardValue(valueId, value) {
+        const valueElement = document.getElementById(valueId);
         if (valueElement) valueElement.textContent = formatNumber(value);
     }
 
@@ -712,20 +726,32 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!response.ok) return;
 
             const data = await response.json();
-            updateCardValue('daily-profit-card', data.profit_today);
-            updateCardValue('daily-sales-card', data.sales_today);
-            updateCardValue('daily-expenses-card', data.expenses_today);
-            updateCardValue('daily-products-cost-card', data.products_cost_today);
+            updateCardValue('daily-profit-value', data.profit_today);
+            updateCardValue('daily-sales-value', data.sales_today);
+            updateCardValue('daily-expenses-value', data.expenses_today);
+            updateCardValue('daily-products-cost-value', data.products_cost_today);
 
             const countElement = document.getElementById('live-operations-count');
             if (countElement) countElement.textContent = formatNumber(data.operations_count);
 
-            const latestElement = document.getElementById('live-latest-operation');
             const latestCard = document.getElementById('live-operation-card');
-            if (latestElement) {
-                latestElement.textContent = data.latest_operation
-                    ? `${data.latest_operation.description} في ${data.latest_operation.store_name} — ${formatNumber(data.latest_operation.amount)} (${data.latest_operation.time})`
-                    : 'لا توجد عمليات بيع اليوم حتى الآن.';
+            const productElement = document.getElementById('live-operation-product');
+            const storeElement = document.getElementById('live-operation-store');
+            const amountElement = document.getElementById('live-operation-amount');
+            const timeElement = document.getElementById('live-operation-time');
+            if (data.latest_operation) {
+                if (productElement) {
+                    productElement.textContent = data.latest_operation.description;
+                    productElement.classList.toggle('text-cyan-200', Boolean(data.latest_operation.is_tint));
+                }
+                if (storeElement) storeElement.textContent = `المتجر: ${data.latest_operation.store_name}`;
+                if (amountElement) amountElement.textContent = formatNumber(data.latest_operation.amount);
+                if (timeElement) timeElement.textContent = data.latest_operation.time || '--:--';
+            } else {
+                if (productElement) productElement.textContent = 'لا توجد عمليات بيع اليوم حتى الآن.';
+                if (storeElement) storeElement.textContent = '—';
+                if (amountElement) amountElement.textContent = '0.00';
+                if (timeElement) timeElement.textContent = '--:--';
             }
             if (latestCard && data.latest_operation?.id && latestOperationId !== data.latest_operation.id) {
                 latestCard.classList.add('border-cyan-500', 'bg-cyan-950/30');

@@ -450,17 +450,24 @@ class UserDashboardController extends Controller
         $latestOperation = null;
         if ($latestSale) {
             $description = trim((string) $latestSale->description);
+            $isTintOperation = mb_stripos($description, 'تضليل') !== false
+                || mb_stripos($description, 'تظليل') !== false;
             $productNames = $latestSale->items
                 ->map(fn ($item) => optional($item->product)->name)
                 ->filter()
                 ->unique()
                 ->values();
+            $operationName = $isTintOperation
+                ? $description
+                : ($productNames->isNotEmpty()
+                    ? $productNames->implode(' - ')
+                    : ($description ?: ((float) $latestSale->labor_total > 0 ? 'شغل يد' : 'عملية بيع')));
 
             $latestOperation = [
                 'id' => (int) $latestSale->id,
                 'store_name' => $latestSale->store->name ?? 'متجر غير معروف',
-                'description' => $description
-                    ?: ($productNames->isNotEmpty() ? $productNames->implode(' - ') : 'عملية بيع'),
+                'description' => $operationName,
+                'is_tint' => $isTintOperation,
                 'amount' => (float) ($latestSale->paid_amount ?? 0),
                 'time' => optional($latestSale->created_at)->format('h:i A'),
             ];
