@@ -131,7 +131,6 @@ class QuickSaleController extends Controller
         'sale_type'     => 'required|in:cash,card,credit,mixed',
         'employee_id'   => 'nullable|exists:employees,id',
         'description'   => 'nullable|string|max:500',
-        'tint_operation_names' => 'nullable|string|max:500',
         'has_invoice'   => 'nullable|in:0,1',
         'has_partial_credit' => 'nullable|in:0,1',
         'mixed_cash'    => 'nullable|numeric|min:0',
@@ -166,21 +165,6 @@ class QuickSaleController extends Controller
         }
 
         Log::info('📦 المنتجات المرسلة', ['items_count' => count($items)]);
-
-        $tintOperationNames = collect($items)
-            ->pluck('tint_group_label')
-            ->map(fn ($name) => trim((string) $name))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($tintOperationNames->isEmpty() && $request->filled('tint_operation_names')) {
-            $tintOperationNames = collect(explode(' - ', (string) $request->tint_operation_names))
-                ->map(fn ($name) => trim($name))
-                ->filter()
-                ->unique()
-                ->values();
-        }
 
         // استخراج تفاصيل الدفع المختلط إذا وجدت
         $mixedCash = (float) ($request->mixed_cash ?? 0);
@@ -368,7 +352,9 @@ class QuickSaleController extends Controller
                     'product_id'          => $item['product_id'],
                     'fraction_id'         => ($isCustom || !$fractionId) ? null : $fractionId,
                     'is_custom'           => $isCustom,
-                    'custom_name'         => $isCustom ? ($item['custom_name'] ?? 'مخصص') : null,
+                    'custom_name'         => $isCustom
+                        ? ($item['custom_name'] ?? 'مخصص')
+                        : (trim((string) ($item['tint_group_label'] ?? '')) ?: null),
                     'custom_consumption'  => $quantityToDecrement,
                     'custom_meters'       => $customMeters,
                     'roll_length_at_sale' => $product->roll_length,
@@ -480,13 +466,6 @@ class QuickSaleController extends Controller
         // لا تدخل شرط الرول أعلاه، لذلك لا يتغير مسارها أو احتسابها.
         $totalProfit += $request->labor_total;
 
-        $operationName = mb_substr($tintOperationNames->implode(' - '), 0, 500);
-        $descriptionParts = collect([
-            $operationName,
-            trim((string) $request->description),
-        ])->filter()->unique()->values();
-        $saleDescription = mb_substr($descriptionParts->implode(' - '), 0, 500);
-
         // إنشاء سجل البيع مع احترام تاريخ العملية المثبت في واجهة البيع السريع.
         $sale = new Sale([
             'store_id'         => $storeId,
@@ -504,7 +483,7 @@ class QuickSaleController extends Controller
             'sale_type'        => $request->sale_type,
             'has_partial_credit' => $hasPartialCredit,
             'has_invoice'      => $request->has_invoice == 1,
-            'description'      => $saleDescription,
+            'description'      => trim((string) $request->description),
             'profit'           => $totalProfit,
         ]);
         $sale->created_at = $operationTimestamp;

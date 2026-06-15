@@ -1055,11 +1055,19 @@ class StoreController extends Controller
         $tintOperations = (clone $salesQuery)
             ->where(function ($query) {
                 $query->where('description', 'like', '%تضليل%')
-                    ->orWhere('description', 'like', '%تظليل%');
+                    ->orWhere('description', 'like', '%تظليل%')
+                    ->orWhereHas('items', function ($itemsQuery) {
+                        $itemsQuery->where('custom_name', 'like', '%تضليل%')
+                            ->orWhere('custom_name', 'like', '%تظليل%');
+                    });
             })
             ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->with('items:id,sale_id,custom_name')
             ->latest('created_at')
-            ->get();
+            ->get()
+            ->each(function ($sale) {
+                $sale->tint_operation_name = $this->resolveTintOperationName($sale);
+            });
         $tintOperationsCount = $tintOperations->count();
         $tintOperationsTotal = (float) $tintOperations->sum('paid_amount');
 
@@ -1172,11 +1180,19 @@ class StoreController extends Controller
         $data['tintOperations'] = (clone $salesQuery)
             ->where(function ($query) {
                 $query->where('description', 'like', '%تضليل%')
-                    ->orWhere('description', 'like', '%تظليل%');
+                    ->orWhere('description', 'like', '%تظليل%')
+                    ->orWhereHas('items', function ($itemsQuery) {
+                        $itemsQuery->where('custom_name', 'like', '%تضليل%')
+                            ->orWhere('custom_name', 'like', '%تظليل%');
+                    });
             })
             ->select(['id', 'description', 'paid_amount', 'final_total', 'created_at'])
+            ->with('items:id,sale_id,custom_name')
             ->latest('created_at')
-            ->get();
+            ->get()
+            ->each(function ($sale) {
+                $sale->tint_operation_name = $this->resolveTintOperationName($sale);
+            });
         $data['tintOperationsCount'] = $data['tintOperations']->count();
         $data['tintOperationsTotal'] = (float) $data['tintOperations']->sum('paid_amount');
         $data['monthlySoldProductsCost'] = $this->calculateSoldProductsCostForPeriod(
@@ -1239,6 +1255,30 @@ class StoreController extends Controller
             // عمليات ما قبل يونيو 2026 تبقى قديمة، وبعدها نستخدم تكلفة الأسطر فقط إذا كانت مكتملة.
             ->selectRaw('COALESCE(SUM(CASE WHEN use_legacy_cost = 1 THEN legacy_products_cost WHEN items_count > 0 AND items_count = costed_items_count THEN item_total_cost ELSE legacy_products_cost END), 0) as total_cost')
             ->value('total_cost');
+    }
+
+    private function resolveTintOperationName(Sale $sale): ?string
+    {
+        $name = $sale->items
+            ->pluck('custom_name')
+            ->map(fn ($itemName) => trim((string) $itemName))
+            ->filter(function ($itemName) {
+                return mb_stripos($itemName, 'تضليل') !== false
+                    || mb_stripos($itemName, 'تظليل') !== false;
+            })
+            ->unique()
+            ->implode(' - ');
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        $description = trim((string) $sale->description);
+        if (mb_stripos($description, 'تضليل') !== false || mb_stripos($description, 'تظليل') !== false) {
+            return $description;
+        }
+
+        return null;
     }
 
     /**

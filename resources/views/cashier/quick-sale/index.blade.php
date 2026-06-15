@@ -569,7 +569,6 @@
                     <input type="hidden" name="sale_type" x-model="sale_type">
                     <input type="hidden" name="employee_id" x-model="employee_id">
                     <input type="hidden" name="description" x-model="description">
-                    <input type="hidden" name="tint_operation_names" :value="tintOperationNames.join(' - ')">
                     <input type="hidden" name="has_invoice" :value="has_invoice ? 1 : 0">
                     <input type="hidden" name="has_partial_credit" :value="hasPartialCredit ? 1 : 0">
                     <input type="hidden" name="debt_amount" :value="hasPartialCredit ? Math.round(partial_credit_amount || 0) : ''">
@@ -831,13 +830,6 @@ function quickSale() {
             const items = Array.isArray(detail?.items) ? detail.items : [];
             if (!items.length) return;
             this.cart.push(...items);
-            const operationName = String(detail?.label || items[0]?.tint_group_label || '').trim();
-            const descriptionParts = this.description.split(' - ').map(part => part.trim()).filter(Boolean);
-            if (operationName && !descriptionParts.includes(operationName)) {
-                this.description = this.description.trim()
-                    ? `${this.description.trim()} - ${operationName}`
-                    : operationName;
-            }
             this.search = '';
             this.$nextTick(() => this.$refs.searchInput?.focus());
             Swal.fire({
@@ -875,24 +867,7 @@ function quickSale() {
         },
 
         removeTintGroup(groupId) {
-            const operationName = String(this.tintGroupItems(groupId)[0]?.tint_group_label || '').trim();
             this.cart = this.cart.filter(item => item.tint_group_id !== groupId);
-            if (operationName) {
-                this.description = this.description
-                    .split(' - ')
-                    .map(part => part.trim())
-                    .filter(part => part && part !== operationName)
-                    .join(' - ');
-            }
-        },
-
-        get tintOperationNames() {
-            return [...new Set(
-                this.cart
-                    .filter(item => item.tint_group_id && item.tint_group_label)
-                    .map(item => String(item.tint_group_label).trim())
-                    .filter(Boolean)
-            )];
         },
 
         get items_total() { return this.cart.reduce((sum, item) => sum + (Math.round(item.total) || 0), 0); },
