@@ -269,8 +269,10 @@ class UserDashboardController extends Controller
             ->selectRaw('COALESCE(SUM(sale_items.total), 0) as sales_value')
             ->get()
             ->groupBy('store_id')
-            ->map(fn ($products) => $products->sortByDesc('sold_quantity')->first())
-            ->filter()
+            ->flatMap(fn ($products) => $products
+                ->sortByDesc('sold_quantity')
+                ->take(5)
+                ->values())
             ->values();
 
         // تفاصيل كل مؤشر لكل متجر (لاستخدامها في نافذة تفاصيل البطاقات)
@@ -368,7 +370,7 @@ class UserDashboardController extends Controller
                 'sales_month' => (float) $storeSalesMonth,
                 'expenses_month' => (float) $storeExpensesMonth,
                 'products_cost_month' => (float) $storeProductsCostMonth,
-                'salaries_month' => (float) $storeNetSalariesMonth,
+                'salaries_month' => (float) $storeSalariesMonth,
                 'withdrawals_month' => (float) $storeWorkerWithdrawalsMonth,
                 'salary_remaining_month' => (float) $storeNetSalariesMonth,
                 'monthly_owner_purchases' => (float) $storeOwnerPurchasesMonth,
@@ -396,6 +398,76 @@ class UserDashboardController extends Controller
             'employeeMonthlyWithdrawals', 'employeeSalaryRemainders',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
+    }
+
+    public function dailySnapshot()
+    {
+        $user = auth('web')->user();
+        $stores = $user->stores;
+        $storeIds = $stores->pluck('id');
+        $selectedStore = null;
+
+        if ($requestedStoreId = request()->integer('summary_store_id')) {
+            $selectedStore = $stores->firstWhere('id', $requestedStoreId);
+        }
+
+        $dailyStoreIds = $selectedStore
+            ? collect([$selectedStore->id])
+            : $storeIds;
+        $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
+
+        $salesQuery = Sale::whereIn('store_id', $dailyStoreIds)
+            ->whereDate('created_at', today())
+            ->whereIn('sale_type', $includedSaleTypes)
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            });
+
+        $salesToday = (float) (clone $salesQuery)->sum('paid_amount');
+        $operationsCount = (int) (clone $salesQuery)->count();
+        $expensesToday = (float) Expense::whereIn('store_id', $dailyStoreIds)
+            ->whereDate('created_at', today())
+            ->sum('amount');
+        $productsCostToday = $this->calculateProductsCost(
+            $dailyStoreIds,
+            today()->startOfDay(),
+            today()->endOfDay(),
+            $includedSaleTypes
+        );
+        $latestSale = (clone $salesQuery)
+            ->with(['store:id,name', 'items.product:id,name'])
+            ->latest()
+            ->first();
+
+        $latestOperation = null;
+        if ($latestSale) {
+            $description = trim((string) $latestSale->description);
+            $productNames = $latestSale->items
+                ->map(fn ($item) => optional($item->product)->name)
+                ->filter()
+                ->unique()
+                ->values();
+
+            $latestOperation = [
+                'id' => (int) $latestSale->id,
+                'store_name' => $latestSale->store->name ?? 'متجر غير معروف',
+                'description' => $description
+                    ?: ($productNames->isNotEmpty() ? $productNames->implode(' - ') : 'عملية بيع'),
+                'amount' => (float) ($latestSale->paid_amount ?? 0),
+                'time' => optional($latestSale->created_at)->format('h:i A'),
+            ];
+        }
+
+        return response()->json([
+            'sales_today' => $salesToday,
+            'expenses_today' => $expensesToday,
+            'products_cost_today' => $productsCostToday,
+            'profit_today' => $salesToday - $productsCostToday,
+            'operations_count' => $operationsCount,
+            'latest_operation' => $latestOperation,
+            'updated_at' => now()->format('h:i:s A'),
+        ]);
     }
 
     /**
