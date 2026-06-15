@@ -666,7 +666,7 @@ const editableSales = @json($editableSales);
 const editSaleUrlTemplate = @json(url('/user/stores/' . $store->id . '/daily-sales/__SALE_ID__'));
 let activeEditSale = null;
 
-function updateEditSaleFields() {
+function updateEditSaleFields(syncTotal = true) {
     const saleType = document.getElementById('edit-sale-type')?.value;
     const paidWrapper = document.getElementById('edit-paid-amount-wrapper');
     const debtWrapper = document.getElementById('edit-debt-wrapper');
@@ -715,7 +715,9 @@ function updateEditSaleFields() {
         mixedConversionWarning.innerHTML = `عند التحويل إلى ميكس من آجل محصّل جزئيًا: تم تحصيل <span class="font-bold">${originalPaidAmount.toFixed(2)}</span> سابقًا، والمتبقي الآن <span class="font-bold">${originalRemainingAmount.toFixed(2)}</span>. أدخل القيم بحيث يكون <span class="font-bold">كاش + شبكة + مديونية = ${originalRemainingAmount.toFixed(2)}</span>.`;
     }
 
-    syncEditedOperationTotal();
+    if (syncTotal) {
+        syncEditedOperationTotal();
+    }
 }
 
 function fillEditSaleForm(sale, oldValues = null) {
@@ -843,8 +845,9 @@ function openEditSaleModal(saleId, oldValues = null) {
     if (title) title.textContent = `تعديل العملية #${sale.id}`;
     fillEditSaleForm(sale, oldValues);
     modal.classList.remove('hidden');
-    updateEditSaleFields();
-    if (!oldValues) syncEditedOperationTotal();
+    // لا نعيد حساب المبلغ عند مجرد فتح النافذة؛ يجب إظهار المبلغ الكامل
+    // المحفوظ للعملية، ثم يعاد الحساب فقط عند تعديل النوع أو المنتجات.
+    updateEditSaleFields(false);
 }
 
 function closeEditSaleModal() {
