@@ -39,7 +39,6 @@ class UserDashboardController extends Controller
         }
 
         // المحاسبين والموظفين
-        $accountantsCount = $user->accountants()->count();
         $employeesCount   = $user->employees()->count();
 
         // الاشتراك
@@ -74,24 +73,6 @@ class UserDashboardController extends Controller
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
             ->count();
-
-        $dailyCashSales = Sale::whereIn('store_id', $dailyStoreIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('cash_amount');
-
-        $dailyCardSales = Sale::whereIn('store_id', $dailyStoreIds)
-            ->whereDate('created_at', today())
-            ->whereIn('sale_type', $includedSaleTypes)
-            ->where(function ($query) {
-                $query->whereNull('description')
-                    ->orWhere('description', '!=', 'manual_invoice_entry');
-            })
-            ->sum('card_amount');
 
         // تكلفة المنتجات فقط من تكاليف أسطر البيع المحفوظة؛ عملية شغل اليد
         // التي لا تحتوي منتجات تكون تكلفتها صفر ولا تُعامل كتكلفة منتج.
@@ -196,18 +177,6 @@ class UserDashboardController extends Controller
 
         /* آخر العمليات */
         $activities = Log::with('store')->whereIn('store_id', $storeIds)->latest()->limit(10)->get();
-
-        // لا يوجد في المشروع الحالي جدول مستقل للشفتات المفتوحة؛ نحافظ على
-        // توافق الواجهة بقائمة فارغة بدل إنشاء مصدر بيانات غير موجود.
-        $longOpenShifts = collect();
-
-        $employeesWithoutSalary = Employee::with('store')
-            ->whereIn('store_id', $storeIds)
-            ->where(function ($query) {
-                $query->whereNull('salary')->orWhere('salary', '<=', 0);
-            })
-            ->get();
-        $employeesWithoutSalaryCount = $employeesWithoutSalary->count();
 
         $lowStockProducts = Product::with('store')
             ->whereIn('store_id', $storeIds)
@@ -337,13 +306,6 @@ class UserDashboardController extends Controller
                 ->sum('amount');
 
             $storeSalariesMonth = (float) $store->employees()->sum('salary');
-            $storeWorkerWithdrawalsMonth = (float) DB::table('employee_withdrawals')
-                ->where('store_id', $storeId)
-                ->where('person_type', Employee::class)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->sum('amount');
-            $storeNetSalariesMonth = max(0, $storeSalariesMonth - $storeWorkerWithdrawalsMonth);
 
             $storeOwnerPurchasesMonth = Purchase::where('store_id', $storeId)
                 ->whereYear('created_at', now()->year)
@@ -378,31 +340,21 @@ class UserDashboardController extends Controller
                 'expenses_month' => (float) $storeExpensesMonth,
                 'products_cost_month' => (float) $storeProductsCostMonth,
                 'salaries_month' => (float) $storeSalariesMonth,
-                'withdrawals_month' => (float) $storeWorkerWithdrawalsMonth,
-                'salary_remaining_month' => (float) $storeNetSalariesMonth,
                 'monthly_owner_purchases' => (float) $storeOwnerPurchasesMonth,
                 'monthly_accountant_consumption' => (float) $storeAccountantConsumptionMonth,
                 'monthly_purchases_consumption' => (float) $storeOwnerPurchasesMonth + (float) $storeAccountantConsumptionMonth,
             ];
         }
 
-        $storePerformance = collect($metricStoreBreakdowns)->sortByDesc('profit_month')->values();
-        $bestStorePerformance = $storePerformance->first();
-        $worstStorePerformance = $storePerformance->count() > 1
-            ? $storePerformance->last()
-            : null;
-
         return view('dashboard.user.index', array_merge(compact(
-            'stores', 'accountantsCount', 'employeesCount', 'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
-            'productsCostMonth', 'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
+            'stores', 'employeesCount', 'daysLeft', 'salesToday', 'salesMonth', 'productsCostToday',
+            'expensesToday', 'expensesMonth', 'profitToday', 'profitMonth',
             'monthlySalaries', 'monthlyWorkerWithdrawals', 'netMonthlySalaries',
             'monthlyOwnerPurchases', 'monthlyAccountantConsumption', 'monthlyPurchasesAndConsumption',
-            'creditOpen', 'metricStoreBreakdowns', 'selectedSummaryStore',
-            'dailySalesOperationsCount', 'dailyCashSales', 'dailyCardSales',
-            'longOpenShifts', 'employeesWithoutSalaryCount', 'employeesWithoutSalary',
+            'creditOpen', 'metricStoreBreakdowns',
+            'dailySalesOperationsCount',
             'lowStockCount', 'lowStockProducts', 'topSellingProducts',
-            'bestStorePerformance', 'worstStorePerformance',
-            'employeeMonthlyWithdrawals', 'employeeSalaryRemainders',
+            'employeeSalaryRemainders',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
     }
@@ -563,8 +515,7 @@ class UserDashboardController extends Controller
             ->whereIn('store_id', $storeIds)->whereBetween('created_at', [$chartStart, $chartEnd])
             ->groupBy('day')->get()->keyBy('day');
 
-        $labels = []; $sales = []; $exps = []; $credits = []; $productCosts = [];
-        $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
+        $labels = []; $sales = []; $exps = []; $credits = [];
 
         for ($i = 0; $i < 14; $i++) {
             $date = $chartStart->copy()->addDays($i)->toDateString();
@@ -572,12 +523,6 @@ class UserDashboardController extends Controller
             $sales[]   = $dailySales[$date]->total ?? 0;
             $credits[] = $dailySales[$date]->credit ?? 0;
             $exps[]    = $dailyExpenses[$date]->total ?? 0;
-            $productCosts[] = $this->calculateProductsCost(
-                $storeIds,
-                $chartStart->copy()->addDays($i)->startOfDay(),
-                $chartStart->copy()->addDays($i)->endOfDay(),
-                $includedSaleTypes
-            );
         }
 
         return [
@@ -585,30 +530,25 @@ class UserDashboardController extends Controller
             'chartSales' => $sales,
             'chartExpenses' => $exps,
             'chartCredit' => $credits,
-            'chartProductCosts' => $productCosts,
         ];
     }
 
     private function emptyStateData($user, $stores)
     {
         return [
-            'stores' => $stores, 'user' => $user, 'accountantsCount' => 0, 'employeesCount' => 0,
+            'stores' => $stores, 'user' => $user, 'employeesCount' => 0,
             'daysLeft' => 0, 'salesToday' => 0, 'salesMonth' => 0, 'productsCostToday' => 0, 'expensesToday' => 0,
-            'productsCostMonth' => 0, 'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
+            'expensesMonth' => 0, 'profitToday' => 0, 'profitMonth' => 0,
             'monthlySalaries' => 0, 'monthlyWorkerWithdrawals' => 0, 'netMonthlySalaries' => 0,
             'monthlyOwnerPurchases' => 0, 'monthlyAccountantConsumption' => 0,
             'monthlyPurchasesAndConsumption' => 0, 'creditOpen' => 0,
             'metricStoreBreakdowns' => [],
-            'selectedSummaryStore' => null,
-            'dailySalesOperationsCount' => 0, 'dailyCashSales' => 0, 'dailyCardSales' => 0,
-            'longOpenShifts' => collect(),
-            'employeesWithoutSalaryCount' => 0, 'employeesWithoutSalary' => collect(),
+            'dailySalesOperationsCount' => 0,
             'lowStockCount' => 0, 'lowStockProducts' => collect(), 'topSellingProducts' => collect(),
-            'bestStorePerformance' => null, 'worstStorePerformance' => null,
-            'employeeMonthlyWithdrawals' => collect(), 'employeeSalaryRemainders' => collect(),
+            'employeeSalaryRemainders' => collect(),
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [],
-            'chartCredit' => [], 'chartProductCosts' => []
+            'chartCredit' => []
         ];
     }
 }
