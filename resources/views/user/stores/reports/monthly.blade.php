@@ -86,7 +86,7 @@
                     @forelse($tintOperations as $operation)
                         <tr class="border-t border-gray-700/70 text-gray-200">
                             <td class="p-3">#{{ $operation->id }}</td>
-                            <td class="p-3 text-indigo-200 font-semibold">{{ $operation->tint_operation_name ?: 'تضليل' }}</td>
+                            <td class="p-3 text-indigo-200 font-semibold">{{ $operation->description ?: 'تضليل' }}</td>
                             <td class="p-3">{{ $operation->created_at?->format('Y-m-d h:i A') }}</td>
                             <td class="p-3 text-green-400 font-bold">{{ number_format($operation->paid_amount, 2) }} ر.س</td>
                         </tr>

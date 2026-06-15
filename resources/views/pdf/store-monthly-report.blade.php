@@ -196,7 +196,7 @@
                     </tr>
                     @foreach(($tintOperations ?? collect()) as $operation)
                         <tr>
-                            <th>#{{ $operation->id }} — {{ $operation->tint_operation_name ?: 'تضليل' }}</th>
+                            <th>#{{ $operation->id }} — {{ $operation->description ?: 'تضليل' }}</th>
                             <td>{{ number_format($operation->paid_amount, 2) }} ر.س</td>
                         </tr>
                     @endforeach

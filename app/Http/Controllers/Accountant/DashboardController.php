@@ -699,19 +699,6 @@ class DashboardController extends Controller
             })
             ->with(['employee', 'accountant', 'items.product'])
             ->get()->map(function($s) {
-                $tintOperationName = $s->items
-                    ->pluck('custom_name')
-                    ->map(fn ($name) => trim((string) $name))
-                    ->filter(fn ($name) => mb_stripos($name, 'تضليل') !== false || mb_stripos($name, 'تظليل') !== false)
-                    ->unique()
-                    ->implode(' - ');
-
-                if ($tintOperationName === ''
-                    && (mb_stripos((string) $s->description, 'تضليل') !== false
-                        || mb_stripos((string) $s->description, 'تظليل') !== false)) {
-                    $tintOperationName = (string) $s->description;
-                }
-
                  $productsList = [];
         foreach ($s->items as $item) {
             $productsList[] = [
@@ -724,7 +711,10 @@ class DashboardController extends Controller
                 return [
                     'id' => $s->id,
                     // قيمة عرض داخل التقرير فقط، ولا تعتمد على أي عمود إضافي في قاعدة البيانات.
-                    'operation_name' => $tintOperationName !== '' ? $tintOperationName : null,
+                    'operation_name' => (mb_stripos((string) $s->description, 'تضليل') !== false
+                        || mb_stripos((string) $s->description, 'تظليل') !== false)
+                            ? $s->description
+                            : null,
                     'time' => $s->created_at->format('h:i A'),
                     'type' => $s->sale_type,
                     'received' => $s->paid_amount,
