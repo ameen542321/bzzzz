@@ -163,23 +163,19 @@
             <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" value-id="daily-products-cost-value" color="yellow" />
         </button>
 
-        <div id="live-operation-card" class="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-cyan-950/40 border border-cyan-900/50 rounded-2xl p-5 transition-colors duration-500">
-            <div class="absolute -left-6 -top-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-xl"></div>
-            <div class="relative flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center">
-                        <i class="fa-solid fa-receipt text-xs"></i>
-                    </span>
-                    <p class="text-xs font-semibold text-cyan-200">آخر عملية مباشرة</p>
-                </div>
-                <span id="live-operation-time" class="text-[10px] text-gray-500">--:--</span>
-            </div>
-            <div class="relative mt-3">
-                <p id="live-operation-product" class="text-sm font-bold text-white leading-6 truncate">جاري متابعة العمليات...</p>
-                <p id="live-operation-store" class="text-[11px] text-gray-400 mt-1">—</p>
-                <div class="flex items-end justify-between gap-3 mt-3 pt-3 border-t border-gray-800/80">
-                    <span class="text-[10px] text-gray-500">المبلغ المستلم</span>
-                    <strong id="live-operation-amount" class="text-xl text-emerald-300">0.00</strong>
+        <div id="live-operation-card" class="relative overflow-hidden bg-gray-900/70 border border-gray-800 rounded-2xl px-4 py-3 transition-colors duration-500">
+            <span id="live-operation-amount" class="absolute left-3 top-2 text-[10px] font-bold text-emerald-300">0.00</span>
+            <div class="flex items-center gap-3 min-h-[52px] pl-12">
+                <span class="w-8 h-8 shrink-0 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center">
+                    <i class="fa-solid fa-bolt text-xs"></i>
+                </span>
+                <div class="min-w-0 text-right">
+                    <p id="live-operation-product" class="text-sm font-bold text-white truncate">جاري متابعة العمليات...</p>
+                    <p class="text-[10px] text-gray-500 mt-1 truncate">
+                        <span id="live-operation-store">—</span>
+                        <span class="mx-1">•</span>
+                        <span id="live-operation-time">--:--</span>
+                    </p>
                 </div>
             </div>
         </div>
@@ -718,10 +714,12 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const url = new URL(snapshotUrl, window.location.origin);
             if (summaryStoreId) url.searchParams.set('summary_store_id', summaryStoreId);
+            url.searchParams.set('_', Date.now().toString());
 
             const response = await fetch(url, {
                 headers: { 'Accept': 'application/json' },
                 credentials: 'same-origin',
+                cache: 'no-store',
             });
             if (!response.ok) return;
 
@@ -744,7 +742,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     productElement.textContent = data.latest_operation.description;
                     productElement.classList.toggle('text-cyan-200', Boolean(data.latest_operation.is_tint));
                 }
-                if (storeElement) storeElement.textContent = `المتجر: ${data.latest_operation.store_name}`;
+                if (storeElement) storeElement.textContent = data.latest_operation.store_name;
                 if (amountElement) amountElement.textContent = formatNumber(data.latest_operation.amount);
                 if (timeElement) timeElement.textContent = data.latest_operation.time || '--:--';
             } else {
@@ -769,7 +767,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     refreshDailySnapshot();
-    window.setInterval(refreshDailySnapshot, 10000);
+    window.setInterval(refreshDailySnapshot, 3000);
 });
 </script>
 

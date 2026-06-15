@@ -481,7 +481,7 @@ class UserDashboardController extends Controller
             'operations_count' => $operationsCount,
             'latest_operation' => $latestOperation,
             'updated_at' => now()->format('h:i:s A'),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     /**
