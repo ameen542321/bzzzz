@@ -130,24 +130,16 @@
 @endif
     {{--  القسم الرابع: الإحصائيات العامة (دمج بين الداشبوردين) --}}
     {{-- ========================================================= --}}
-    <p class="text-xs font-semibold text-gray-400 mt-1 mb-2">الملخص اليومي</p>
-    <div class="mb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-cyan-950/30 border border-cyan-800/50 rounded-2xl p-4">
-            <div class="flex items-center justify-between gap-3">
-                <div>
-                    <p class="text-xs text-cyan-300">إجمالي عمليات اليوم في جميع المتاجر</p>
-                    <p id="live-operations-count" class="text-3xl font-black text-white mt-1">{{ number_format($dailySalesOperationsCount) }}</p>
-                </div>
-                <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" title="تحديث تلقائي"></span>
-            </div>
-            <p id="live-updated-at" class="text-[11px] text-gray-500 mt-2">تحديث تلقائي كل 30 ثانية</p>
-        </div>
-        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-4">
-            <p class="text-xs text-gray-400">آخر عملية بيع</p>
-            <p id="live-latest-operation" class="text-sm text-white mt-2">جاري متابعة العمليات الجديدة...</p>
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-1 mb-2">
+        <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
+        <div class="inline-flex items-center gap-2 text-[11px] text-gray-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>العمليات اليوم:</span>
+            <strong id="live-operations-count" class="text-cyan-300">{{ number_format($dailySalesOperationsCount) }}</strong>
+            <span id="live-updated-at" class="text-gray-600">تحديث مباشر</span>
         </div>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
         {{-- صافي الربح اليوم --}}
         <button id="daily-profit-card" type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: صافي الربح اليومي حسب كل متجر">
@@ -169,6 +161,14 @@
         <button id="daily-products-cost-card" type="button" class="text-right metric-card" data-metric="products_cost_today" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة اليوم حسب كل متجر">
             <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" color="yellow" />
         </button>
+
+        <div id="live-operation-card" class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5 transition-colors duration-500">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-gray-400">آخر عملية مباشرة</p>
+                <i class="fa-solid fa-bolt text-[11px] text-cyan-400"></i>
+            </div>
+            <p id="live-latest-operation" class="text-sm font-bold text-white mt-2 leading-6">جاري متابعة العمليات...</p>
+        </div>
 
     </div>
 
@@ -245,17 +245,40 @@
         </div>
 
         <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
-            <p class="text-sm font-semibold text-white mb-3">أفضل خمسة منتجات مبيعًا في كل متجر هذا الشهر</p>
-            <div class="max-h-72 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm font-semibold text-white">الأكثر مبيعًا حسب المتجر</p>
+                    <p class="text-[11px] text-gray-500 mt-1">أفضل 5 منتجات خلال الشهر الحالي</p>
+                </div>
+                <i class="fa-solid fa-ranking-star text-amber-300"></i>
+            </div>
+            <div class="max-h-72 overflow-y-auto custom-scrollbar space-y-5 pr-1">
                 @forelse($topSellingProducts->groupBy('store_id') as $storeProducts)
-                    <div>
-                        <p class="text-xs font-bold text-emerald-300 mb-2">{{ $storeProducts->first()->store_name }}</p>
-                        <div class="space-y-2">
+                    @php
+                        $highestQuantity = max(1, (float) $storeProducts->max('sold_quantity'));
+                    @endphp
+                    <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs font-bold text-emerald-300">{{ $storeProducts->first()->store_name }}</p>
+                            <span class="text-[10px] text-gray-500">{{ $storeProducts->count() }} منتجات</span>
+                        </div>
+                        <div class="space-y-3">
                             @foreach($storeProducts as $index => $product)
-                                <div class="grid grid-cols-[24px_1fr_auto] items-center gap-2 text-xs">
-                                    <span class="text-gray-500">{{ $index + 1 }}</span>
-                                    <span class="text-gray-200">{{ $product->name }}</span>
-                                    <span class="text-cyan-300">{{ number_format((float) $product->sold_quantity, 2) }}</span>
+                                <div>
+                                    <div class="flex items-center justify-between gap-3 text-xs mb-1.5">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <span class="w-5 h-5 shrink-0 rounded-full bg-gray-800 text-gray-400 flex items-center justify-center text-[10px]">{{ $index + 1 }}</span>
+                                            <span class="text-gray-200 truncate">{{ $product->name }}</span>
+                                        </div>
+                                        <div class="text-left shrink-0">
+                                            <span class="text-cyan-300 font-bold">{{ number_format((float) $product->sold_quantity, 2) }}</span>
+                                            <span class="text-[10px] text-gray-600 mr-1">{{ number_format((float) $product->sales_value, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                                        <div class="h-full rounded-full bg-gradient-to-l from-cyan-400 to-emerald-400"
+                                             style="width: {{ min(100, ((float) $product->sold_quantity / $highestQuantity) * 100) }}%"></div>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
@@ -528,6 +551,7 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener('DOMContentLoaded', function () {
     const snapshotUrl = @json(route('user.dashboard.daily-snapshot'));
     const summaryStoreId = @json(request('summary_store_id'));
+    let latestOperationId = null;
 
     function formatNumber(value) {
         return Number(value || 0).toLocaleString('en-US', {
@@ -562,10 +586,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (countElement) countElement.textContent = formatNumber(data.operations_count);
 
             const latestElement = document.getElementById('live-latest-operation');
+            const latestCard = document.getElementById('live-operation-card');
             if (latestElement) {
                 latestElement.textContent = data.latest_operation
                     ? `${data.latest_operation.description} في ${data.latest_operation.store_name} — ${formatNumber(data.latest_operation.amount)} (${data.latest_operation.time})`
                     : 'لا توجد عمليات بيع اليوم حتى الآن.';
+            }
+            if (latestCard && data.latest_operation?.id && latestOperationId !== data.latest_operation.id) {
+                latestCard.classList.add('border-cyan-500', 'bg-cyan-950/30');
+                window.setTimeout(() => {
+                    latestCard.classList.remove('border-cyan-500', 'bg-cyan-950/30');
+                }, 1800);
+                latestOperationId = data.latest_operation.id;
             }
 
             const updatedElement = document.getElementById('live-updated-at');
@@ -576,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     refreshDailySnapshot();
-    window.setInterval(refreshDailySnapshot, 30000);
+    window.setInterval(refreshDailySnapshot, 10000);
 });
 </script>
 

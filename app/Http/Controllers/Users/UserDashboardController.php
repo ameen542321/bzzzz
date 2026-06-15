@@ -210,7 +210,11 @@ class UserDashboardController extends Controller
 
         $lowStockProducts = Product::with('store')
             ->whereIn('store_id', $storeIds)
-            ->where('quantity', '>', 0)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('sale_items')
+                    ->whereColumn('sale_items.product_id', 'products.id');
+            })
             ->lowStock()
             ->orderBy('quantity')
             ->get();
