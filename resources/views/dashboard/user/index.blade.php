@@ -14,6 +14,9 @@
     $lowStockProducts = $lowStockProducts ?? collect();
     $topSellingProducts = $topSellingProducts ?? collect();
     $employeeSalaryRemainders = $employeeSalaryRemainders ?? [];
+    // موظفون بلا راتب: يستخدمان في التنبيه والقائمة التفصيلية أدناه.
+    $employeesWithoutSalary = $employeesWithoutSalary ?? collect();
+    $employeesWithoutSalaryCount = $employeesWithoutSalaryCount ?? $employeesWithoutSalary->count();
 @endphp
 <div class="p-6 space-y-10">
 
@@ -80,6 +83,25 @@
         @if($creditLate > 0)
             <div class="alert-box bg-orange-900/40 border-orange-700 text-orange-200">
                 ⚠️ لديك {{ $creditLate }} مديونيات متأخرة لأكثر من 30 يوم
+            </div>
+        @endif
+
+        {{-- تنبيه إداري مهم: الموظفون الذين راتبهم غير مسجل أو يساوي صفرًا. --}}
+        @if($employeesWithoutSalaryCount > 0)
+            <div class="alert-box bg-purple-900/40 border-purple-700 text-purple-100">
+                <div class="flex flex-col gap-2">
+                    <p class="font-semibold">
+                        ⚠️ يوجد {{ $employeesWithoutSalaryCount }} موظف لم يُسجّل له راتب.
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($employeesWithoutSalary as $employee)
+                            <span class="inline-flex items-center gap-1 rounded-lg bg-black/20 px-2 py-1 text-xs">
+                                <span>{{ $employee->name }}</span>
+                                <span class="text-purple-300">— {{ $employee->store->name ?? 'متجر غير معروف' }}</span>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
             </div>
         @endif
 
@@ -516,7 +538,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // تفاصيل كل بطاقة موزعة حسب المتجر، مرسلة من الكنترولر كـ JSON.
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
+    // تعريف العناوين والقيم والنص التوضيحي لكل بطاقة قابلة للنقر.
     const metricDefinitions = {
         profit_today: { title: 'صافي الربح اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         sales_today: { title: 'مبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
@@ -579,12 +603,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // بيانات الموظفين الجاهزة لحساب وعرض الراتب والسحب والمتبقي لكل متجر.
     const salaryRows = @json($employeeSalaryRemainders ?? []);
     const modal = document.getElementById('salary-withdrawals-modal');
     const openButton = document.getElementById('salary-after-withdrawals-card');
     const closeButton = document.getElementById('salary-withdrawals-close');
     const storesContainer = document.getElementById('salary-withdrawals-stores');
 
+    // حماية النصوص القادمة من قاعدة البيانات قبل إدراجها داخل HTML ديناميكي.
     function escapeHtml(value) {
         return String(value ?? '')
             .replaceAll('&', '&amp;')
@@ -594,6 +620,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .replaceAll("'", '&#039;');
     }
 
+    // توحيد عرض جميع مبالغ نافذة الرواتب إلى منزلتين عشريتين.
     function formatSalary(value) {
         return Number(value || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
@@ -601,6 +628,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // تجميع الموظفين حسب المتجر وبناء جدول قابل للفتح لكل متجر.
     function renderSalaryStores() {
         if (!storesContainer) return;
 
@@ -683,10 +711,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // مسار JSON الذي يحدّث بطاقات اليوم وآخر عملية دون إعادة تحميل الصفحة.
     const snapshotUrl = @json(route('user.dashboard.daily-snapshot'));
+    // فلتر المتجر الحالي إن اختار المالك متجرًا محددًا للملخص اليومي.
     const summaryStoreId = @json(request('summary_store_id'));
+    // آخر معرف عُرض؛ يستخدم لتفعيل وميض البطاقة عند وصول عملية جديدة فقط.
     let latestOperationId = null;
 
+    // تنسيق الأرقام الحية مع منزلتين كحد أقصى.
     function formatNumber(value) {
         return Number(value || 0).toLocaleString('en-US', {
             minimumFractionDigits: 0,
@@ -694,11 +726,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // تحديث قيمة بطاقة واحدة بواسطة معرف عنصر القيمة داخل المكوّن.
     function updateCardValue(valueId, value) {
         const valueElement = document.getElementById(valueId);
         if (valueElement) valueElement.textContent = formatNumber(value);
     }
 
+    // جلب اللقطة اليومية وتحديث البطاقات والعداد وآخر عملية كل ثلاث ثوانٍ.
     async function refreshDailySnapshot() {
         try {
             const url = new URL(snapshotUrl, window.location.origin);

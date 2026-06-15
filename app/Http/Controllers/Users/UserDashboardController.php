@@ -15,11 +15,25 @@ use Illuminate\Support\Facades\Schema;
 
 class UserDashboardController extends Controller
 {
+    /**
+     * عرض لوحة تحكم المالك.
+     *
+     * تجمع هذه الدالة بيانات متاجر المالك فقط، ثم تبني:
+     * - الملخص اليومي والشهري للمبيعات والتكلفة والمصروفات والربح.
+     * - الرواتب والسحوبات والمديونيات.
+     * - تنبيهات المخزون والموظفين الذين لم يُسجّل لهم راتب.
+     * - أفضل المنتجات والمخطط وآخر نشاطات النظام.
+     *
+     * جميع الاستعلامات المقيدة بالمتاجر تستخدم $storeIds لمنع ظهور بيانات
+     * تخص مالكًا آخر، بينما يستخدم $dailyStoreIds لتطبيق فلتر متجر واحد
+     * على بطاقات اليوم فقط عند اختيار متجر من الواجهة.
+     */
     public function index()
     {
+        // المالك المسجل دخوله عبر حارس مستخدمي النظام.
         $user = auth('web')->user();
 
-        // جلب المتاجر
+        // متاجر المالك ومعرفاتها؛ تستخدم المعرفات في جميع استعلامات اللوحة.
         $stores = $user->stores;
         $storeIds = $stores->pluck('id');
 
@@ -38,12 +52,26 @@ class UserDashboardController extends Controller
             return view('dashboard.user.index', $this->emptyStateData($user, $stores));
         }
 
-        // المحاسبين والموظفين
-        $employeesCount   = $user->employees()->count();
+        // العدد الإجمالي للموظفين الظاهر في بطاقة التشغيل.
+        $employeesCount = $user->employees()->count();
 
-        // الاشتراك
-        $subscriptionEnd  = $user->subscription_end_at;
-        $daysLeft         = $subscriptionEnd ? now()->diffInDays($subscriptionEnd, false) : null;
+        // الموظفون الذين لم يُحدد لهم راتب فعلي بعد (NULL أو صفر).
+        // هذا الاستعلام يخدم تنبيهًا تشغيليًا مهمًا في الواجهة، ولا يدخل
+        // هؤلاء الموظفون بقيمة وهمية في إجمالي الرواتب.
+        $employeesWithoutSalary = $user->employees()
+            ->with('store:id,name')
+            ->where(function ($query) {
+                $query->whereNull('salary')
+                    ->orWhere('salary', '<=', 0);
+            })
+            ->orderBy('store_id')
+            ->orderBy('name')
+            ->get();
+        $employeesWithoutSalaryCount = $employeesWithoutSalary->count();
+
+        // نهاية الاشتراك وعدد الأيام المتبقية؛ null يعني عدم وجود تاريخ نهاية.
+        $subscriptionEnd = $user->subscription_end_at;
+        $daysLeft = $subscriptionEnd ? now()->diffInDays($subscriptionEnd, false) : null;
 
         /*
         |--------------------------------------------------------------------------
@@ -112,14 +140,16 @@ class UserDashboardController extends Controller
             ->whereMonth('created_at', now()->month)
             ->sum('amount');
 
-        // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
+        // إجمالي الرواتب المسجلة كاملة قبل خصم سحوبات الشهر.
         $monthlySalaries = $user->employees()->sum('salary') ?? 0;
+        // مجموع سحوبات الموظفين خلال الشهر الحالي من العلاقة polymorphic.
         $monthlyWorkerWithdrawals = (float) DB::table('employee_withdrawals')
             ->whereIn('store_id', $storeIds)
             ->where('person_type', Employee::class)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
             ->sum('amount');
+        // المتبقي المستحق من الرواتب، مع منع ظهور قيمة سالبة.
         $netMonthlySalaries = max(0, (float) $monthlySalaries - $monthlyWorkerWithdrawals);
 
         /* صافي الربح - في هذا النظام المبلغ المحصل هو أساس البيع */
@@ -190,6 +220,7 @@ class UserDashboardController extends Controller
             ->get();
         $lowStockCount = $lowStockProducts->count();
 
+        // صف خام لكل موظف يجمع راتبه وسحوباته الحالية واسم متجره.
         $employeeMonthlyWithdrawals = DB::table('employees')
             ->leftJoin('employee_withdrawals', function ($join) {
                 // جدول السحوبات حُوّل إلى علاقة polymorphic؛ الموظف محفوظ في
@@ -207,6 +238,7 @@ class UserDashboardController extends Controller
             ->selectRaw('COALESCE(SUM(employee_withdrawals.amount), 0) as withdrawals_total')
             ->get();
 
+        // تحويل الصفوف الخام إلى بنية جاهزة لنافذة تفاصيل الرواتب.
         $employeeSalaryRemainders = $employeeMonthlyWithdrawals
             ->map(function ($employee) {
                 return [
@@ -223,6 +255,7 @@ class UserDashboardController extends Controller
             })
             ->values();
 
+        // أفضل خمسة منتجات من حيث الكمية المباعة في كل متجر خلال الشهر.
         $topSellingProducts = DB::table('sale_items')
             ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
             ->join('products', 'sale_items.product_id', '=', 'products.id')
@@ -354,13 +387,21 @@ class UserDashboardController extends Controller
             'creditOpen', 'metricStoreBreakdowns',
             'dailySalesOperationsCount',
             'lowStockCount', 'lowStockProducts', 'topSellingProducts',
-            'employeeSalaryRemainders',
+            'employeeSalaryRemainders', 'employeesWithoutSalary', 'employeesWithoutSalaryCount',
             'creditClosed', 'creditLate', 'user', 'activities'
         ), $chartData));
     }
 
+    /**
+     * إرجاع الأرقام اليومية المتغيرة بصيغة JSON دون إعادة تحميل الصفحة.
+     *
+     * تستدعي الواجهة هذا المسار كل ثلاث ثوانٍ. ويعيد المبيعات المحصلة،
+     * المصروفات، تكلفة المنتجات، الربح، عدد العمليات، وآخر عملية بيع.
+     * يدعم summary_store_id بشرط أن يكون المتجر تابعًا للمالك الحالي.
+     */
     public function dailySnapshot()
     {
+        // بيانات المالك ونطاق المتاجر المسموح به لهذا الطلب.
         $user = auth('web')->user();
         $stores = $user->stores;
         $storeIds = $stores->pluck('id');
@@ -375,6 +416,7 @@ class UserDashboardController extends Controller
             : $storeIds;
         $includedSaleTypes = ['cash', 'card', 'credit', 'mixed'];
 
+        // استعلام أساس يُنسخ لكل مجموع حتى تتطابق شروط جميع بطاقات اليوم.
         $salesQuery = Sale::whereIn('store_id', $dailyStoreIds)
             ->whereDate('created_at', today())
             ->whereIn('sale_type', $includedSaleTypes)
@@ -399,6 +441,7 @@ class UserDashboardController extends Controller
             ->latest()
             ->first();
 
+        // بنية آخر عملية تظل null عندما لا توجد مبيعات اليوم.
         $latestOperation = null;
         if ($latestSale) {
             $description = trim((string) $latestSale->description);
@@ -497,6 +540,15 @@ class UserDashboardController extends Controller
             ->value('total_cost');
     }
 
+    /**
+     * تجهيز سلاسل المخطط لآخر 14 يومًا.
+     *
+     * @param  iterable<int>  $storeIds معرفات المتاجر التابعة للمالك.
+     * @return array{chartLabels: array, chartSales: array, chartExpenses: array, chartCredit: array}
+     *
+     * تجمع الدالة القيم مرة واحدة حسب التاريخ، ثم تملأ الأيام غير الموجودة
+     * بأصفار حتى تبقى السلاسل الأربع متساوية الطول وصالحة للرسم في Canvas.
+     */
     private function prepareChartData($storeIds)
     {
         $chartStart = now()->subDays(13)->startOfDay();
@@ -515,7 +567,11 @@ class UserDashboardController extends Controller
             ->whereIn('store_id', $storeIds)->whereBetween('created_at', [$chartStart, $chartEnd])
             ->groupBy('day')->get()->keyBy('day');
 
-        $labels = []; $sales = []; $exps = []; $credits = [];
+        // كل مصفوفة تقابل سلسلة مرئية واحدة في مخطط الواجهة.
+        $labels = [];
+        $sales = [];
+        $exps = [];
+        $credits = [];
 
         for ($i = 0; $i < 14; $i++) {
             $date = $chartStart->copy()->addDays($i)->toDateString();
@@ -533,6 +589,12 @@ class UserDashboardController extends Controller
         ];
     }
 
+    /**
+     * إنشاء حمولة آمنة للواجهة عندما لا يملك المستخدم أي متجر.
+     *
+     * إبقاء جميع المفاتيح موجودة يمنع أخطاء Undefined variable في Blade،
+     * كما يسمح بعرض الصفحة والإرشاد إلى إنشاء أول متجر.
+     */
     private function emptyStateData($user, $stores)
     {
         return [
@@ -546,6 +608,7 @@ class UserDashboardController extends Controller
             'dailySalesOperationsCount' => 0,
             'lowStockCount' => 0, 'lowStockProducts' => collect(), 'topSellingProducts' => collect(),
             'employeeSalaryRemainders' => collect(),
+            'employeesWithoutSalary' => collect(), 'employeesWithoutSalaryCount' => 0,
             'creditClosed' => 0, 'creditLate' => 0, 'activities' => collect(),
             'chartLabels' => [], 'chartSales' => [], 'chartExpenses' => [],
             'chartCredit' => []
