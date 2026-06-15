@@ -1,7 +1,8 @@
 @props([
     'title' => '',
     'value' => '',
-    'color' => 'emerald'
+    'color' => 'emerald',
+    'valueId' => null,
 ])
 
 @php
@@ -19,7 +20,7 @@
 
 <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
     <p class="text-xs text-gray-400">{{ $title }}</p>
-    <p class="text-2xl font-bold {{ $colorClass }} mt-2">
+    <p @if($valueId) id="{{ $valueId }}" @endif class="text-2xl font-bold {{ $colorClass }} mt-2">
         {{ $value }}
     </p>
 </div>

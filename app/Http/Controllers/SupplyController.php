@@ -72,7 +72,9 @@ class SupplyController extends Controller {
 
         $unitType = (string) ($request->unit_type ?: 'unit');
         $priceProvided = $request->filled('purchase_price');
-        $newPrice = $priceProvided ? (float) $request->purchase_price : (float) $product->cost_price;
+        $newPrice = $priceProvided
+            ? $this->normalizeSupplyCostPrice($product, (float) $request->purchase_price, $unitType)
+            : (float) $product->cost_price;
 
         try {
             if (!$priceProvided || abs($newPrice - (float) $product->cost_price) <= 0.01) {
@@ -114,8 +116,11 @@ class SupplyController extends Controller {
 
         try {
             if ($request->action === 'approve') {
-                $approvedPrice = $request->filled('purchase_price') ? (float) $request->purchase_price : (float) $product->cost_price;
-                $this->applySupply($product, (float)$request->quantity, $approvedPrice, (string) ($request->unit_type ?: 'unit'), $request->notes);
+                $unitType = (string) ($request->unit_type ?: 'unit');
+                $approvedPrice = $request->filled('purchase_price')
+                    ? $this->normalizeSupplyCostPrice($product, (float) $request->purchase_price, $unitType)
+                    : (float) $product->cost_price;
+                $this->applySupply($product, (float)$request->quantity, $approvedPrice, $unitType, $request->notes);
             }
         } catch (QueryException $e) {
             report($e);
@@ -204,6 +209,17 @@ class SupplyController extends Controller {
         }
 
         return "تعذر {$action}: {$driverMessage}";
+    }
+
+
+    private function normalizeSupplyCostPrice($product, float $inputPrice, string $unitType): float
+    {
+        if ($product->product_type === 'fractional' && $unitType === 'meter' && (float) $product->roll_length > 0) {
+            // عند التوريد بالمتر، السعر المدخل هو سعر المتر ونحفظ cost_price دائماً كسعر الرول الكامل.
+            return $inputPrice * (float) $product->roll_length;
+        }
+
+        return $inputPrice;
     }
 
     private function applySupply($product, $qty, $price, string $unitType = 'unit', ?string $notes = null) {

@@ -43,11 +43,13 @@ class CategoryController extends Controller
             'name'             => 'required|string|max:255',
             'description'      => 'nullable|string',
             'status'           => 'required|in:active,inactive',
-            'is_main_category' => 'required|boolean',
+            'is_main_category'    => 'required|boolean',
+            'category_name_preset' => 'nullable|in:tint,upholstery',
         ]);
 
         Category::create([
-            'name'             => $request->name,
+            // الاسم المعتمد يُبنى في الخادم حتى لا يمكن تغيير «تضليل» أو «تنجيد وتلابيس» من المتصفح.
+            'name'             => $this->resolveCategoryName($request->name, $request->category_name_preset, $request->boolean('is_main_category')),
             'description'      => $request->description,
             'status'           => $request->status,
             'store_id'         => $store->id,
@@ -85,6 +87,7 @@ class CategoryController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'category_name_preset' => 'nullable|in:tint,upholstery',
             'status' => 'required|in:active,inactive',
             'target_store_id' => [
                 'nullable',
@@ -96,7 +99,8 @@ class CategoryController extends Controller
 
         DB::transaction(function () use ($request, $category, $validated) {
             $category->update([
-                'name' => $validated['name'],
+                // عند اختيار أحد الزرين، نحفظ الاسم المعتمد مهما كانت قيمة حقل الاسم المرسلة.
+                'name' => $this->resolveCategoryName($validated['name'], $validated['category_name_preset'] ?? null, (bool) $category->is_main_category),
                 'description' => $request->description,
                 'status' => $validated['status'],
                 'is_main_category' => $request->is_main_category ?? $category->is_main_category,
@@ -130,6 +134,22 @@ class CategoryController extends Controller
         return redirect()
             ->route('user.stores.categories.index', $store->id)
             ->with('success', 'تم تحديث بيانات القسم بنجاح');
+    }
+
+    /**
+     * يحافظ على الأسماء التي تعتمد عليها الشاشات المتخصصة، مع السماح بأسماء يدوية لبقية الأقسام.
+     */
+    private function resolveCategoryName(string $name, ?string $preset, bool $isMainCategory): string
+    {
+        if ($isMainCategory) {
+            return trim($name);
+        }
+
+        return match ($preset) {
+            'tint' => 'تضليل',
+            'upholstery' => 'تنجيد وتلابيس',
+            default => trim($name),
+        };
     }
 
     /**
