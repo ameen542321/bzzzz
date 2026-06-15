@@ -123,9 +123,6 @@
             <p class="text-gray-400">سجل التضليل (خصم المنتجات)</p>
             <p class="text-cyan-300 font-bold">{{ number_format($stats['tadlil_count'] ?? 0) }} عملية</p>
             <p class="text-emerald-300 font-bold">{{ number_format($stats['tadlil_total'] ?? 0, 2) }} ر.س</p>
-            @if(($stats['tadlil_names'] ?? collect())->isNotEmpty())
-                <p class="mt-1 text-[10px] text-indigo-200 leading-relaxed">{{ ($stats['tadlil_names'] ?? collect())->implode('، ') }}</p>
-            @endif
             <p class="text-[11px] text-gray-500">
                 @if($selectedShift)
                     شفتات معتمدة
@@ -199,9 +196,6 @@
                 @endif
                 <span class="text-gray-400">سجل التضليل (خصم المنتجات):</span><span class="text-cyan-300 font-bold">{{ number_format($shift['stats']['tadlil_count'] ?? 0) }} عملية</span>
                 <span class="text-gray-400">إجمالي التضليل (خصم المنتجات):</span><span class="text-emerald-300 font-bold">{{ number_format($shift['stats']['tadlil_total'] ?? 0, 2) }} ر.س</span>
-                @if(($shift['stats']['tadlil_names'] ?? collect())->isNotEmpty())
-                    <span class="text-gray-400">أسماء عمليات التضليل:</span><span class="text-indigo-200 font-bold">{{ ($shift['stats']['tadlil_names'] ?? collect())->implode('، ') }}</span>
-                @endif
                 <span class="text-gray-400">منصرفات:</span><span class="text-red-400 font-bold">{{ number_format($shift['stats']['outgoing_total'], 2) }}</span>
                 <span class="text-gray-400">عمليات:</span><span class="text-purple-400 font-bold">{{ number_format($shift['stats']['count']) }}</span>
                 @if(($shift['stats']['deferred_profit'] ?? 0) > 0)
