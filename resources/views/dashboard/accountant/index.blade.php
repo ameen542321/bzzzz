@@ -244,16 +244,16 @@
 
             <div class="p-4 md:px-6 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm border-b border-gray-700 bg-gray-800/40">
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">كاش</p>
-                    <p class="text-emerald-400 font-bold">{{ number_format($shiftOperationDetails['cash_total'] ?? 0, 2) }} ريال</p>
+                    <p class="text-gray-500 text-xs">إجمالي الدخل</p>
+                    <p class="text-emerald-400 font-bold">{{ number_format($shiftOperationDetails['total_in'] ?? 0, 2) }}</p>
                 </div>
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">شبكة</p>
-                    <p class="text-cyan-400 font-bold">{{ number_format($shiftOperationDetails['card_total'] ?? 0, 2) }} ريال</p>
+                    <p class="text-gray-500 text-xs">إجمالي الخرج</p>
+                    <p class="text-red-400 font-bold">{{ number_format($shiftOperationDetails['total_out'] ?? 0, 2) }}</p>
                 </div>
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">مصروفات</p>
-                    <p class="text-red-400 font-bold">{{ number_format($shiftOperationDetails['expenses_total'] ?? 0, 2) }} ريال</p>
+                    <p class="text-gray-500 text-xs">عدد العمليات</p>
+                    <p class="text-cyan-400 font-bold">{{ number_format($shiftOperationDetails['count'] ?? 0) }}</p>
                 </div>
             </div>
 
@@ -276,7 +276,7 @@
                                 <td class="p-3 text-gray-300">{{ $row['product'] ?: '-' }}</td>
                                 <td class="p-3 text-gray-300">{{ $row['payment_type'] }}</td>
                                 <td class="p-3 text-left font-bold {{ in_array($row['operation_type'], ['مصروف', 'سحب', 'مديونية']) ? 'text-red-400' : 'text-green-400' }}">
-                                    {{ number_format($row['amount'], 2) }} ريال
+                                    {{ number_format($row['amount'], 2) }}
                                 </td>
                             </tr>
                         @empty

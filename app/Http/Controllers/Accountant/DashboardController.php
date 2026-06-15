@@ -444,9 +444,12 @@ class DashboardController extends Controller
         return [
             'rows' => $rows,
             'count' => $rows->count(),
-            'cash_total' => (float) $rows->sum('cash_amount'),
-            'card_total' => (float) $rows->sum('card_amount'),
-            'expenses_total' => (float) $rows->where('operation_type', 'مصروف')->sum('amount'),
+            'total_in' => (float) ($sales->sum('amount') + $collections->sum('amount')),
+            'total_out' => (float) (
+                $expenses->sum('amount')
+                + $withdrawals->sum('amount')
+                + $debts->sum('amount')
+            ),
         ];
     }
 
