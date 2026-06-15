@@ -488,6 +488,10 @@
                     'id' => (int) $sale->id,
                     'sale_type' => (string) $sale->sale_type,
                     'paid_amount' => (float) ($sale->paid_amount ?? 0),
+                    'operation_amount' => max(
+                        (float) ($sale->final_total ?? 0),
+                        (float) (($sale->paid_amount ?? 0) + ($sale->remaining_amount ?? 0))
+                    ),
                     'remaining_amount' => (float) ($sale->remaining_amount ?? 0),
                     'cash_amount' => (float) ($sale->cash_amount ?? 0),
                     'card_amount' => (float) ($sale->card_amount ?? 0),
@@ -722,7 +726,10 @@ function fillEditSaleForm(sale, oldValues = null) {
     };
 
     setValue('edit-sale-type', values.sale_type);
-    setValue('edit-paid-amount-input', values.paid_amount);
+    setValue(
+        'edit-paid-amount-input',
+        oldValues ? values.paid_amount : (values.operation_amount ?? values.paid_amount)
+    );
     setValue('edit-debt-amount-input', values.debt_amount ?? values.remaining_amount);
     setValue('edit-employee-input', values.employee_id);
     setValue('edit-cash-amount-input', values.cash_amount);
