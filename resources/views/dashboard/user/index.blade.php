@@ -142,19 +142,7 @@
     {{--  القسم الرابع: الإحصائيات العامة (دمج بين الداشبوردين) --}}
     {{-- ========================================================= --}}
     <div class="flex flex-wrap items-center justify-between gap-2 mt-1 mb-2">
-        <div class="flex items-center gap-3">
-            <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
-            <label for="daily-summary-store-filter" class="sr-only">تصفية الملخص اليومي حسب المتجر</label>
-            <select id="daily-summary-store-filter"
-                    class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:border-cyan-500 focus:outline-none">
-                <option value="">جميع المتاجر</option>
-                @foreach($stores as $store)
-                    <option value="{{ $store->id }}" @selected(optional($selectedSummaryStore ?? null)->id === $store->id)>
-                        {{ $store->name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+        <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
         <div class="inline-flex items-center gap-2 text-[11px] text-gray-400">
             <span id="live-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>العمليات اليوم:</span>
@@ -738,9 +726,6 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener('DOMContentLoaded', function () {
     // مسار JSON الذي يحدّث بطاقات اليوم وآخر عملية دون إعادة تحميل الصفحة.
     const snapshotUrl = @json(route('user.dashboard.daily-snapshot'));
-    // فلتر المتجر الحالي إن اختار المالك متجرًا محددًا للملخص اليومي.
-    let summaryStoreId = @json(optional($selectedSummaryStore ?? null)->id);
-    const storeFilter = document.getElementById('daily-summary-store-filter');
     const statusDot = document.getElementById('live-status-dot');
     // آخر معرف عُرض؛ يستخدم لتفعيل وميض البطاقة عند وصول عملية جديدة فقط.
     let latestOperationId = null;
@@ -761,26 +746,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateCardValue(valueId, value) {
         const valueElement = document.getElementById(valueId);
         if (valueElement) valueElement.textContent = formatNumber(value);
-    }
-
-    // تحديث البطاقات فور اختيار المتجر من البيانات المحملة مع الصفحة،
-    // ثم يؤكد طلب snapshot القيم من الخادم.
-    function applyStoreBreakdown(storeId) {
-        const breakdowns = window.ownerDashboardStoreBreakdowns || [];
-        const selectedId = storeId ? Number(storeId) : null;
-        const selectedRows = selectedId
-            ? breakdowns.filter((store) => Number(store.store_id) === selectedId)
-            : breakdowns;
-
-        const sumMetric = (metric) => selectedRows.reduce(
-            (total, store) => total + Number(store[metric] || 0),
-            0
-        );
-
-        updateCardValue('daily-profit-value', sumMetric('profit_today'));
-        updateCardValue('daily-sales-value', sumMetric('sales_today'));
-        updateCardValue('daily-expenses-value', sumMetric('expenses_today'));
-        updateCardValue('daily-products-cost-value', sumMetric('products_cost_today'));
     }
 
     function updateConnectionStatus(isConnected, updatedAt = null) {
@@ -805,13 +770,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (document.hidden) return;
 
         const requestSequence = ++snapshotRequestSequence;
-        const requestedStoreId = summaryStoreId ? Number(summaryStoreId) : null;
         activeSnapshotController?.abort();
         activeSnapshotController = new AbortController();
 
         try {
             const url = new URL(snapshotUrl, window.location.origin);
-            if (requestedStoreId) url.searchParams.set('summary_store_id', requestedStoreId);
             url.searchParams.set('_', Date.now().toString());
 
             const response = await fetch(url, {
@@ -825,11 +788,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const data = await response.json();
-            const responseStoreId = data.summary_store_id ? Number(data.summary_store_id) : null;
-            if (
-                requestSequence !== snapshotRequestSequence
-                || responseStoreId !== (summaryStoreId ? Number(summaryStoreId) : null)
-            ) {
+            if (requestSequence !== snapshotRequestSequence) {
                 return;
             }
 
@@ -886,13 +845,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     }
-
-    storeFilter?.addEventListener('change', function () {
-        summaryStoreId = this.value || null;
-        latestOperationId = null;
-        applyStoreBreakdown(summaryStoreId);
-        refreshDailySnapshot();
-    });
 
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden) {

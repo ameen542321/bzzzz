@@ -32,9 +32,7 @@ class UserDashboardController extends Controller
             return view('dashboard.user.index', $this->emptyStateData($user, $stores));
         }
 
-        [$selectedSummaryStore, $dailyStoreIds] = $this->resolveDailyStoreFilter($stores);
-
-        $dailySummary = $this->buildDailySummary($dailyStoreIds);
+        $dailySummary = $this->buildDailySummary($storeIds);
         $monthlySummary = $this->buildMonthlySummary($user->id, $storeIds);
         $salarySummary = $this->buildSalarySummary($user, $storeIds);
         $creditSummary = $this->buildCreditSummary($storeIds);
@@ -58,7 +56,6 @@ class UserDashboardController extends Controller
             [
                 'user' => $user,
                 'stores' => $stores,
-                'selectedSummaryStore' => $selectedSummaryStore,
                 'daysLeft' => $daysLeft,
                 'activities' => $activities,
                 'metricStoreBreakdowns' => $metricStoreBreakdowns,
@@ -81,15 +78,15 @@ class UserDashboardController extends Controller
     {
         $user = auth('web')->user();
         $stores = $user->stores;
-        [$selectedStore, $dailyStoreIds] = $this->resolveDailyStoreFilter($stores);
-        $filterKey = $dailyStoreIds->sort()->implode('-') ?: 'none';
-        $cacheKey = "owner-dashboard:{$user->id}:daily-snapshot:".today()->toDateString().":{$filterKey}";
+        $storeIds = $stores->pluck('id');
+        $storeKey = $storeIds->sort()->implode('-') ?: 'none';
+        $cacheKey = "owner-dashboard:{$user->id}:daily-snapshot:".today()->toDateString().":{$storeKey}";
 
-        $snapshot = Cache::remember($cacheKey, now()->addSeconds(3), function () use ($dailyStoreIds) {
-            $dailySummary = $this->buildDailySummary($dailyStoreIds);
+        $snapshot = Cache::remember($cacheKey, now()->addSeconds(3), function () use ($storeIds) {
+            $dailySummary = $this->buildDailySummary($storeIds);
             $latestSale = Sale::query()
                 ->collectedDashboardSales()
-                ->whereIn('store_id', $dailyStoreIds)
+                ->whereIn('store_id', $storeIds)
                 ->whereDate('created_at', today())
                 ->with(['store:id,name', 'items.product:id,name'])
                 ->latest()
@@ -106,30 +103,10 @@ class UserDashboardController extends Controller
             ];
         });
 
-        $snapshot['summary_store_id'] = $selectedStore?->id;
         $snapshot['updated_at'] = now()->format('h:i:s A');
 
         return response()->json($snapshot)
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    }
-
-    /**
-     * تطبيق فلتر متجر اليوم مع رفض أي متجر لا يتبع المالك.
-     *
-     * @return array{0: mixed, 1: Collection}
-     */
-    private function resolveDailyStoreFilter(Collection $stores): array
-    {
-        $selectedStore = null;
-
-        if ($requestedStoreId = request()->integer('summary_store_id')) {
-            $selectedStore = $stores->firstWhere('id', $requestedStoreId);
-        }
-
-        return [
-            $selectedStore,
-            $selectedStore ? collect([$selectedStore->id]) : $stores->pluck('id'),
-        ];
     }
 
     /**
@@ -647,7 +624,6 @@ class UserDashboardController extends Controller
         return [
             'stores' => $stores,
             'user' => $user,
-            'selectedSummaryStore' => null,
             'employeesCount' => 0,
             'daysLeft' => 0,
             'salesToday' => 0,
