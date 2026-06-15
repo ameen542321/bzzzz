@@ -30,12 +30,12 @@
     <div class="flex items-center justify-between">
         <div>
             <div class="flex items-center gap-2">
-                <p class="text-gray-400 text-sm">💰 مبيعات</p>
+                <p class="text-gray-400 text-sm">💰 إجمالي المبلغ المستلم</p>
                 {{-- ✅ تولتيب المبيعات (يظهر لليسار) --}}
                 <div class="relative group">
                     <span class="text-gray-500 text-xs cursor-help border border-gray-700 rounded-full w-4 h-4 flex items-center justify-center">?</span>
                     <div class="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-gray-800 border border-gray-700 text-white text-[10px] p-2 rounded-lg w-48 shadow-xl z-50">
-                        <span class="font-bold text-blue-400">إجمالي   عمليات البيع المسجله</span><br>
+                        <span class="font-bold text-blue-400">مجموع المبالغ المستلمة فعلياً من عمليات البيع</span><br>
 
                     </div>
                 </div>
@@ -221,34 +221,45 @@
         </div>
     </div>
 
-    <div x-show="openOperationsModal" x-transition.opacity class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" style="display:none;">
-        <div @click.away="openOperationsModal = false" class="w-full max-w-6xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
-            <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+    <div x-show="openOperationsModal"
+         x-transition.opacity
+         @keydown.escape.window="openOperationsModal = false"
+         class="fixed inset-0 z-50 bg-white dark:bg-gray-900 overflow-hidden"
+         style="display:none;">
+        <div class="w-full h-full flex flex-col bg-white dark:bg-gray-900">
+            <div class="p-4 md:px-6 border-b border-gray-700 flex items-center justify-between">
                 <div>
                     <h3 class="text-white font-bold text-lg">تفاصيل عمليات الشفت</h3>
-                    <p class="text-gray-400 text-xs mt-1">تتصفّر تلقائياً بعد إغلاق الشفت لأن البيانات مرتبطة بالفترة بعد آخر إقفال.</p>
+                    <p class="text-gray-400 text-xs mt-1">
+                        {{ number_format($shiftOperationDetails['count'] ?? 0) }} عملية منذ {{ $startTime->format('Y-m-d h:i A') }}
+                    </p>
                 </div>
-                <button @click="openOperationsModal = false" class="text-gray-400 hover:text-white text-xl">&times;</button>
+                <button type="button"
+                        @click="openOperationsModal = false"
+                        class="bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-xmark"></i>
+                    إغلاق
+                </button>
             </div>
 
-            <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm border-b border-gray-700 bg-gray-800/40">
+            <div class="p-4 md:px-6 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm border-b border-gray-700 bg-gray-800/40">
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">إجمالي الداخل</p>
-                    <p class="text-green-400 font-bold">{{ number_format($shiftOperationDetails['total_in'] ?? 0, 2) }} ريال</p>
+                    <p class="text-gray-500 text-xs">كاش</p>
+                    <p class="text-emerald-400 font-bold">{{ number_format($shiftOperationDetails['cash_total'] ?? 0, 2) }} ريال</p>
                 </div>
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">إجمالي الخارج</p>
-                    <p class="text-red-400 font-bold">{{ number_format($shiftOperationDetails['total_out'] ?? 0, 2) }} ريال</p>
+                    <p class="text-gray-500 text-xs">شبكة</p>
+                    <p class="text-cyan-400 font-bold">{{ number_format($shiftOperationDetails['card_total'] ?? 0, 2) }} ريال</p>
                 </div>
                 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-                    <p class="text-gray-500 text-xs">عدد العمليات</p>
-                    <p class="text-cyan-400 font-bold">{{ number_format($shiftOperationDetails['count'] ?? 0) }}</p>
+                    <p class="text-gray-500 text-xs">مصروفات</p>
+                    <p class="text-red-400 font-bold">{{ number_format($shiftOperationDetails['expenses_total'] ?? 0, 2) }} ريال</p>
                 </div>
             </div>
 
-            <div class="max-h-[60vh] overflow-auto">
+            <div class="flex-1 overflow-auto">
                 <table class="w-full text-right text-sm">
-                    <thead class="bg-gray-800 text-gray-400">
+                    <thead class="bg-gray-800 text-gray-400 sticky top-0 z-10">
                         <tr>
                             <th class="p-3">الوقت</th>
                             <th class="p-3">نوع العملية</th>
@@ -402,9 +413,6 @@
                             </div>
                         </div>
                         <span class="text-white font-black text-lg">{{ number_format($totalSinceBalance, 2) }} ريال</span>
-                    </div>
-                    <div class="text-[10px] text-gray-500 pr-5">
-                        قيمة الفواتير: {{ number_format($totalInvoicedSinceBalance ?? 0, 2) }} ريال
                     </div>
 
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 mb-1">
@@ -708,27 +716,23 @@
 <div class="mt-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-lg">
     <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
         <span class="text-yellow-400">🕘</span>
-        آخر العمليات
+        سجل آخر العمليات
     </h2>
 
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead>
                 <tr class="text-right border-b border-gray-700">
-                    <th class="pb-3 text-gray-400 font-medium text-sm">الوقت</th>
                     <th class="pb-3 text-gray-400 font-medium text-sm">النوع</th>
-                    <th class="pb-3 text-gray-400 font-medium text-sm">الموظف</th>
                     <th class="pb-3 text-gray-400 font-medium text-sm">الوصف</th>
-                    <th class="pb-3 text-gray-400 font-medium text-sm text-left">المبلغ</th>
+                    <th class="pb-3 text-gray-400 font-medium text-sm">الموظف</th>
+                    <th class="pb-3 text-gray-400 font-medium text-sm">المبلغ المستلم / المنصرف</th>
+                    <th class="pb-3 text-gray-400 font-medium text-sm text-left">التاريخ والوقت</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($lastOperations as $op)
                 <tr class="border-b border-gray-700/50 hover:bg-white/5 transition">
-                    <td class="py-4">
-                        <div class="text-gray-300 text-sm">{{ $op->created_at->format('h:i A') }}</div>
-                        <div class="text-gray-500 text-xs">{{ $op->created_at->format('Y-m-d') }}</div>
-                    </td>
                     <td class="py-4">
                         @if($op->type == 'sale')
                             <span class="px-3 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">بيع</span>
@@ -741,17 +745,21 @@
                         @endif
                     </td>
                     <td class="py-4">
-                        <div class="text-gray-300 text-sm">{{ $op->employee }}</div>
-                    </td>
-                    <td class="py-4">
-                        <div class="text-gray-400 text-sm truncate max-w-[150px]" title="{{ $op->description }}">
+                        <div class="text-gray-300 text-sm max-w-md" title="{{ $op->description }}">
                             {{ $op->description }}
                         </div>
                     </td>
-                    <td class="py-4 text-left">
+                    <td class="py-4">
+                        <div class="text-gray-400 text-sm">{{ $op->employee }}</div>
+                    </td>
+                    <td class="py-4">
                         <div class="font-bold {{ in_array($op->type, ['expense', 'withdrawal']) ? 'text-red-400' : 'text-green-400' }}">
                             {{ number_format($op->amount, 2) }} <span class="text-xs text-gray-400">ريال</span>
                         </div>
+                    </td>
+                    <td class="py-4 text-left">
+                        <div class="text-gray-300 text-sm">{{ $op->created_at->format('h:i A') }}</div>
+                        <div class="text-gray-500 text-xs">{{ $op->created_at->format('Y-m-d') }}</div>
                     </td>
                 </tr>
                 @empty

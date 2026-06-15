@@ -159,7 +159,7 @@ class DashboardController extends Controller
                     ->orWhere('description', '!=', 'manual_invoice_entry');
             })
             ->selectRaw('
-                COALESCE(SUM(final_total), 0) as total_sales,
+                COALESCE(SUM(paid_amount), 0) as total_sales,
 
                 -- المبالغ النقدية: من مبيعات كاش + الجزء النقدي من المختلط
                 COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
@@ -270,7 +270,8 @@ class DashboardController extends Controller
             \Log::info('=== getLastOperations START ===');
 
             // 1. المبيعات - بدون select معقد
-            $sales = Sale::where('store_id', $storeId)
+            $sales = Sale::with(['items.product:id,name'])
+                ->where('store_id', $storeId)
                 ->where(function ($query) {
                     $query->whereNull('description')
                         ->orWhere('description', '!=', 'manual_invoice_entry');
@@ -327,8 +328,28 @@ class DashboardController extends Controller
             ->latest()
             ->get()
             ->map(function ($sale) {
-                $productName = optional($sale->items->first()?->product)->name
-                    ?? ($sale->items->count() > 1 ? 'عدة منتجات' : '-');
+                $description = trim((string) ($sale->description ?: $sale->internal_notes));
+                $isTintOperation = mb_stripos($description, 'تضليل') !== false
+                    || mb_stripos($description, 'تظليل') !== false;
+                $productNames = $sale->items
+                    ->map(fn ($item) => optional($item->product)->name)
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($isTintOperation) {
+                    $operationType = 'تضليل';
+                    $operationLabel = $description;
+                } elseif ($productNames->isNotEmpty()) {
+                    $operationType = 'بيع منتجات';
+                    $operationLabel = $productNames->implode(' - ');
+                } elseif ((float) $sale->labor_total > 0) {
+                    $operationType = 'شغل يد';
+                    $operationLabel = $description ?: 'شغل يد';
+                } else {
+                    $operationType = 'عملية بيع';
+                    $operationLabel = $description ?: 'عملية بدون منتجات';
+                }
 
                 $paymentType = match ($sale->sale_type) {
                     'cash' => 'كاش',
@@ -340,11 +361,17 @@ class DashboardController extends Controller
 
                 return [
                     'time' => $sale->created_at,
-                    'operation_type' => 'بيع',
-                    'product' => $productName,
-                    'amount' => (float) ($sale->paid_amount ?: $sale->final_total ?: $sale->total ?: 0),
+                    'operation_type' => $operationType,
+                    'product' => $operationLabel,
+                    'amount' => (float) ($sale->paid_amount ?? 0),
+                    'cash_amount' => (float) ($sale->sale_type === 'cash'
+                        ? $sale->paid_amount
+                        : ($sale->sale_type === 'mixed' ? $sale->cash_amount : 0)),
+                    'card_amount' => (float) ($sale->sale_type === 'card'
+                        ? $sale->paid_amount
+                        : ($sale->sale_type === 'mixed' ? $sale->card_amount : 0)),
                     'payment_type' => $paymentType,
-                    'note' => $sale->description ?: $sale->internal_notes,
+                    'note' => $description ?: null,
                 ];
             });
 
@@ -354,6 +381,8 @@ class DashboardController extends Controller
                 'operation_type' => 'تحصيل',
                 'product' => $item['employee_name'] ?? '-',
                 'amount' => (float) ($item['collected_amount'] ?? 0),
+                'cash_amount' => (float) ($item['collected_amount'] ?? 0),
+                'card_amount' => 0,
                 'payment_type' => 'تحصيل',
                 'note' => $item['description'] ?? null,
             ];
@@ -368,6 +397,8 @@ class DashboardController extends Controller
                 'operation_type' => 'مصروف',
                 'product' => $exp->type ?: '-',
                 'amount' => (float) $exp->amount,
+                'cash_amount' => 0,
+                'card_amount' => 0,
                 'payment_type' => 'مصروف',
                 'note' => $exp->description,
             ]);
@@ -381,6 +412,8 @@ class DashboardController extends Controller
                 'operation_type' => 'سحب',
                 'product' => $w->description ?: '-',
                 'amount' => (float) $w->amount,
+                'cash_amount' => 0,
+                'card_amount' => 0,
                 'payment_type' => 'سحب',
                 'note' => $w->description,
             ]);
@@ -394,6 +427,8 @@ class DashboardController extends Controller
                 'operation_type' => 'مديونية',
                 'product' => $d->description ?: '-',
                 'amount' => (float) $d->amount,
+                'cash_amount' => 0,
+                'card_amount' => 0,
                 'payment_type' => 'مديونية',
                 'note' => $d->description,
             ]);
@@ -409,8 +444,9 @@ class DashboardController extends Controller
         return [
             'rows' => $rows,
             'count' => $rows->count(),
-            'total_in' => (float) $rows->whereIn('operation_type', ['بيع', 'تحصيل'])->sum('amount'),
-            'total_out' => (float) $rows->whereIn('operation_type', ['مصروف', 'سحب', 'مديونية'])->sum('amount'),
+            'cash_total' => (float) $rows->sum('cash_amount'),
+            'card_total' => (float) $rows->sum('card_amount'),
+            'expenses_total' => (float) $rows->where('operation_type', 'مصروف')->sum('amount'),
         ];
     }
 
@@ -630,7 +666,7 @@ class DashboardController extends Controller
         $salesSummary = Sale::where('store_id', $store->id)
             ->whereBetween('created_at', [$startTime, $endTime])
             ->selectRaw('
-                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN final_total ELSE 0 END), 0) as total_sales,
+                COALESCE(SUM(CASE WHEN (description IS NULL OR description != "manual_invoice_entry") THEN paid_amount ELSE 0 END), 0) as total_sales,
                 COALESCE(SUM(CASE WHEN sale_type = "cash" THEN paid_amount ELSE 0 END), 0) +
                 COALESCE(SUM(CASE WHEN sale_type = "mixed" THEN cash_amount ELSE 0 END), 0) as cash_sales,
                 COALESCE(SUM(CASE WHEN sale_type = "card" THEN paid_amount ELSE 0 END), 0) +
@@ -1190,7 +1226,30 @@ class DashboardController extends Controller
         }
 
         $description = $model->description ?? $model->reason ?? $model->note ?? 'عملية نظام';
-        $amount = $model->final_total ?? $model->amount ?? 0;
+        $amount = $model->amount ?? 0;
+
+        if ($type === 'sale') {
+            $saleDescription = trim((string) $model->description);
+            $isTintOperation = mb_stripos($saleDescription, 'تضليل') !== false
+                || mb_stripos($saleDescription, 'تظليل') !== false;
+            $productNames = collect($model->items ?? [])
+                ->map(fn ($item) => optional($item->product)->name)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($isTintOperation) {
+                $description = $saleDescription;
+            } elseif ($productNames->isNotEmpty()) {
+                $description = $productNames->implode(' - ');
+            } elseif ((float) $model->labor_total > 0) {
+                $description = $saleDescription ?: 'شغل يد';
+            } else {
+                $description = $saleDescription ?: 'عملية بيع بدون منتجات';
+            }
+
+            $amount = (float) ($model->paid_amount ?? 0);
+        }
 
         return (object)[
             'type' => $type,
