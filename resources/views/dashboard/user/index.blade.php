@@ -559,6 +559,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const valueEl = document.getElementById('metric-modal-value');
     const detailsEl = document.getElementById('metric-modal-details');
 
+    // تعقيم النصوص القادمة من قاعدة البيانات قبل إدراجها داخل innerHTML.
+    // يمنع تفسير اسم المتجر كوسوم HTML أو JavaScript غير موثوق.
+    function escapeMetricHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
     function formatByMetric(metricKey, amount) {
         const numeric = Number(amount || 0);
         if (metricKey === 'expenses_today' || metricKey === 'expenses_month') {
@@ -580,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function () {
             valueEl.textContent = data.value;
             const rows = storeBreakdowns.map((store) => {
                 return `<li class="flex items-center justify-between border-b border-gray-800 py-2">
-                    <span class="text-gray-200">${store.store_name}</span>
+                    <span class="text-gray-200">${escapeMetricHtml(store.store_name)}</span>
                     <span>${formatByMetric(key, store[key])} <span class="text-gray-500 text-xs">ر.س</span></span>
                 </li>`;
             }).join('');
