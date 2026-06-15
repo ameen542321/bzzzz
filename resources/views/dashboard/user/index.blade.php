@@ -174,7 +174,7 @@
 
     {{-- الصف الثاني --}}
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">الملخص الشهري</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
         <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي الربح الشهري حسب كل متجر">
             <x-stat-card title="صافي الربح الشهري (بعد الخصومات)"
@@ -189,6 +189,9 @@
         </button>
         <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر">
             <x-stat-card title="الرواتب الشهرية" value="{{ number_format($monthlySalaries ?? 0) }}" color="indigo" />
+        </button>
+        <button id="salary-after-withdrawals-card" type="button" class="text-right" title="عرض المتبقي من الرواتب والسحوبات حسب المتجر والموظف">
+            <x-stat-card title="الرواتب بعد السحب" value="{{ number_format($netMonthlySalaries ?? 0) }}" color="blue" />
         </button>
     </div>
 
@@ -371,6 +374,34 @@
     </div>
 </div>
 
+{{-- نافذة الرواتب بعد السحب: المتاجر أولاً، ثم موظفو المتجر عند الضغط عليه. --}}
+<div id="salary-withdrawals-modal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 overflow-y-auto">
+    <div class="max-w-3xl mx-auto mt-10 mb-10 bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden">
+        <div class="p-5 border-b border-gray-800 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-white font-bold text-lg">الرواتب بعد السحب</h3>
+                <p class="text-xs text-gray-400 mt-1">اضغط اسم المتجر لعرض الموظفين وإجمالي سحب كل موظف والمتبقي من راتبه.</p>
+            </div>
+            <button type="button" id="salary-withdrawals-close" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-3 border-b border-gray-800 bg-gray-950/40">
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">إجمالي الرواتب</p>
+                <p class="text-indigo-300 font-bold mt-1">{{ number_format($monthlySalaries ?? 0, 2) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">إجمالي السحوبات</p>
+                <p class="text-red-300 font-bold mt-1">{{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">المتبقي من الرواتب</p>
+                <p class="text-emerald-300 font-bold mt-1">{{ number_format($netMonthlySalaries ?? 0, 2) }}</p>
+            </div>
+        </div>
+        <div id="salary-withdrawals-stores" class="p-5 space-y-3"></div>
+    </div>
+</div>
+
 </div>
 
 {{-- ========================================================= --}}
@@ -543,6 +574,110 @@ document.addEventListener('DOMContentLoaded', function () {
     closeBtn?.addEventListener('click', () => modal.classList.add('hidden'));
     modal?.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.add('hidden');
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const salaryRows = @json($employeeSalaryRemainders ?? []);
+    const modal = document.getElementById('salary-withdrawals-modal');
+    const openButton = document.getElementById('salary-after-withdrawals-card');
+    const closeButton = document.getElementById('salary-withdrawals-close');
+    const storesContainer = document.getElementById('salary-withdrawals-stores');
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function formatSalary(value) {
+        return Number(value || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    function renderSalaryStores() {
+        if (!storesContainer) return;
+
+        const groupedStores = salaryRows.reduce((stores, employee) => {
+            const storeName = employee.store_name || 'متجر غير معروف';
+            if (!stores[storeName]) stores[storeName] = [];
+            stores[storeName].push(employee);
+            return stores;
+        }, {});
+
+        const storeEntries = Object.entries(groupedStores);
+        if (!storeEntries.length) {
+            storesContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-6">لا توجد بيانات رواتب متاحة.</p>';
+            return;
+        }
+
+        storesContainer.innerHTML = storeEntries.map(([storeName, employees], storeIndex) => {
+            const salaryTotal = employees.reduce((total, employee) => total + Number(employee.salary || 0), 0);
+            const withdrawalsTotal = employees.reduce((total, employee) => total + Number(employee.withdrawals_total || 0), 0);
+            const remainingTotal = employees.reduce((total, employee) => total + Number(employee.salary_remaining || 0), 0);
+            const rows = employees.map((employee) => `
+                <tr class="border-b border-gray-800/70 last:border-0">
+                    <td class="py-3 px-2 text-gray-200">${escapeHtml(employee.name)}</td>
+                    <td class="py-3 px-2 text-indigo-300">${formatSalary(employee.salary)}</td>
+                    <td class="py-3 px-2 text-red-300">${formatSalary(employee.withdrawals_total)}</td>
+                    <td class="py-3 px-2 text-emerald-300 font-bold">${formatSalary(employee.salary_remaining)}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="rounded-xl border border-gray-800 overflow-hidden">
+                    <button type="button"
+                            class="salary-store-toggle w-full p-4 flex items-center justify-between gap-3 text-right hover:bg-white/5 transition"
+                            data-target="salary-store-${storeIndex}">
+                        <div>
+                            <p class="text-sm font-bold text-white">${escapeHtml(storeName)}</p>
+                            <p class="text-[11px] text-gray-500 mt-1">${employees.length} موظف — المتبقي ${formatSalary(remainingTotal)}</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px]">
+                            <span class="text-indigo-300">الرواتب ${formatSalary(salaryTotal)}</span>
+                            <span class="text-red-300">السحب ${formatSalary(withdrawalsTotal)}</span>
+                            <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                        </div>
+                    </button>
+                    <div id="salary-store-${storeIndex}" class="hidden border-t border-gray-800 overflow-x-auto">
+                        <table class="w-full min-w-[560px] text-xs text-right">
+                            <thead class="bg-gray-950/60 text-gray-500">
+                                <tr>
+                                    <th class="py-2 px-2">الموظف</th>
+                                    <th class="py-2 px-2">الراتب</th>
+                                    <th class="py-2 px-2">إجمالي السحب</th>
+                                    <th class="py-2 px-2">المتبقي</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    openButton?.addEventListener('click', function () {
+        renderSalaryStores();
+        modal?.classList.remove('hidden');
+    });
+    closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
+    modal?.addEventListener('click', function (event) {
+        if (event.target === modal) modal.classList.add('hidden');
+    });
+    storesContainer?.addEventListener('click', function (event) {
+        const toggle = event.target.closest('.salary-store-toggle');
+        if (!toggle) return;
+        const details = document.getElementById(toggle.dataset.target);
+        details?.classList.toggle('hidden');
+        toggle.querySelector('.fa-chevron-down')?.classList.toggle('rotate-180');
     });
 });
 </script>

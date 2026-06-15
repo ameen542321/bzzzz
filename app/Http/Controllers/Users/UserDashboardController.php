@@ -9,7 +9,6 @@ use App\Models\Employee;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\CreditSale;
-use App\Models\Withdrawal;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -134,7 +133,9 @@ class UserDashboardController extends Controller
 
         // إجمالي رواتب جميع موظفي متاجر المالك (حمولة ثابتة شهرية)
         $monthlySalaries = $user->employees()->sum('salary') ?? 0;
-        $monthlyWorkerWithdrawals = (float) Withdrawal::whereIn('store_id', $storeIds)
+        $monthlyWorkerWithdrawals = (float) DB::table('employee_withdrawals')
+            ->whereIn('store_id', $storeIds)
+            ->where('person_type', Employee::class)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
             ->sum('amount');
@@ -336,7 +337,9 @@ class UserDashboardController extends Controller
                 ->sum('amount');
 
             $storeSalariesMonth = (float) $store->employees()->sum('salary');
-            $storeWorkerWithdrawalsMonth = (float) Withdrawal::where('store_id', $storeId)
+            $storeWorkerWithdrawalsMonth = (float) DB::table('employee_withdrawals')
+                ->where('store_id', $storeId)
+                ->where('person_type', Employee::class)
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
                 ->sum('amount');
