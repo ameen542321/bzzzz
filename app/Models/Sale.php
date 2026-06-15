@@ -86,4 +86,25 @@ class Sale extends Model
     {
         return $this->hasMany(CreditSale::class);
     }
+
+    /**
+     * استبعاد القيود اليدوية التي لا تدخل في مؤشرات المبيعات.
+     */
+    public function scopeExcludeManualInvoiceEntries($query)
+    {
+        return $query->where(function ($query) {
+            $query->whereNull('description')
+                ->orWhere('description', '!=', 'manual_invoice_entry');
+        });
+    }
+
+    /**
+     * أنواع البيع التي تمثل مبالغ محصلة في لوحة المالك.
+     */
+    public function scopeCollectedDashboardSales($query)
+    {
+        return $query
+            ->whereIn('sale_type', ['cash', 'card', 'credit', 'mixed'])
+            ->excludeManualInvoiceEntries();
+    }
 }

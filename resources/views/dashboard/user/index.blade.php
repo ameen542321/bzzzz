@@ -142,9 +142,21 @@
     {{--  القسم الرابع: الإحصائيات العامة (دمج بين الداشبوردين) --}}
     {{-- ========================================================= --}}
     <div class="flex flex-wrap items-center justify-between gap-2 mt-1 mb-2">
-        <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
+        <div class="flex items-center gap-3">
+            <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
+            <label for="daily-summary-store-filter" class="sr-only">تصفية الملخص اليومي حسب المتجر</label>
+            <select id="daily-summary-store-filter"
+                    class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:border-cyan-500 focus:outline-none">
+                <option value="">جميع المتاجر</option>
+                @foreach($stores as $store)
+                    <option value="{{ $store->id }}" @selected(optional($selectedSummaryStore ?? null)->id === $store->id)>
+                        {{ $store->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
         <div class="inline-flex items-center gap-2 text-[11px] text-gray-400">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="live-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>العمليات اليوم:</span>
             <strong id="live-operations-count" class="text-cyan-300">{{ number_format($dailySalesOperationsCount) }}</strong>
             <span id="live-updated-at" class="text-gray-600">تحديث مباشر</span>
@@ -326,7 +338,7 @@
         <div class="flex flex-wrap gap-4 mb-3 text-xs">
             <span class="inline-flex items-center gap-2 text-emerald-300"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>مبيعات</span>
             <span class="inline-flex items-center gap-2 text-red-300"><span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>مصروفات</span>
-            <span class="inline-flex items-center gap-2 text-blue-300"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>مديونيات</span>
+            <span class="inline-flex items-center gap-2 text-blue-300"><span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>الديون المتبقية</span>
         </div>
 
         <canvas id="smartChart" class="w-full h-64"></canvas>
@@ -552,6 +564,7 @@ document.addEventListener('DOMContentLoaded', function () {
         salaries_month: { title: 'الرواتب الشهرية', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'إجمالي الرواتب كاملة دون خصم السحوبات. تفاصيل السحوبات والمتبقي من الراتب تظهر في نافذة السحوبات المخصصة.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };
+    window.ownerDashboardMetricDefinitions = metricDefinitions;
 
     const modal = document.getElementById('metric-modal');
     const closeBtn = document.getElementById('metric-modal-close');
@@ -725,9 +738,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // مسار JSON الذي يحدّث بطاقات اليوم وآخر عملية دون إعادة تحميل الصفحة.
     const snapshotUrl = @json(route('user.dashboard.daily-snapshot'));
     // فلتر المتجر الحالي إن اختار المالك متجرًا محددًا للملخص اليومي.
-    const summaryStoreId = @json(request('summary_store_id'));
+    let summaryStoreId = @json(optional($selectedSummaryStore ?? null)->id);
+    const storeFilter = document.getElementById('daily-summary-store-filter');
+    const statusDot = document.getElementById('live-status-dot');
     // آخر معرف عُرض؛ يستخدم لتفعيل وميض البطاقة عند وصول عملية جديدة فقط.
     let latestOperationId = null;
+    let consecutiveSnapshotFailures = 0;
+    let snapshotTimer = null;
 
     // تنسيق الأرقام الحية مع منزلتين كحد أقصى.
     function formatNumber(value) {
@@ -743,8 +760,27 @@ document.addEventListener('DOMContentLoaded', function () {
         if (valueElement) valueElement.textContent = formatNumber(value);
     }
 
+    function updateConnectionStatus(isConnected, updatedAt = null) {
+        const updatedElement = document.getElementById('live-updated-at');
+
+        statusDot?.classList.toggle('bg-emerald-400', isConnected);
+        statusDot?.classList.toggle('bg-orange-400', !isConnected);
+        statusDot?.classList.toggle('animate-pulse', isConnected);
+
+        if (!updatedElement) return;
+        if (isConnected && updatedAt) {
+            updatedElement.textContent = `آخر تحديث: ${updatedAt}`;
+        } else if (!isConnected) {
+            if (!updatedElement.textContent.startsWith('تعذر التحديث')) {
+                updatedElement.textContent = `تعذر التحديث — ${updatedElement.textContent}`;
+            }
+        }
+    }
+
     // جلب اللقطة اليومية وتحديث البطاقات والعداد وآخر عملية كل ثلاث ثوانٍ.
     async function refreshDailySnapshot() {
+        if (document.hidden) return;
+
         try {
             const url = new URL(snapshotUrl, window.location.origin);
             if (summaryStoreId) url.searchParams.set('summary_store_id', summaryStoreId);
@@ -755,13 +791,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 credentials: 'same-origin',
                 cache: 'no-store',
             });
-            if (!response.ok) return;
+            if (!response.ok) {
+                throw new Error(`Snapshot request failed: ${response.status}`);
+            }
 
             const data = await response.json();
+            consecutiveSnapshotFailures = 0;
             updateCardValue('daily-profit-value', data.profit_today);
             updateCardValue('daily-sales-value', data.sales_today);
             updateCardValue('daily-expenses-value', data.expenses_today);
             updateCardValue('daily-products-cost-value', data.products_cost_today);
+
+            const metricDefinitions = window.ownerDashboardMetricDefinitions;
+            if (metricDefinitions) {
+                metricDefinitions.profit_today.value = `${formatNumber(data.profit_today)} ر.س`;
+                metricDefinitions.sales_today.value = `${formatNumber(data.sales_today)} ر.س`;
+                metricDefinitions.expenses_today.value = `${formatNumber(data.expenses_today)} ر.س`;
+                metricDefinitions.products_cost_today.value = `${formatNumber(data.products_cost_today)} ر.س`;
+            }
 
             const countElement = document.getElementById('live-operations-count');
             if (countElement) countElement.textContent = formatNumber(data.operations_count);
@@ -793,15 +840,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 latestOperationId = data.latest_operation.id;
             }
 
-            const updatedElement = document.getElementById('live-updated-at');
-            if (updatedElement) updatedElement.textContent = `آخر تحديث: ${data.updated_at}`;
+            updateConnectionStatus(true, data.updated_at);
         } catch (error) {
-            // يبقى آخر رقم ظاهر دون إزعاج المستخدم إذا انقطع الاتصال مؤقتًا.
+            consecutiveSnapshotFailures++;
+            if (consecutiveSnapshotFailures >= 2) {
+                updateConnectionStatus(false);
+            }
         }
     }
 
+    storeFilter?.addEventListener('change', function () {
+        summaryStoreId = this.value || null;
+        latestOperationId = null;
+        refreshDailySnapshot();
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            refreshDailySnapshot();
+        }
+    });
+
     refreshDailySnapshot();
-    window.setInterval(refreshDailySnapshot, 3000);
+    snapshotTimer = window.setInterval(refreshDailySnapshot, 5000);
+    window.addEventListener('beforeunload', () => window.clearInterval(snapshotTimer));
 });
 </script>
 
