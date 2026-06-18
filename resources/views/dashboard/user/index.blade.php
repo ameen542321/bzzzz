@@ -3,6 +3,21 @@
 @section('title', 'لوحة التحكم')
 
 @section('content')
+@php
+    /*
+     * قيم توافق آمنة لنسخة واجهة لوحة المالك الموسعة.
+     * تبقى الواجهة قابلة للعمل مع الكنترولر الأصلي، وتعرض القيم الفارغة فقط
+     * للبيانات الإضافية التي لا يرسلها الكنترولر بدل ظهور Undefined variable.
+     */
+    $dailySalesOperationsCount = $dailySalesOperationsCount ?? 0;
+    $lowStockCount = $lowStockCount ?? 0;
+    $lowStockProducts = $lowStockProducts ?? collect();
+    $topSellingProducts = $topSellingProducts ?? collect();
+    $employeeSalaryRemainders = $employeeSalaryRemainders ?? [];
+    // موظفون بلا راتب: يستخدمان في التنبيه والقائمة التفصيلية أدناه.
+    $employeesWithoutSalary = $employeesWithoutSalary ?? collect();
+    $employeesWithoutSalaryCount = $employeesWithoutSalaryCount ?? $employeesWithoutSalary->count();
+@endphp
 <div class="p-6 space-y-10">
 
     {{-- ========================================================= --}}
@@ -71,6 +86,25 @@
             </div>
         @endif
 
+        {{-- تنبيه إداري مهم: الموظفون الذين راتبهم غير مسجل أو يساوي صفرًا. --}}
+        @if($employeesWithoutSalaryCount > 0)
+            <div class="alert-box bg-purple-900/40 border-purple-700 text-purple-100">
+                <div class="flex flex-col gap-2">
+                    <p class="font-semibold">
+                        ⚠️ يوجد {{ $employeesWithoutSalaryCount }} موظف لم يُسجّل له راتب.
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($employeesWithoutSalary as $employee)
+                            <span class="inline-flex items-center gap-1 rounded-lg bg-black/20 px-2 py-1 text-xs">
+                                <span>{{ $employee->name }}</span>
+                                <span class="text-purple-300">— {{ $employee->store->name ?? 'متجر غير معروف' }}</span>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
     </div>
 
 
@@ -107,35 +141,61 @@
 @endif
     {{--  القسم الرابع: الإحصائيات العامة (دمج بين الداشبوردين) --}}
     {{-- ========================================================= --}}
-    <p class="text-xs font-semibold text-gray-400 mt-1 mb-2">الملخص اليومي</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-1 mb-2">
+        <p class="text-xs font-semibold text-gray-400">الملخص اليومي</p>
+        <div class="inline-flex items-center gap-2 text-[11px] text-gray-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>العمليات اليوم:</span>
+            <strong id="live-operations-count" class="text-cyan-300">{{ number_format($dailySalesOperationsCount) }}</strong>
+            <span id="live-updated-at" class="text-gray-600">تحديث مباشر</span>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
         {{-- صافي الربح اليوم --}}
-        <button type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: صافي الربح اليومي حسب كل متجر">
+        <button id="daily-profit-card" type="button" class="text-right metric-card" data-metric="profit_today" title="للمزيد من التفاصيل اضغط: صافي الربح اليومي حسب كل متجر">
             <x-stat-card title="صافي الربح اليوم"
                 value="{{ number_format($profitToday) }}"
+                value-id="daily-profit-value"
                 color="{{ $profitToday >= 0 ? 'emerald' : 'red' }}" />
         </button>
 
         {{-- [تعديل آمن] مبيعات اليوم محسوبة من المحصّل الفعلي --}}
-        <button type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: مبيعات اليوم حسب كل متجر">
-            <x-stat-card title="مبيعات اليوم" value="{{ number_format($salesToday) }}" color="emerald" />
+        <button id="daily-sales-card" type="button" class="text-right metric-card" data-metric="sales_today" title="للمزيد من التفاصيل اضغط: مبيعات اليوم حسب كل متجر">
+            <x-stat-card title="مبيعات اليوم" value="{{ number_format($salesToday) }}" value-id="daily-sales-value" color="emerald" />
         </button>
 
         {{-- مصروفات اليوم --}}
-        <button type="button" class="text-right metric-card" data-metric="expenses_today" title="للمزيد من التفاصيل اضغط: مصروفات اليوم حسب كل متجر">
-            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday) }}" color="red" />
+        <button id="daily-expenses-card" type="button" class="text-right metric-card" data-metric="expenses_today" title="للمزيد من التفاصيل اضغط: مصروفات اليوم حسب كل متجر">
+            <x-stat-card title="مصروفات اليوم" value="{{ number_format($expensesToday) }}" value-id="daily-expenses-value" color="red" />
         </button>
 
-        <button type="button" class="text-right metric-card" data-metric="products_cost_today" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة اليوم حسب كل متجر">
-            <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" color="yellow" />
+        <button id="daily-products-cost-card" type="button" class="text-right metric-card" data-metric="products_cost_today" title="للمزيد من التفاصيل اضغط: تكلفة المنتجات المباعة اليوم حسب كل متجر">
+            <x-stat-card title="تكلفة المنتجات المباعة اليوم" value="{{ number_format($productsCostToday, 2) }}" value-id="daily-products-cost-value" color="yellow" />
         </button>
+
+        <div id="live-operation-card" class="relative overflow-hidden bg-gray-900/70 border border-gray-800 rounded-2xl px-4 py-3 transition-colors duration-500">
+            <span id="live-operation-amount" class="absolute left-3 top-2 text-[10px] font-bold text-emerald-300">0.00</span>
+            <div class="flex items-center gap-3 min-h-[52px] pl-12">
+                <span class="w-8 h-8 shrink-0 rounded-lg bg-cyan-500/15 text-cyan-300 flex items-center justify-center">
+                    <i class="fa-solid fa-bolt text-xs"></i>
+                </span>
+                <div class="min-w-0 text-right">
+                    <p id="live-operation-product" class="text-sm font-bold text-white truncate">جاري متابعة العمليات...</p>
+                    <p class="text-[10px] text-gray-500 mt-1 truncate">
+                        <span id="live-operation-store">—</span>
+                        <span class="mx-1">•</span>
+                        <span id="live-operation-time">--:--</span>
+                    </p>
+                </div>
+            </div>
+        </div>
 
     </div>
 
     {{-- الصف الثاني --}}
     <p class="text-xs font-semibold text-gray-400 mt-5 mb-2">الملخص الشهري</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
         <button type="button" class="text-right metric-card" data-metric="profit_month" title="للمزيد من التفاصيل اضغط: صافي الربح الشهري حسب كل متجر">
             <x-stat-card title="صافي الربح الشهري (بعد الخصومات)"
@@ -149,7 +209,10 @@
             <x-stat-card title="مصروفات الشهر" value="{{ number_format($expensesMonth) }}" color="red" />
         </button>
         <button type="button" class="text-right metric-card" data-metric="salaries_month" title="للمزيد من التفاصيل اضغط: الرواتب الشهرية حسب كل متجر">
-            <x-stat-card title="صافي الرواتب (شهري)" value="{{ number_format($netMonthlySalaries ?? 0) }}" color="indigo" />
+            <x-stat-card title="الرواتب الشهرية" value="{{ number_format($monthlySalaries ?? 0) }}" color="indigo" />
+        </button>
+        <button id="salary-after-withdrawals-card" type="button" class="text-right" title="عرض المتبقي من الرواتب والسحوبات حسب المتجر والموظف">
+            <x-stat-card title="الرواتب بعد السحب" value="{{ number_format($netMonthlySalaries ?? 0) }}" color="blue" />
         </button>
     </div>
 
@@ -182,6 +245,73 @@
         <x-stat-card title="مديونيات مفتوحة" value="{{ $creditOpen }}" color="yellow" />
         <x-stat-card title="مديونيات مسددة" value="{{ $creditClosed }}" color="emerald" />
         <x-stat-card title="مديونيات متأخرة" value="{{ $creditLate }}" color="red" />
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-sm font-semibold text-white">المنتجات منخفضة المخزون</p>
+                <span class="text-xs text-yellow-300">{{ number_format($lowStockCount) }} منتج</span>
+            </div>
+            <div class="max-h-72 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                @forelse($lowStockProducts as $product)
+                    <div class="flex items-center justify-between gap-3 border-b border-gray-800 pb-2">
+                        <div>
+                            <p class="text-sm text-gray-200">{{ $product->name }}</p>
+                            <p class="text-[11px] text-gray-500">{{ $product->store->name ?? 'متجر غير معروف' }}</p>
+                        </div>
+                        <span class="text-xs font-bold text-yellow-300">{{ number_format((float) $product->quantity, 2) }}</span>
+                    </div>
+                @empty
+                    <p class="text-xs text-gray-500">لا توجد منتجات منخفضة المخزون.</p>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm font-semibold text-white">الأكثر مبيعًا حسب المتجر</p>
+                    <p class="text-[11px] text-gray-500 mt-1">أفضل 5 منتجات خلال الشهر الحالي</p>
+                </div>
+                <i class="fa-solid fa-ranking-star text-amber-300"></i>
+            </div>
+            <div class="max-h-72 overflow-y-auto custom-scrollbar space-y-5 pr-1">
+                @forelse($topSellingProducts->groupBy('store_id') as $storeProducts)
+                    @php
+                        $highestQuantity = max(1, (float) $storeProducts->max('sold_quantity'));
+                    @endphp
+                    <div class="rounded-xl border border-gray-800 bg-gray-950/40 p-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs font-bold text-emerald-300">{{ $storeProducts->first()->store_name }}</p>
+                            <span class="text-[10px] text-gray-500">{{ $storeProducts->count() }} منتجات</span>
+                        </div>
+                        <div class="space-y-3">
+                            @foreach($storeProducts as $index => $product)
+                                <div>
+                                    <div class="flex items-center justify-between gap-3 text-xs mb-1.5">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <span class="w-5 h-5 shrink-0 rounded-full bg-gray-800 text-gray-400 flex items-center justify-center text-[10px]">{{ $index + 1 }}</span>
+                                            <span class="text-gray-200 truncate">{{ $product->name }}</span>
+                                        </div>
+                                        <div class="text-left shrink-0">
+                                            <span class="text-cyan-300 font-bold">{{ number_format((float) $product->sold_quantity, 2) }}</span>
+                                            <span class="text-[10px] text-gray-600 mr-1">{{ number_format((float) $product->sales_value, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                                        <div class="h-full rounded-full bg-gradient-to-l from-cyan-400 to-emerald-400"
+                                             style="width: {{ min(100, ((float) $product->sold_quantity / $highestQuantity) * 100) }}%"></div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-gray-500">لا توجد مبيعات منتجات خلال الشهر الحالي.</p>
+                @endforelse
+            </div>
+        </div>
     </div>
 
     {{-- ========================================================= --}}
@@ -262,6 +392,34 @@
         </div>
         <p id="metric-modal-value" class="text-2xl font-black text-emerald-400 mb-2"></p>
         <p id="metric-modal-details" class="text-sm text-gray-300 leading-7"></p>
+    </div>
+</div>
+
+{{-- نافذة الرواتب بعد السحب: المتاجر أولاً، ثم موظفو المتجر عند الضغط عليه. --}}
+<div id="salary-withdrawals-modal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 overflow-y-auto">
+    <div class="max-w-3xl mx-auto mt-10 mb-10 bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden">
+        <div class="p-5 border-b border-gray-800 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-white font-bold text-lg">الرواتب بعد السحب</h3>
+                <p class="text-xs text-gray-400 mt-1">اضغط اسم المتجر لعرض الموظفين وإجمالي سحب كل موظف والمتبقي من راتبه.</p>
+            </div>
+            <button type="button" id="salary-withdrawals-close" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-3 border-b border-gray-800 bg-gray-950/40">
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">إجمالي الرواتب</p>
+                <p class="text-indigo-300 font-bold mt-1">{{ number_format($monthlySalaries ?? 0, 2) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">إجمالي السحوبات</p>
+                <p class="text-red-300 font-bold mt-1">{{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-800 p-3">
+                <p class="text-[11px] text-gray-500">المتبقي من الرواتب</p>
+                <p class="text-emerald-300 font-bold mt-1">{{ number_format($netMonthlySalaries ?? 0, 2) }}</p>
+            </div>
+        </div>
+        <div id="salary-withdrawals-stores" class="p-5 space-y-3"></div>
     </div>
 </div>
 
@@ -380,7 +538,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // تفاصيل كل بطاقة موزعة حسب المتجر، مرسلة من الكنترولر كـ JSON.
     const storeBreakdowns = @json($metricStoreBreakdowns ?? []);
+    // تعريف العناوين والقيم والنص التوضيحي لكل بطاقة قابلة للنقر.
     const metricDefinitions = {
         profit_today: { title: 'صافي الربح اليوم', value: '{{ number_format($profitToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         sales_today: { title: 'مبيعات اليوم', value: '{{ number_format($salesToday, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
@@ -389,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function () {
         profit_month: { title: 'صافي الربح الشهري', value: '{{ number_format($profitMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         sales_month: { title: 'مبيعات الشهر', value: '{{ number_format($salesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
         expenses_month: { title: 'مصروفات الشهر', value: '{{ number_format($expensesMonth, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
-        salaries_month: { title: 'صافي الرواتب (شهري)', value: '{{ number_format($netMonthlySalaries ?? 0, 2) }} ر.س', details: 'بعد خصم سحوبات العمال. إجمالي الرواتب: {{ number_format($monthlySalaries ?? 0, 2) }} ر.س - السحوبات: {{ number_format($monthlyWorkerWithdrawals ?? 0, 2) }} ر.س.' },
+        salaries_month: { title: 'الرواتب الشهرية', value: '{{ number_format($monthlySalaries ?? 0, 2) }} ر.س', details: 'إجمالي الرواتب كاملة دون خصم السحوبات. تفاصيل السحوبات والمتبقي من الراتب تظهر في نافذة السحوبات المخصصة.' },
         monthly_purchases_consumption: { title: 'المشتريات والاستهلاك (شهري)', value: '{{ number_format($monthlyPurchasesAndConsumption, 2) }} ر.س', details: 'تفصيل القيمة حسب المتاجر.' },
     };
 
@@ -438,6 +598,199 @@ document.addEventListener('DOMContentLoaded', function () {
     modal?.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.add('hidden');
     });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // بيانات الموظفين الجاهزة لحساب وعرض الراتب والسحب والمتبقي لكل متجر.
+    const salaryRows = @json($employeeSalaryRemainders ?? []);
+    const modal = document.getElementById('salary-withdrawals-modal');
+    const openButton = document.getElementById('salary-after-withdrawals-card');
+    const closeButton = document.getElementById('salary-withdrawals-close');
+    const storesContainer = document.getElementById('salary-withdrawals-stores');
+
+    // حماية النصوص القادمة من قاعدة البيانات قبل إدراجها داخل HTML ديناميكي.
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    // توحيد عرض جميع مبالغ نافذة الرواتب إلى منزلتين عشريتين.
+    function formatSalary(value) {
+        return Number(value || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    // تجميع الموظفين حسب المتجر وبناء جدول قابل للفتح لكل متجر.
+    function renderSalaryStores() {
+        if (!storesContainer) return;
+
+        const groupedStores = salaryRows.reduce((stores, employee) => {
+            const storeName = employee.store_name || 'متجر غير معروف';
+            if (!stores[storeName]) stores[storeName] = [];
+            stores[storeName].push(employee);
+            return stores;
+        }, {});
+
+        const storeEntries = Object.entries(groupedStores);
+        if (!storeEntries.length) {
+            storesContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-6">لا توجد بيانات رواتب متاحة.</p>';
+            return;
+        }
+
+        storesContainer.innerHTML = storeEntries.map(([storeName, employees], storeIndex) => {
+            const salaryTotal = employees.reduce((total, employee) => total + Number(employee.salary || 0), 0);
+            const withdrawalsTotal = employees.reduce((total, employee) => total + Number(employee.withdrawals_total || 0), 0);
+            const remainingTotal = employees.reduce((total, employee) => total + Number(employee.salary_remaining || 0), 0);
+            const rows = employees.map((employee) => `
+                <tr class="border-b border-gray-800/70 last:border-0">
+                    <td class="py-3 px-2 text-gray-200">${escapeHtml(employee.name)}</td>
+                    <td class="py-3 px-2 text-indigo-300">${formatSalary(employee.salary)}</td>
+                    <td class="py-3 px-2 text-red-300">${formatSalary(employee.withdrawals_total)}</td>
+                    <td class="py-3 px-2 text-emerald-300 font-bold">${formatSalary(employee.salary_remaining)}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="rounded-xl border border-gray-800 overflow-hidden">
+                    <button type="button"
+                            class="salary-store-toggle w-full p-4 flex items-center justify-between gap-3 text-right hover:bg-white/5 transition"
+                            data-target="salary-store-${storeIndex}">
+                        <div>
+                            <p class="text-sm font-bold text-white">${escapeHtml(storeName)}</p>
+                            <p class="text-[11px] text-gray-500 mt-1">${employees.length} موظف — المتبقي ${formatSalary(remainingTotal)}</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px]">
+                            <span class="text-indigo-300">الرواتب ${formatSalary(salaryTotal)}</span>
+                            <span class="text-red-300">السحب ${formatSalary(withdrawalsTotal)}</span>
+                            <i class="fa-solid fa-chevron-down text-gray-500"></i>
+                        </div>
+                    </button>
+                    <div id="salary-store-${storeIndex}" class="hidden border-t border-gray-800 overflow-x-auto">
+                        <table class="w-full min-w-[560px] text-xs text-right">
+                            <thead class="bg-gray-950/60 text-gray-500">
+                                <tr>
+                                    <th class="py-2 px-2">الموظف</th>
+                                    <th class="py-2 px-2">الراتب</th>
+                                    <th class="py-2 px-2">إجمالي السحب</th>
+                                    <th class="py-2 px-2">المتبقي</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    openButton?.addEventListener('click', function () {
+        renderSalaryStores();
+        modal?.classList.remove('hidden');
+    });
+    closeButton?.addEventListener('click', () => modal?.classList.add('hidden'));
+    modal?.addEventListener('click', function (event) {
+        if (event.target === modal) modal.classList.add('hidden');
+    });
+    storesContainer?.addEventListener('click', function (event) {
+        const toggle = event.target.closest('.salary-store-toggle');
+        if (!toggle) return;
+        const details = document.getElementById(toggle.dataset.target);
+        details?.classList.toggle('hidden');
+        toggle.querySelector('.fa-chevron-down')?.classList.toggle('rotate-180');
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // مسار JSON الذي يحدّث بطاقات اليوم وآخر عملية دون إعادة تحميل الصفحة.
+    const snapshotUrl = @json(route('user.dashboard.daily-snapshot'));
+    // فلتر المتجر الحالي إن اختار المالك متجرًا محددًا للملخص اليومي.
+    const summaryStoreId = @json(request('summary_store_id'));
+    // آخر معرف عُرض؛ يستخدم لتفعيل وميض البطاقة عند وصول عملية جديدة فقط.
+    let latestOperationId = null;
+
+    // تنسيق الأرقام الحية مع منزلتين كحد أقصى.
+    function formatNumber(value) {
+        return Number(value || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    // تحديث قيمة بطاقة واحدة بواسطة معرف عنصر القيمة داخل المكوّن.
+    function updateCardValue(valueId, value) {
+        const valueElement = document.getElementById(valueId);
+        if (valueElement) valueElement.textContent = formatNumber(value);
+    }
+
+    // جلب اللقطة اليومية وتحديث البطاقات والعداد وآخر عملية كل ثلاث ثوانٍ.
+    async function refreshDailySnapshot() {
+        try {
+            const url = new URL(snapshotUrl, window.location.origin);
+            if (summaryStoreId) url.searchParams.set('summary_store_id', summaryStoreId);
+            url.searchParams.set('_', Date.now().toString());
+
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store',
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            updateCardValue('daily-profit-value', data.profit_today);
+            updateCardValue('daily-sales-value', data.sales_today);
+            updateCardValue('daily-expenses-value', data.expenses_today);
+            updateCardValue('daily-products-cost-value', data.products_cost_today);
+
+            const countElement = document.getElementById('live-operations-count');
+            if (countElement) countElement.textContent = formatNumber(data.operations_count);
+
+            const latestCard = document.getElementById('live-operation-card');
+            const productElement = document.getElementById('live-operation-product');
+            const storeElement = document.getElementById('live-operation-store');
+            const amountElement = document.getElementById('live-operation-amount');
+            const timeElement = document.getElementById('live-operation-time');
+            if (data.latest_operation) {
+                if (productElement) {
+                    productElement.textContent = data.latest_operation.description;
+                    productElement.classList.toggle('text-cyan-200', Boolean(data.latest_operation.is_tint));
+                }
+                if (storeElement) storeElement.textContent = data.latest_operation.store_name;
+                if (amountElement) amountElement.textContent = formatNumber(data.latest_operation.amount);
+                if (timeElement) timeElement.textContent = data.latest_operation.time || '--:--';
+            } else {
+                if (productElement) productElement.textContent = 'لا توجد عمليات بيع اليوم حتى الآن.';
+                if (storeElement) storeElement.textContent = '—';
+                if (amountElement) amountElement.textContent = '0.00';
+                if (timeElement) timeElement.textContent = '--:--';
+            }
+            if (latestCard && data.latest_operation?.id && latestOperationId !== data.latest_operation.id) {
+                latestCard.classList.add('border-cyan-500', 'bg-cyan-950/30');
+                window.setTimeout(() => {
+                    latestCard.classList.remove('border-cyan-500', 'bg-cyan-950/30');
+                }, 1800);
+                latestOperationId = data.latest_operation.id;
+            }
+
+            const updatedElement = document.getElementById('live-updated-at');
+            if (updatedElement) updatedElement.textContent = `آخر تحديث: ${data.updated_at}`;
+        } catch (error) {
+            // يبقى آخر رقم ظاهر دون إزعاج المستخدم إذا انقطع الاتصال مؤقتًا.
+        }
+    }
+
+    refreshDailySnapshot();
+    window.setInterval(refreshDailySnapshot, 3000);
 });
 </script>
 

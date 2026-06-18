@@ -38,9 +38,28 @@
                     {{ $is_main_category ? 'اسم النشاط' : 'اسم القسم' }}
                 </label>
 
-                <input type="text" name="name"
+                <input type="text" name="name" id="category_name"
                        value="{{ old('name') }}"
                        class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-blue-500 focus:ring-blue-500 transition">
+
+                @unless($is_main_category)
+                    <input type="hidden" name="category_name_preset" id="category_name_preset" value="{{ old('category_name_preset') }}">
+                    <div class="mt-4 p-4 bg-blue-950/30 border border-blue-500/30 rounded-xl">
+                        <p class="text-sm font-bold text-blue-300 mb-2">أسماء أقسام معتمدة للنظام</p>
+                        <p class="text-xs text-gray-400 mb-3">استخدم أحد الزرين لتثبيت اسم القسم دون أخطاء إملائية. ويمكنك كتابة أي اسم آخر يدويًا للأقسام الأخرى.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button type="button" data-category-preset="tint" data-category-name="تضليل"
+                                    class="category-preset-btn border border-sky-500/50 bg-sky-500/10 hover:bg-sky-500/20 text-sky-200 rounded-lg px-4 py-3 text-sm font-bold transition">
+                                <i class="fa-solid fa-sun ml-1"></i> تضليل
+                            </button>
+                            <button type="button" data-category-preset="upholstery" data-category-name="تنجيد وتلابيس"
+                                    class="category-preset-btn border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 rounded-lg px-4 py-3 text-sm font-bold transition">
+                                <i class="fa-solid fa-couch ml-1"></i> تنجيد وتلابيس
+                            </button>
+                        </div>
+                        <p id="category_preset_notice" class="hidden mt-3 text-xs text-emerald-300"></p>
+                    </div>
+                @endunless
 
                 @error('name')
                     <p class="text-red-400 text-sm mt-1">{{ $message }}</p>
@@ -82,4 +101,48 @@
 
 </div>
 
+
+@unless($is_main_category)
+<script>
+    (() => {
+        const nameInput = document.getElementById('category_name');
+        const presetInput = document.getElementById('category_name_preset');
+        const notice = document.getElementById('category_preset_notice');
+        const buttons = document.querySelectorAll('[data-category-preset]');
+        let applyingPreset = false;
+
+        function refreshPresetState() {
+            buttons.forEach((button) => {
+                const selected = presetInput.value === button.dataset.categoryPreset;
+                button.classList.toggle('ring-2', selected);
+                button.classList.toggle('ring-emerald-400', selected);
+            });
+            if (presetInput.value) {
+                notice.textContent = `سيُحفظ اسم القسم بالصيغة المعتمدة: ${nameInput.value}`;
+                notice.classList.remove('hidden');
+            } else {
+                notice.classList.add('hidden');
+            }
+        }
+
+        buttons.forEach((button) => button.addEventListener('click', () => {
+            applyingPreset = true;
+            nameInput.value = button.dataset.categoryName;
+            presetInput.value = button.dataset.categoryPreset;
+            applyingPreset = false;
+            refreshPresetState();
+            nameInput.focus();
+        }));
+
+        nameInput.addEventListener('input', () => {
+            if (!applyingPreset) {
+                presetInput.value = '';
+                refreshPresetState();
+            }
+        });
+
+        refreshPresetState();
+    })();
+</script>
+@endunless
 @endsection
