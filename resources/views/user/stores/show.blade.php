@@ -232,24 +232,34 @@
             ->where('sales.store_id', $store->id)
             ->whereBetween('sales.created_at', [$monthStart, $monthEnd])
             ->whereIn('sales.sale_type', $includedSaleTypes)
+            ->where(function ($query) {
+                $query->whereNull('sales.description')
+                    ->orWhere('sales.description', '!=', 'manual_invoice_entry');
+            })
             ->sum(\DB::raw('COALESCE(sale_items.total_cost, 0)'));
     } else {
         $monthlySoldProductsCost = (float) $store->sales()
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->whereIn('sale_type', $includedSaleTypes)
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'manual_invoice_entry');
+            })
             ->sum('products_total');
     }
 
-    $monthNetProfit = (float) $monthSales - ((float) $monthExpenses + (float) $monthlyAccountantConsumption + (float) $monthlySoldProductsCost + (float) $monthlyOperationalPurchases + (float) $netMonthlySalaries);
+    // مطابق للتقرير الشهري: صافي النتيجة = المحصل - (تكلفة المنتجات المباعة + الاستهلاك الداخلي + مشتريات المالك للاستهلاك + المصروفات).
+    // الرواتب والسحبيات تعرض للتوضيح فقط ولا تدخل في معادلة الربح.
+    $monthNetProfit = (float) $monthSales - ((float) $monthlySoldProductsCost + (float) $monthlyAccountantConsumption + (float) $monthlyOwnerPurchases + (float) $monthExpenses);
 
     $monthFinanceStats = [
         ['title'=>'المحصل الشهري','value'=>number_format($monthSales,2),'icon'=>'fa-wallet','color'=>'green','desc'=>now()->translatedFormat('Y/m').' • '.$monthSalesCount.' عملية (المحصل)','tooltip'=>'إجمالي المحصل الفعلي خلال الشهر','unit'=>'ر.س'],
         ['title'=>'إجمالي المصروفات','value'=>number_format($monthExpenses,2),'icon'=>'fa-receipt','color'=>'red','desc'=>'مصروفات المتجر','tooltip'=>'إجمالي المصروفات المسجلة خلال الشهر','unit'=>'ر.س'],
         ['title'=>'استهلاك داخلي (المحاسب)','value'=>number_format($monthlyAccountantConsumption,2),'icon'=>'fa-box-open','color'=>'yellow','desc'=>$monthlyAccountantConsumption>0?'استهلاك داخلي بسعر التكلفة':'لا يوجد استهلاك محاسب هذا الشهر','tooltip'=>'الاستهلاك التشغيلي يُعرض منفصلًا عن بطاقة مشتريات المالك للاستهلاك','unit'=>'ر.س'],
         ['title'=>'تكلفة المنتجات المباعة','value'=>number_format($monthlySoldProductsCost,2),'icon'=>'fa-cart-shopping','color'=>'cyan','desc'=>'تُخصم من الربح','tooltip'=>'إجمالي تكلفة المنتجات المباعة بسعر التكلفة','unit'=>'ر.س'],
-        ['title'=>'مشتريات المالك للاستهلاك','value'=>number_format($monthlyOwnerPurchases,2),'icon'=>'fa-truck-ramp-box','color'=>'blue','desc'=>'مطابق لصفحة الاستهلاك','tooltip'=>'نفس قيمة مشتريات المالك للاستهلاك في تقرير الاستهلاك','unit'=>'ر.س'],
-        ['title'=>'صافي الرواتب','value'=>number_format($netMonthlySalaries,2),'icon'=>'fa-user-tie','color'=>'purple','desc'=>'الرواتب بعد خصم سحب العمال','tooltip'=>'صافي الرواتب = إجمالي الرواتب - سحب العمال خلال الشهر','unit'=>'ر.س'],
-        ['title'=>$monthNetProfit<0?'إجمالي الخسارة':'إجمالي الربح','value'=>number_format(abs($monthNetProfit),2),'icon'=>'fa-chart-line','color'=>$monthNetProfit>=0?'emerald':'rose','desc'=>$monthNetProfit<0?'خسارة بعد التكاليف':'ربح بعد التكاليف','tooltip'=>$monthNetProfit<0?'إجمالي الخسارة = (المصروفات + الاستهلاك + تكلفة المبيعات + المشتريات + صافي الرواتب) - المحصل':'إجمالي الربح = المحصل - (المصروفات + الاستهلاك + تكلفة المبيعات + المشتريات + صافي الرواتب)','unit'=>'ر.س'],
+        ['title'=>'مشتريات المالك للاستهلاك','value'=>number_format($monthlyOwnerPurchases,2),'icon'=>'fa-truck-ramp-box','color'=>'blue','desc'=>'مطابق للتقرير الشهري','tooltip'=>'نفس قيمة مشتريات المالك للاستهلاك المخصومة في التقرير الشهري','unit'=>'ر.س'],
+        ['title'=>'صافي الرواتب','value'=>number_format($netMonthlySalaries,2),'icon'=>'fa-user-tie','color'=>'purple','desc'=>'للتوضيح فقط','tooltip'=>'صافي الرواتب = إجمالي الرواتب - سحب العمال خلال الشهر، ولا يدخل في معادلة صافي الربح الشهرية','unit'=>'ر.س'],
+        ['title'=>$monthNetProfit<0?'إجمالي الخسارة':'إجمالي الربح','value'=>number_format(abs($monthNetProfit),2),'icon'=>'fa-chart-line','color'=>$monthNetProfit>=0?'emerald':'rose','desc'=>$monthNetProfit<0?'خسارة بعد التكاليف':'ربح بعد التكاليف','tooltip'=>$monthNetProfit<0?'إجمالي الخسارة = (المصروفات + الاستهلاك الداخلي + مشتريات المالك للاستهلاك + تكلفة المنتجات المباعة) - المحصل':'إجمالي الربح = المحصل - (تكلفة المنتجات المباعة + الاستهلاك الداخلي + مشتريات المالك للاستهلاك + المصروفات)','unit'=>'ر.س'],
     ];
 
     // 11. بطاقة مستحقات الموظفين
@@ -283,7 +293,7 @@
     $employeePayrollStats = [
         ['title'=>'راتب الموظف (الإجمالي)','value'=>number_format($monthlySalaries,2),'icon'=>'fa-sack-dollar','color'=>'blue','desc'=>'إجمالي رواتب الشهر قبل السحب','tooltip'=>'الراتب الأساسي الإجمالي لكل الموظفين قبل خصم السحبيات','unit'=>'ر.س'],
         ['title'=>'سحبيات الموظف','value'=>number_format($employeeMonthlyWithdrawals,2),'icon'=>'fa-hand-holding-dollar','color'=>'yellow','desc'=>'إجمالي السحبيات الشهرية','tooltip'=>'مجموع سحبيات الموظفين خلال الشهر','unit'=>'ر.س'],
-        ['title'=>'صافي الرواتب','value'=>number_format($netMonthlySalaries,2),'icon'=>'fa-wallet','color'=>'indigo','desc'=>'بعد خصم السحبيات','tooltip'=>'صافي الرواتب المعتمد في الربحية الشهرية','unit'=>'ر.س'],
+        ['title'=>'صافي الرواتب','value'=>number_format($netMonthlySalaries,2),'icon'=>'fa-wallet','color'=>'indigo','desc'=>'بعد خصم السحبيات','tooltip'=>'قيمة توضيحية فقط ولا تدخل في الربحية الشهرية','unit'=>'ر.س'],
         ['title'=>'قيمة غياب الموظف','value'=>number_format($employeeMonthlyAbsenceCost,2),'icon'=>'fa-user-clock','color'=>'red','desc'=>'محتسبة: الراتب ÷ أيام الشهر × أيام الغياب','tooltip'=>'خصم الغياب محسوب بناءً على الأجر اليومي لكل موظف','unit'=>'ر.س'],
         ['title'=>'المديونية','value'=>number_format($employeeMonthlyDebts,2),'icon'=>'fa-file-invoice','color'=>'orange','desc'=>'إجمالي المديونيات الشهرية','tooltip'=>'إجمالي المديونيات المسجلة على الموظفين','unit'=>'ر.س'],
         ['title'=>'المتبقي من الراتب','value'=>number_format($employeeRemainingSalary,2),'icon'=>'fa-coins','color'=>$employeeRemainingSalary>=0?'emerald':'rose','desc'=>'الراتب - (السحبيات + الغياب + المديونية)','tooltip'=>'المتبقي المستحق بعد الخصومات والسحبيات والمديونيات','unit'=>'ر.س'],
