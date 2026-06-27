@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#111827">
 
-    {{-- Alpine --}}
-<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-<style>
-    [x-cloak] { display: none !important; }
-</style>
-
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -24,10 +22,9 @@
 
     {{-- ✅ تحميل Tailwind + app.js عبر Vite فقط --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    {{-- <script src="https://cdn.tailwindcss.com"></script> --}}
 </head>
 
-<body class="bg-gray-900 text-gray-100">
+<body class="app-surface bg-gray-900 text-gray-100 antialiased">
 
     {{-- Navbar --}}
     @include('layouts.partials.navbar')
@@ -37,7 +34,7 @@
        
 
         {{-- Main Content --}}
-        <main id="mainContent" class="flex-1 p-6 transition-all duration-300 mt-16">
+        <main id="mainContent" class="flex-1 p-4 md:p-6 transition-all duration-300 mt-16">
     @auth
     @if(auth()->user()->status === 'active' && auth()->user()->subscription_end_at)
         @php

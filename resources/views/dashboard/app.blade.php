@@ -12,24 +12,12 @@
         document.documentElement.classList.remove('dark');
     }
 </script>
-        {{-- Tailwind --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    {{-- Alpine.js + Collapse --}}
-   {{-- Alpine.js + Collapse --}}
-
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-
-<!-- Alpine Core -->
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    {{-- AlpineJS --}}
+    {{-- Alpine Collapse plugin only; Alpine core and Tailwind are loaded through Vite. --}}
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- ملفك الأساسي - المسار الصحيح لـ public/css -->
     <link href="{{ asset('css/style.css') }}" rel="stylesheet">
