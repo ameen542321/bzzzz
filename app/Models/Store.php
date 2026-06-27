@@ -50,6 +50,7 @@ class Store extends Model
      */
     protected $casts = [
         'bank_accounts' => 'array', // ليتعامل مع الحسابات كـ Array بدلاً من نص
+        // توضيح: هذه الحقول تخص نظام الشفتات حتى تصل للواجهة والكنترولرات بأنواع ثابتة.
         'force_shift_closure' => 'boolean',
         'number_of_shifts' => 'integer',
     ];
@@ -69,6 +70,7 @@ class Store extends Model
     public function stockMovements() { return $this->hasMany(StockMovement::class); }
     public function withdrawals() { return $this->hasMany(Withdrawal::class); }
     public function employees() { return $this->hasMany(Employee::class); }
+    public function shifts() { return $this->hasMany(StoreShift::class); }
     // داخل Model Store.php
 public function saleItems()
 {
@@ -128,6 +130,7 @@ public function invoices()
     public function shiftStartTimes(): array
     {
         $starts = [];
+        // نحصر العدد بين 1 و3 لأن قاعدة البيانات تدعم ثلاثة أوقات بداية فقط حالياً.
         $shiftCount = max(1, min(3, (int) ($this->number_of_shifts ?: 1)));
 
         for ($i = 1; $i <= $shiftCount; $i++) {
@@ -139,6 +142,7 @@ public function invoices()
         }
 
         if (empty($starts)) {
+            // في حال لم تضبط أوقات الشفتات بعد، نستخدم بداية اليوم كقيمة افتراضية آمنة.
             $starts[] = '00:00';
         }
 
@@ -163,10 +167,12 @@ public function invoices()
 
             if ($candidate->lte($reference)) {
                 $currentStart = $candidate;
+                $currentIndex = $index;
                 $nextTime = $starts[$index + 1] ?? $starts[0];
                 $nextStart = $reference->copy()->setTimeFromTimeString($nextTime);
 
                 if ($nextStart->lte($currentStart)) {
+                    // إذا كان الشفت التالي في اليوم التالي (مثلاً شفت يبدأ 11 مساءً وينتهي 7 صباحاً).
                     $nextStart->addDay();
                 }
             }
@@ -181,6 +187,9 @@ public function invoices()
             'start' => $currentStart,
             'end' => $nextStart,
             'label' => 'من ' . $currentStart->format('h:i A') . ' إلى ' . $nextStart->format('h:i A'),
+            'number' => ($currentIndex ?? count($starts) - 1) + 1,
+            'total' => count($starts),
+            'has_next_shift_today' => count($starts) > 1 && (($currentIndex ?? count($starts) - 1) + 1) < count($starts),
             'is_overdue' => $reference->gt($nextStart),
         ];
     }

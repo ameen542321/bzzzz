@@ -11,6 +11,7 @@ use App\Models\Withdrawal;
 use App\Models\DailyBalance;
 use App\Models\Debt;
 use App\Models\Notification;
+use App\Models\StoreShift;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class DashboardController extends Controller
         $accountant = auth('accountant')->user();
         $storeId = $accountant->store_id;
         $store = $accountant->store;
+        // توضيح: نحسب الشفت المجدول للعرض والتنبيه فقط، أما حساب الإقفال المالي فيبقى مبنياً على آخر DailyBalance فعلي.
         $scheduledShift = $store ? $store->scheduledShiftWindow(now()) : null;
         $lastBalance = null;
 
@@ -586,7 +588,8 @@ class DashboardController extends Controller
 
     $validator = Validator::make($request->all(), [
         'actual_cash' => 'required|numeric|min:0',
-        'notes' => 'nullable|string|max:500'
+        'notes' => 'nullable|string|max:500',
+        'closure_action' => 'nullable|in:activate_next_shift,close_accounting_day'
     ]);
 
     if ($validator->fails()) {
@@ -620,6 +623,7 @@ class DashboardController extends Controller
 
         $startTime = $lastBalance ? $lastBalance->end_time : now()->startOfDay();
         $endTime = now();
+        $scheduledShift = $store->scheduledShiftWindow($endTime);
 
         \Log::info('Balance closure started', [
             'store_id' => $store->id,
@@ -825,6 +829,21 @@ class DashboardController extends Controller
             'start_time' => $startTime,
             'end_time' => $endTime,
             'notes' => $request->notes,
+        ]);
+
+        // توضيح: هذا هو كيان الشفت الصريح الذي سيسمح لاحقاً بفصل الطلبات والمراجعات على مستوى الشفت بدلاً من التاريخ فقط.
+        StoreShift::create([
+            'store_id' => $store->id,
+            'accountant_id' => $accountant->id,
+            'daily_balance_id' => $dailyBalance->id,
+            'business_date' => Carbon::parse($endTime)->toDateString(),
+            'shift_number' => $scheduledShift['number'] ?? 1,
+            'scheduled_start' => $scheduledShift['start'] ?? null,
+            'scheduled_end' => $scheduledShift['end'] ?? null,
+            'actual_start' => $startTime,
+            'actual_end' => $endTime,
+            'status' => 'closed',
+            'closure_action' => $request->input('closure_action'),
         ]);
 
         // \Log::info('DailyBalance created with ID: ' . $dailyBalance->id);

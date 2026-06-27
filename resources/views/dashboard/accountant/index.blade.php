@@ -333,6 +333,7 @@
                 <div class="mt-2 flex items-center gap-4">
                     <div class="text-xs text-gray-300">
                         @if(!empty($scheduledShift))
+                        {{-- توضيح: هذا السطر يعرض الشفت المجدول الحالي فقط ولا يغيّر فترة الحساب المالي للإقفال. --}}
                         <div class="flex items-center gap-1 text-indigo-200">
                             <span class="w-2 h-2 bg-indigo-400 rounded-full"></span>
                             الشفت المجدول: {{ $scheduledShift['label'] }}
@@ -579,6 +580,23 @@
                             هذا المبلغ يمثل النقد (الدرج) فقط، مبيعات الشبكة تُحسب تلقائياً.
                         </p>
                     </div>
+
+                    @if(!empty($scheduledShift) && ($scheduledShift['has_next_shift_today'] ?? false))
+                    <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3">
+                        <label class="text-gray-300 text-xs mb-2 block">بعد إغلاق هذا الشفت:</label>
+                        <div class="space-y-2 text-sm">
+                            <label class="flex items-center gap-2 text-white">
+                                <input type="radio" name="closure_action" value="activate_next_shift" checked class="text-indigo-600 bg-gray-800 border-gray-600">
+                                <span>تفعيل الشفت التالي</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-white">
+                                <input type="radio" name="closure_action" value="close_accounting_day" class="text-indigo-600 bg-gray-800 border-gray-600">
+                                <span>إغلاق اليوم المحاسبي</span>
+                            </label>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-2">يظهر هذا الخيار فقط عند إغلاق شفت يليه شفت آخر في نفس إعدادات اليوم.</p>
+                    </div>
+                    @endif
 
                     <div>
                         <label class="text-gray-400 text-xs mb-1 block">ملاحظات (اختياري):</label>
