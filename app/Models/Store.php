@@ -14,6 +14,7 @@ use App\Models\Accountant;
 use App\Models\Withdrawal;
 use App\Models\EmployeeDebt;
 use App\Models\StockMovement;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -37,11 +38,11 @@ class Store extends Model
         'commercial_registration',
         'bank_accounts',
         'invoice_terms',
-         'number_of_shifts',
-         'shift_1_start',
-         'shift_2_start',
-    'shift_3_start',
-     'force_shift_closure'
+        'number_of_shifts',
+        'shift_1_start',
+        'shift_2_start',
+        'shift_3_start',
+        'force_shift_closure'
     ];
 
     /**
@@ -49,6 +50,9 @@ class Store extends Model
      */
     protected $casts = [
         'bank_accounts' => 'array', // ليتعامل مع الحسابات كـ Array بدلاً من نص
+        // توضيح: هذه الحقول تخص نظام الشفتات حتى تصل للواجهة والكنترولرات بأنواع ثابتة.
+        'force_shift_closure' => 'boolean',
+        'number_of_shifts' => 'integer',
     ];
 
     /*
@@ -66,6 +70,7 @@ class Store extends Model
     public function stockMovements() { return $this->hasMany(StockMovement::class); }
     public function withdrawals() { return $this->hasMany(Withdrawal::class); }
     public function employees() { return $this->hasMany(Employee::class); }
+    public function shifts() { return $this->hasMany(StoreShift::class); }
     // داخل Model Store.php
 public function saleItems()
 {
@@ -117,6 +122,76 @@ public function invoices()
     public function isActive()
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * أوقات بداية الشفتات المفعلة مرتبة زمنياً.
+     */
+    public function shiftStartTimes(): array
+    {
+        $starts = [];
+        // نحصر العدد بين 1 و3 لأن قاعدة البيانات تدعم ثلاثة أوقات بداية فقط حالياً.
+        $shiftCount = max(1, min(3, (int) ($this->number_of_shifts ?: 1)));
+
+        for ($i = 1; $i <= $shiftCount; $i++) {
+            $value = $this->getAttribute("shift_{$i}_start");
+
+            if ($value) {
+                $starts[] = substr((string) $value, 0, 5);
+            }
+        }
+
+        if (empty($starts)) {
+            // في حال لم تضبط أوقات الشفتات بعد، نستخدم بداية اليوم كقيمة افتراضية آمنة.
+            $starts[] = '00:00';
+        }
+
+        $starts = array_values(array_unique($starts));
+        sort($starts);
+
+        return $starts;
+    }
+
+    /**
+     * يرجع حدود الشفت المجدول الحالي اعتماداً على إعدادات المتجر.
+     */
+    public function scheduledShiftWindow(?Carbon $reference = null): array
+    {
+        $reference = ($reference ?: now())->copy();
+        $starts = $this->shiftStartTimes();
+        $currentStart = null;
+        $nextStart = null;
+
+        foreach ($starts as $index => $time) {
+            $candidate = $reference->copy()->setTimeFromTimeString($time);
+
+            if ($candidate->lte($reference)) {
+                $currentStart = $candidate;
+                $currentIndex = $index;
+                $nextTime = $starts[$index + 1] ?? $starts[0];
+                $nextStart = $reference->copy()->setTimeFromTimeString($nextTime);
+
+                if ($nextStart->lte($currentStart)) {
+                    // إذا كان الشفت التالي في اليوم التالي (مثلاً شفت يبدأ 11 مساءً وينتهي 7 صباحاً).
+                    $nextStart->addDay();
+                }
+            }
+        }
+
+        if (!$currentStart) {
+            $currentStart = $reference->copy()->subDay()->setTimeFromTimeString(end($starts));
+            $nextStart = $reference->copy()->setTimeFromTimeString($starts[0]);
+        }
+
+        return [
+            'start' => $currentStart,
+            'end' => $nextStart,
+            'label' => 'من ' . $currentStart->format('h:i A') . ' إلى ' . $nextStart->format('h:i A'),
+            'number' => ($currentIndex ?? count($starts) - 1) + 1,
+            'total' => count($starts),
+            'has_next_shift_today' => count($starts) > 1 && (($currentIndex ?? count($starts) - 1) + 1) < count($starts),
+            'is_overdue' => $reference->gt($nextStart),
+        ];
     }
 
     /**

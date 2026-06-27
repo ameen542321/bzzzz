@@ -120,6 +120,12 @@ class StoreController extends Controller
             'commercial_registration' => 'nullable|string|max:255',
             'tax_number'          => 'nullable|string|max:255',
             'description'         => 'nullable|string',
+            // توضيح: إعدادات الشفتات تحفظ مع المتجر حتى تكون مراجعة الشفتات مبنية على إعداد واضح من المالك.
+            'number_of_shifts'    => 'required|integer|min:1|max:3',
+            'shift_1_start'       => 'nullable|date_format:H:i|required_if:number_of_shifts,1,2,3',
+            'shift_2_start'       => 'nullable|date_format:H:i|required_if:number_of_shifts,2,3',
+            'shift_3_start'       => 'nullable|date_format:H:i|required_if:number_of_shifts,3',
+            'force_shift_closure' => 'nullable|boolean',
         ]);
 
         $user = auth()->user();
@@ -146,6 +152,12 @@ class StoreController extends Controller
             'status'              => 'active',
             'slug'                => Str::slug($request->name) . '-' . uniqid(),
             'expires_at'          => null,
+            // توضيح: نلغي أوقات الشفتات غير المستخدمة حتى لا تؤثر إعدادات قديمة عند تقليل عدد الشفتات.
+            'number_of_shifts'    => (int) $request->number_of_shifts,
+            'shift_1_start'       => $request->shift_1_start,
+            'shift_2_start'       => $request->number_of_shifts >= 2 ? $request->shift_2_start : null,
+            'shift_3_start'       => $request->number_of_shifts >= 3 ? $request->shift_3_start : null,
+            'force_shift_closure' => $request->boolean('force_shift_closure'),
         ]);
 
         return redirect()->route('user.stores.index')->with('success', 'تم إنشاء المتجر بنجاح مع كافة البيانات الضريبية.');
@@ -191,7 +203,19 @@ class StoreController extends Controller
             'commercial_registration' => 'nullable|string',
             'bank_accounts' => 'nullable|string',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            // توضيح: نفس قواعد الإنشاء مطبقة في التعديل حتى لا تختلف قراءة الشفتات بين متجر جديد ومتجر معدل.
+            'number_of_shifts' => 'required|integer|min:1|max:3',
+            'shift_1_start' => 'nullable|date_format:H:i|required_if:number_of_shifts,1,2,3',
+            'shift_2_start' => 'nullable|date_format:H:i|required_if:number_of_shifts,2,3',
+            'shift_3_start' => 'nullable|date_format:H:i|required_if:number_of_shifts,3',
+            'force_shift_closure' => 'nullable|boolean',
         ]);
+
+        $validated['number_of_shifts'] = (int) $validated['number_of_shifts'];
+        // توضيح: عند تقليل عدد الشفتات، تنظيف القيم القديمة يمنع ظهور شفتات تاريخية بالخطأ في المراجعة.
+        $validated['shift_2_start'] = $validated['number_of_shifts'] >= 2 ? ($validated['shift_2_start'] ?? null) : null;
+        $validated['shift_3_start'] = $validated['number_of_shifts'] >= 3 ? ($validated['shift_3_start'] ?? null) : null;
+        $validated['force_shift_closure'] = $request->boolean('force_shift_closure');
 
         // معالجة رفع الشعار
         if ($request->hasFile('logo')) {

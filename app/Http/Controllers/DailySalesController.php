@@ -9,6 +9,7 @@ use App\Models\CreditSale;
 use App\Models\Expense;
 use App\Models\Withdrawal;
 use App\Models\DailyBalance;
+use App\Models\Accountant;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -182,6 +183,13 @@ class DailySalesController extends Controller
             ->values();
 
         $employees = $store->employees()->select('id', 'name')->orderBy('name')->get();
+        // توضيح: صفحة مراجعة الشفتات تحتاج معرفة المحاسبين الفعالين لتعرض الاسم مباشرة عند وجود محاسب واحد فقط،
+        // وتعرض قائمة اختيار فقط عند وجود أكثر من محاسب حتى لا تظهر عناصر غير لازمة في الواجهة.
+        $activeAccountants = Accountant::where('store_id', $store->id)
+            ->where('status', 'active')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
 
         $shiftSummaries = $shiftWindows->map(function ($window) use ($sales, $store) {
             $shiftSales = $sales->filter(fn($sale) => ($sale->shift_key ?? 'default_shift') === $window['key']);
@@ -273,6 +281,8 @@ class DailySalesController extends Controller
                 'label' => $window['label'],
                 'start' => $window['start'],
                 'end' => $window['end'],
+                'accountant_id' => $window['accountant_id'] ?? null,
+                'accountant_name' => $window['accountant_name'] ?? null,
                 // تمرير ملاحظة إغلاق الشفت للواجهة كما هي (إن وُجدت) لعرضها في ملخص الشفت.
                 'notes' => $window['notes'] ?? null,
                 'stats' => $stats,
@@ -299,7 +309,7 @@ class DailySalesController extends Controller
             'shift_count' => $shiftSummaries->count(),
         ];
 
-        return view('user.stores.daily', compact('store', 'sales', 'stats', 'startTime', 'endTime', 'selectedShift', 'shiftSummaries', 'employees'));
+        return view('user.stores.daily', compact('store', 'sales', 'stats', 'startTime', 'endTime', 'selectedShift', 'shiftSummaries', 'employees', 'activeAccountants'));
     }
 
     private function getCreditCollectionOperations(int $storeId, $shiftWindows, array $visibleSaleIds = [])
@@ -565,6 +575,7 @@ class DailySalesController extends Controller
         // الأساس: نعتمد على الشفتات المغلقة فقط (DailyBalance).
         // نعتمد تاريخ الإغلاق (end_time) كمرجع اليوم حتى لا تظهر شفتات قديمة متداخلة زمنيًا بعد النقل.
         $balances = DailyBalance::where('store_id', $storeId)
+            ->with('accountant:id,name')
             ->whereNotNull('start_time')
             ->whereNotNull('end_time')
             ->whereDate('created_at', $selectedDate->toDateString())
@@ -578,6 +589,8 @@ class DailySalesController extends Controller
                 'start' => Carbon::parse($balance->start_time),
                 'end' => Carbon::parse($balance->end_time),
                 'source' => 'balance',
+                'accountant_id' => $balance->accountant_id,
+                'accountant_name' => optional($balance->accountant)->name,
                 // تطبيع الملاحظة: النص الفارغ يتحول إلى null حتى لا يظهر بلوك فارغ في الواجهة.
                 'notes' => trim((string) ($balance->notes ?? '')) !== '' ? (string) $balance->notes : null,
             ];
@@ -600,6 +613,8 @@ class DailySalesController extends Controller
                     'start' => $openStart,
                     'end' => $openEnd,
                     'source' => 'open_shift',
+                    'accountant_id' => null,
+                    'accountant_name' => null,
                     // الشفت المفتوح لا يملك ملاحظة إغلاق بعد؛ تُترك null عمدًا.
                     'notes' => null,
                 ]);

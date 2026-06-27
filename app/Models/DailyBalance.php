@@ -19,4 +19,9 @@ class DailyBalance extends Model
     public function accountant() {
         return $this->belongsTo(Accountant::class);
     }
+
+    public function storeShift()
+    {
+        return $this->hasOne(StoreShift::class);
+    }
 }

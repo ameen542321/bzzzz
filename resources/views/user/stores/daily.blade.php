@@ -2,17 +2,23 @@
 @section('title', 'المبيعات - ' . $store->name)
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-6 text-right" dir="rtl">
+    @php
+        $shiftCountForReview = (int) ($stats['shift_count'] ?? 0);
+        $activeAccountants = $activeAccountants ?? collect();
+        $hasMultipleShiftsForReview = $shiftCountForReview > 1;
+        $hasMultipleAccountantsForReview = $activeAccountants->count() > 1;
+    @endphp
 
     {{-- ===== شريط العنوان والبحث المتقدم ===== --}}
     <div class="mb-6 bg-gray-800/50 p-4 rounded-2xl border border-gray-700">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-white flex items-center gap-2">
-                    <i class="fas fa-chart-line text-green-500"></i>
+                    <i class="fas fa-clipboard-check text-green-500"></i>
                     @if(request('date') || request('search'))
                         نتائج البحث
                     @else
-                        مبيعات الشفت اليومية
+                        مراجعة الشفتات
                     @endif
                 </h1>
                 <p class="text-gray-400 text-sm mt-1">{{ $store->name }}</p>
@@ -49,7 +55,7 @@
 
         <div class="mt-3 text-sm text-gray-400 bg-gray-900/50 p-2 rounded-lg flex flex-col gap-1">
             <div class="text-[11px] text-green-300 bg-green-500/10 border border-green-500/20 rounded-md px-2 py-1">
-                ✅ عرض التقرير يعتمد على الفترة المحددة (اليوم أو التاريخ المختار).
+                ✅ عرض المراجعة يعتمد على الشفتات المغلقة فعلياً في التاريخ المحدد، وليس على إعداد عدد الشفتات الحالي فقط.
             </div>
             <div>
                 <i class="fas fa-clock ml-1 text-blue-400"></i>
@@ -59,9 +65,21 @@
                 <span class="text-gray-200">{{ $endTime->format('Y-m-d h:i A') }}</span>
                 @if($selectedShift)
                     <span class="mr-2 text-[11px] text-green-400">(حسب الفترة المعتمدة)</span>
-                    <span class="mr-2 text-[11px] text-cyan-300">عدد الفترات المعروضة: {{ $stats['shift_count'] }}</span>
+                    @if($hasMultipleShiftsForReview)
+                        <span class="mr-2 text-[11px] text-cyan-300">عدد الفترات المعروضة: {{ $stats['shift_count'] }}</span>
+                    @endif
                 @else
                     <span class="mr-2 text-[11px] text-yellow-400">(تم اعتماد الفترة اليومية المحددة)</span>
+                @endif
+            </div>
+            <div class="text-[11px] text-slate-300 bg-slate-800/70 border border-slate-700 rounded-md px-2 py-1">
+                <i class="fas fa-user-tie ml-1 text-indigo-300"></i>
+                @if($activeAccountants->isEmpty())
+                    <span class="text-red-300">لا يوجد محاسبون فعالون لهذا المتجر. فعّل محاسباً قبل إعادة تعيين طلبات الشفت.</span>
+                @elseif($hasMultipleAccountantsForReview)
+                    اختر المحاسب داخل بطاقة الشفت عند الحاجة لإعادة التعيين أو المتابعة.
+                @else
+                    المحاسب الفعال: <span class="text-white font-bold">{{ $activeAccountants->first()->name }}</span>
                 @endif
             </div>
             @if(request('search') || request('date'))
@@ -132,15 +150,36 @@
         <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-3 text-[12px]">
             @php
                 $isClosedShift = \Illuminate\Support\Str::startsWith((string) ($shift['key'] ?? ''), 'shift_');
+                $shiftOrdinal = $loop->iteration;
             @endphp
             <div class="flex justify-between items-center mb-2">
                 <div class="flex flex-col">
-                    <span class="text-white font-bold">{{ $shift['label'] }}</span>
+                    @if($hasMultipleShiftsForReview)
+                        <span class="text-white font-bold">الشفت {{ $shiftOrdinal }} من {{ $shiftCountForReview }}</span>
+                    @endif
                     @if($isClosedShift)
                         <span class="text-[9px] text-gray-500/70 tracking-wider uppercase">ref: shf-{{ str_replace('shift_', '', (string) $shift['key']) }}</span>
                     @endif
                 </div>
                 <span class="text-gray-400">{{ $shift['start']->format('h:i A') }} → {{ $shift['end']->format('h:i A') }}</span>
+            </div>
+            <div class="mb-2 rounded-lg border border-slate-700 bg-slate-950/40 p-2">
+                <div class="text-[11px] text-slate-400 mb-1">المحاسب المسؤول</div>
+                @if($activeAccountants->isEmpty())
+                    <div class="text-red-300 text-[11px]">لا يوجد محاسبون فعالون.</div>
+                @elseif($hasMultipleAccountantsForReview)
+                    {{-- توضيح: تظهر قائمة المحاسبين فقط عند تعدد المحاسبين؛ أما المحاسب الواحد فيعرض اسمه مباشرة بدون قائمة. --}}
+                    <select class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[11px] text-white">
+                        @foreach($activeAccountants as $accountantOption)
+                            <option value="{{ $accountantOption->id }}" @selected((int) ($shift['accountant_id'] ?? 0) === (int) $accountantOption->id)>
+                                {{ $accountantOption->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="text-[10px] text-gray-500 mt-1">إعادة التعيين الفعلية ستتم من كيان الشفت الصريح عند تفعيل فصل الطلبات على مستوى الشفت.</div>
+                @else
+                    <div class="text-white font-bold text-[12px]">{{ $shift['accountant_name'] ?: $activeAccountants->first()->name }}</div>
+                @endif
             </div>
             @if($isClosedShift)
             {{-- نستخدم URL مباشر بدل route() لتفادي تعطل الصفحة إذا كانت أسماء المسارات غير محدثة في بيئة التشغيل. --}}
@@ -209,11 +248,15 @@
                             $shiftNumber = $shiftLabelNumberMatch[0] ?? null;
                         @endphp
                         <div class="flex flex-wrap items-center gap-2">
+                            @if($hasMultipleShiftsForReview)
                             <span class="text-[10px] font-semibold text-gray-200 border border-gray-500/50 px-2.5 py-1 rounded-full">
-                                {{ $shiftNumber ? 'الشفت رقم ' . $shiftNumber : 'الشفت' }}
+                                الشفت {{ $loop->iteration }} من {{ $shiftCountForReview }}
                             </span>
+                            @endif
                             <div class="flex flex-col">
-                                <h3 class="text-sm font-bold text-white tracking-wide">{{ $shift['label'] }}</h3>
+                                <h3 class="text-sm font-bold text-white tracking-wide">
+                                    {{ $hasMultipleShiftsForReview ? $shift['label'] : 'قائمة عمليات اليوم المحاسبي' }}
+                                </h3>
                                 @if(\Illuminate\Support\Str::startsWith((string) ($shift['key'] ?? ''), 'shift_'))
                                     <span class="text-[9px] text-gray-500/70 tracking-wider uppercase">ref: shf-{{ str_replace('shift_', '', (string) $shift['key']) }}</span>
                                 @endif
@@ -222,7 +265,9 @@
                         <span class="text-xs text-gray-300 bg-gray-800/80 border border-gray-600 px-2 py-1 rounded-md">{{ $shift['start']->format('h:i A') }} → {{ $shift['end']->format('h:i A') }}</span>
                     </div>
                     <div class="mb-3 px-2 py-1.5 border border-gray-300 rounded-lg text-[11px] text-gray-700">
-                        <span class="font-semibold">قائمة عمليات {{ $shiftNumber ? 'الشفت رقم ' . $shiftNumber : $shift['label'] }}</span>
+                        <span class="font-semibold">
+                            {{ $hasMultipleShiftsForReview ? 'قائمة عمليات الشفت رقم ' . $loop->iteration : 'قائمة عمليات اليوم المحاسبي' }}
+                        </span>
                         <span class="text-gray-600">({{ number_format($shiftSales->count()) }} عملية)</span>
                     </div>
 
