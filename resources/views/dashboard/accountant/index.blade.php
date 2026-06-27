@@ -332,6 +332,12 @@
                 <h3 class="text-2xl font-bold text-white mt-1">{{ number_format($totalCashInShift, 2) }} <span class="text-xs text-gray-300">ريال</span></h3>
                 <div class="mt-2 flex items-center gap-4">
                     <div class="text-xs text-gray-300">
+                        @if(!empty($scheduledShift))
+                        <div class="flex items-center gap-1 text-indigo-200">
+                            <span class="w-2 h-2 bg-indigo-400 rounded-full"></span>
+                            الشفت المجدول: {{ $scheduledShift['label'] }}
+                        </div>
+                        @endif
                         <div class="flex items-center gap-1">
                             <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
                             مبيعات: {{ number_format($totalSinceBalance, 2) }}
@@ -384,6 +390,9 @@
             <div class="text-center mb-4 sticky top-0 bg-gray-900 pt-0 pb-2 z-10">
                 <h2 class="text-xl font-bold text-white">تأكيد إصدار الموازنة اليومية </h2>
                 <p class="text-gray-400 text-sm mt-1 uppercase tracking-wider">ملخص الحساب النقدي </p>
+                @if(!empty($scheduledShift))
+                    <p class="text-indigo-300 text-xs mt-2">الشفت المجدول: {{ $scheduledShift['label'] }}</p>
+                @endif
             </div>
 
             {{-- المحتوى القابل للسكرول --}}

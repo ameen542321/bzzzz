@@ -103,6 +103,58 @@
                     </div>
                 </div>
 
+                {{-- بطاقة إعدادات الشفتات --}}
+                <div class="bg-slate-900/40 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-md"
+                     x-data="{ shifts: Number('{{ old('number_of_shifts', $store->number_of_shifts ?? 1) }}') }">
+                    <div class="p-8 border-b border-slate-800 bg-gradient-to-r from-indigo-600/5 to-transparent">
+                        <h2 class="text-white text-xl font-bold flex items-center gap-3">
+                            <i class="fa-solid fa-clock text-indigo-500"></i>
+                            إعدادات نظام الشفتات
+                        </h2>
+                        <p class="text-slate-400 text-xs mt-2">حدد عدد الورديات ومواعيد بدايتها حتى يتم احتساب الشفت الحالي وتنبيه المحاسب وقت الإقفال.</p>
+                    </div>
+
+                    <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-slate-300 text-sm font-semibold mr-1">عدد الشفتات اليومية</label>
+                            <select name="number_of_shifts" x-model.number="shifts"
+                                    class="w-full bg-slate-950/50 border border-slate-700 text-white rounded-2xl px-5 py-3.5 focus:border-indigo-500 outline-none">
+                                <option value="1">شفت واحد</option>
+                                <option value="2">شفتان</option>
+                                <option value="3">ثلاثة شفتات</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-slate-300 text-sm font-semibold mr-1">بداية الشفت الأول</label>
+                            <input type="time" name="shift_1_start" value="{{ old('shift_1_start', isset($store->shift_1_start) ? substr((string) $store->shift_1_start, 0, 5) : '00:00') }}"
+                                   class="w-full bg-slate-950/50 border border-slate-700 text-white rounded-2xl px-5 py-3.5 focus:border-indigo-500 outline-none" required>
+                        </div>
+
+                        <div class="space-y-2" x-show="shifts >= 2" x-cloak>
+                            <label class="text-slate-300 text-sm font-semibold mr-1">بداية الشفت الثاني</label>
+                            <input type="time" name="shift_2_start" value="{{ old('shift_2_start', isset($store->shift_2_start) ? substr((string) $store->shift_2_start, 0, 5) : '08:00') }}"
+                                   class="w-full bg-slate-950/50 border border-slate-700 text-white rounded-2xl px-5 py-3.5 focus:border-indigo-500 outline-none">
+                        </div>
+
+                        <div class="space-y-2" x-show="shifts >= 3" x-cloak>
+                            <label class="text-slate-300 text-sm font-semibold mr-1">بداية الشفت الثالث</label>
+                            <input type="time" name="shift_3_start" value="{{ old('shift_3_start', isset($store->shift_3_start) ? substr((string) $store->shift_3_start, 0, 5) : '16:00') }}"
+                                   class="w-full bg-slate-950/50 border border-slate-700 text-white rounded-2xl px-5 py-3.5 focus:border-indigo-500 outline-none">
+                        </div>
+
+                        <label class="md:col-span-2 flex items-center gap-3 bg-slate-950/40 border border-slate-700 rounded-2xl p-4 cursor-pointer">
+                            <input type="checkbox" name="force_shift_closure" value="1"
+                                   @checked(old('force_shift_closure', $store->force_shift_closure ?? false))
+                                   class="w-5 h-5 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+                            <span>
+                                <span class="block text-white font-bold text-sm">تفعيل تنبيهات الإقفال الإلزامي بعد نهاية الشفت</span>
+                                <span class="block text-slate-400 text-xs mt-1">يستخدمها النظام لإبراز مواعيد الشفتات وتنبيه المحاسب عند متابعة الإقفالات.</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
                 {{-- زر الإرسال --}}
                 <button type="submit" class="w-full h-16 bg-gradient-to-r {{ $isEdit ? 'from-emerald-600 to-teal-700' : 'from-blue-600 to-indigo-700' }} text-white rounded-2xl font-black text-lg shadow-2xl transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-3">
                     <i class="fa-solid {{ $isEdit ? 'fa-rotate' : 'fa-circle-check' }}"></i>

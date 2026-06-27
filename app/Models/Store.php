@@ -14,6 +14,7 @@ use App\Models\Accountant;
 use App\Models\Withdrawal;
 use App\Models\EmployeeDebt;
 use App\Models\StockMovement;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -37,11 +38,11 @@ class Store extends Model
         'commercial_registration',
         'bank_accounts',
         'invoice_terms',
-         'number_of_shifts',
-         'shift_1_start',
-         'shift_2_start',
-    'shift_3_start',
-     'force_shift_closure'
+        'number_of_shifts',
+        'shift_1_start',
+        'shift_2_start',
+        'shift_3_start',
+        'force_shift_closure'
     ];
 
     /**
@@ -49,6 +50,8 @@ class Store extends Model
      */
     protected $casts = [
         'bank_accounts' => 'array', // ليتعامل مع الحسابات كـ Array بدلاً من نص
+        'force_shift_closure' => 'boolean',
+        'number_of_shifts' => 'integer',
     ];
 
     /*
@@ -117,6 +120,69 @@ public function invoices()
     public function isActive()
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * أوقات بداية الشفتات المفعلة مرتبة زمنياً.
+     */
+    public function shiftStartTimes(): array
+    {
+        $starts = [];
+        $shiftCount = max(1, min(3, (int) ($this->number_of_shifts ?: 1)));
+
+        for ($i = 1; $i <= $shiftCount; $i++) {
+            $value = $this->getAttribute("shift_{$i}_start");
+
+            if ($value) {
+                $starts[] = substr((string) $value, 0, 5);
+            }
+        }
+
+        if (empty($starts)) {
+            $starts[] = '00:00';
+        }
+
+        $starts = array_values(array_unique($starts));
+        sort($starts);
+
+        return $starts;
+    }
+
+    /**
+     * يرجع حدود الشفت المجدول الحالي اعتماداً على إعدادات المتجر.
+     */
+    public function scheduledShiftWindow(?Carbon $reference = null): array
+    {
+        $reference = ($reference ?: now())->copy();
+        $starts = $this->shiftStartTimes();
+        $currentStart = null;
+        $nextStart = null;
+
+        foreach ($starts as $index => $time) {
+            $candidate = $reference->copy()->setTimeFromTimeString($time);
+
+            if ($candidate->lte($reference)) {
+                $currentStart = $candidate;
+                $nextTime = $starts[$index + 1] ?? $starts[0];
+                $nextStart = $reference->copy()->setTimeFromTimeString($nextTime);
+
+                if ($nextStart->lte($currentStart)) {
+                    $nextStart->addDay();
+                }
+            }
+        }
+
+        if (!$currentStart) {
+            $currentStart = $reference->copy()->subDay()->setTimeFromTimeString(end($starts));
+            $nextStart = $reference->copy()->setTimeFromTimeString($starts[0]);
+        }
+
+        return [
+            'start' => $currentStart,
+            'end' => $nextStart,
+            'label' => 'من ' . $currentStart->format('h:i A') . ' إلى ' . $nextStart->format('h:i A'),
+            'is_overdue' => $reference->gt($nextStart),
+        ];
     }
 
     /**

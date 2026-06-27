@@ -25,6 +25,8 @@ class DashboardController extends Controller
     {
         $accountant = auth('accountant')->user();
         $storeId = $accountant->store_id;
+        $store = $accountant->store;
+        $scheduledShift = $store ? $store->scheduledShiftWindow(now()) : null;
         $lastBalance = null;
 
         try {
@@ -141,7 +143,7 @@ class DashboardController extends Controller
                 'shiftStatusMessage', 'salesEfficiency', 'cashFromCollections', 'cashSales',
                 'cardSales', 'totalCashInShift', 'quickStats', 'pendingCreditCount', 'lastBalance', 'accountant',
                 'creditCollections', 'collectedFromCurrentPeriod', 'collectedFromOldPeriod',
-                'shiftOperationDetails'
+                'shiftOperationDetails', 'scheduledShift'
             ));
 
         } catch (\Exception $e) {
